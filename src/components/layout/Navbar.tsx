@@ -1,33 +1,46 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Search, Heart, ShoppingBag, Menu, X } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { Container } from '@/components/ui/Container';
 import { MobileNav } from './MobileNav';
+import { MegaMenu } from './MegaMenu';
+import { SearchDrawer } from './SearchDrawer';
 
 const primaryLinks = [
-  { label: 'Shop', to: '/shop' },
   { label: 'Collections', to: '/collections' },
   { label: 'Journal', to: '/blog' },
   { label: 'About', to: '/about' },
 ];
 
 /**
- * Sticky top nav. Mega-menu content, live search drawer, and real cart/wishlist
- * counts land in Phase 2 (nav polish) and Phase 4 (state) respectively — this
- * is the structural shell every page renders inside of.
+ * Sticky top nav with a mega menu on "Shop" and a full search drawer.
+ * Cart/wishlist counts stay stubbed at 0 until Phase 4 wires the Zustand stores.
  */
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [megaMenuOpen, setMegaMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-stone-light/95 backdrop-blur border-b border-stone-dark">
+    <header className="relative sticky top-0 z-40 bg-stone-light/95 backdrop-blur border-b border-stone-dark">
       <Container className="flex items-center justify-between h-16">
         <Link to="/" aria-label="Folia home">
           <Logo />
         </Link>
 
         <nav aria-label="Primary" className="hidden md:flex items-center gap-8">
+          <button
+            type="button"
+            aria-expanded={megaMenuOpen}
+            onClick={() => setMegaMenuOpen((v) => !v)}
+            className={`flex items-center gap-1 text-sm font-medium transition-colors ${
+              megaMenuOpen ? 'text-pine' : 'text-ink-soft hover:text-pine'
+            }`}
+          >
+            Shop
+            <ChevronDown size={14} className={`transition-transform ${megaMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
           {primaryLinks.map((link) => (
             <NavLink
               key={link.to}
@@ -47,6 +60,7 @@ export function Navbar() {
           <button
             type="button"
             aria-label="Search"
+            onClick={() => setSearchOpen(true)}
             className="p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
           >
             <Search size={20} />
@@ -77,7 +91,13 @@ export function Navbar() {
         </div>
       </Container>
 
-      <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} links={primaryLinks} />
+      <MegaMenu open={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
+      <MobileNav
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        links={[{ label: 'Shop', to: '/shop' }, ...primaryLinks]}
+      />
+      <SearchDrawer open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   );
 }

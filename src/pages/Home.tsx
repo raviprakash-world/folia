@@ -2,14 +2,15 @@ import { Link } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
-import { Card } from '@/components/ui/Card';
 import { ArrowRight } from 'lucide-react';
+import { FeaturedCollections } from '@/components/home/FeaturedCollections';
+import { BestSellers } from '@/components/home/BestSellers';
+import { TrendingProducts } from '@/components/home/TrendingProducts';
+import { Benefits } from '@/components/home/Benefits';
+import { Testimonials } from '@/components/home/Testimonials';
+import { PromoBanners } from '@/components/home/PromoBanners';
+import { BlogPreview } from '@/components/home/BlogPreview';
 
-/**
- * Phase 1 placeholder — proves out the token system (color, type, radius,
- * shadow, the Tag signature element) end to end before Phase 2 builds the
- * real hero, carousels, and homepage sections on top of it.
- */
 export default function Home() {
   return (
     <>
@@ -28,7 +29,11 @@ export default function Home() {
               <Button variant="secondary" size="lg" icon={<ArrowRight size={18} />} iconPosition="right">
                 <Link to="/shop">Shop the collection</Link>
               </Button>
-              <Button variant="outline" size="lg" className="!text-stone-light !border-stone-light hover:!bg-stone-light hover:!text-pine">
+              <Button
+                variant="outline"
+                size="lg"
+                className="!text-stone-light !border-stone-light hover:!bg-stone-light hover:!text-pine"
+              >
                 <Link to="/about">Our approach</Link>
               </Button>
             </div>
@@ -41,31 +46,13 @@ export default function Home() {
         </Container>
       </section>
 
-      <Container className="py-20">
-        <div className="flex items-end justify-between mb-8">
-          <h2 className="font-display text-3xl font-semibold text-pine">Design system check</h2>
-          <span className="font-mono text-xs text-ink-soft uppercase tracking-wider">Phase 1</span>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            { name: 'Monstera Deliciosa', price: '$68', tone: 'ochre' as const, badge: 'Bestseller' },
-            { name: 'Ceramic Vessel — Ash', price: '$42', tone: 'rust' as const, badge: 'Sale' },
-            { name: 'Fiddle Leaf Fig', price: '$95', tone: 'pine' as const, badge: 'New' },
-          ].map((item) => (
-            <Card key={item.name} variant="raised" className="p-5">
-              <div className="aspect-square rounded-[var(--radius-control)] bg-stone-dark mb-4" />
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-medium text-ink">{item.name}</h3>
-                  <p className="font-mono text-sm text-ink-soft mt-1">{item.price}</p>
-                </div>
-                <Tag tone={item.tone}>{item.badge}</Tag>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </Container>
+      <FeaturedCollections />
+      <BestSellers />
+      <TrendingProducts />
+      <Benefits />
+      <Testimonials />
+      <PromoBanners />
+      <BlogPreview />
     </>
   );
 }

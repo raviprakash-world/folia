@@ -72,7 +72,7 @@ src/
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Scaffolding, Tailwind, design tokens, shared UI primitives, routing, layout | ✅ Done |
-| 2 | Homepage sections, full nav (mega menu, search drawer), footer polish | Not started |
+| 2 | Homepage sections, full nav (mega menu, search drawer), footer polish | ✅ Done |
 | 3 | Product listing (filters/sort/pagination), product detail, MSW mock API | Not started |
 | 4 | Cart, wishlist, Zustand stores, persistence | Not started |
 | 5 | Remaining pages, forms (RHF + Zod), mock auth | Not started |
@@ -80,6 +80,15 @@ src/
 
 Routes not yet built render a labeled placeholder stating which phase covers them,
 rather than a broken page — check `src/pages/` and `src/routes/index.tsx`.
+
+## Known issues (tracked, not fixed yet)
+
+- **Main bundle exceeds Vite's 500KB warning threshold** (~544KB / 172KB gzip).
+  `Navbar` lives in the non-lazy root `Layout`, and it pulls in `MegaMenu` and
+  `SearchDrawer`, which depend on `framer-motion` — so that dependency ends up
+  in the eager bundle instead of a route-split chunk. Real fix (manual chunk
+  splitting and/or lazy-loading the drawer content itself, not just routes)
+  is Phase 6 scope, not a one-line patch.
 
 ## Notes on scope vs. the original brief
 
