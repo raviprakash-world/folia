@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/*
+  Folia design tokens.
+  Palette named, not numbered — every color has a job, not a scale position.
+  See /src/styles/tokens.md for the rationale behind each choice.
+*/
+@theme {
+  /* Color */
+  --color-pine: #1f3329;
+  --color-pine-light: #2b4638;
+  --color-fern: #4b7259;
+  --color-fern-light: #6a9179;
+  --color-fern-dark: #395a44;
+  --color-stone: #edeae1;
+  --color-stone-light: #f6f4ee;
+  --color-stone-dark: #ded9cb;
+  --color-ink: #1b1b18;
+  --color-ink-soft: #55534c;
+  --color-ochre: #c08a34;
+  --color-ochre-light: #d9a555;
+  --color-rust: #a6553c;
+  --color-rust-light: #f3e2dc;
+
+  /* Type */
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Radius — controls stay tight, cards get soft corners, one circular exception (swatches) is set locally */
+  --radius-control: 6px;
+  --radius-card: 14px;
+  --radius-tag: 3px;
+
+  /* Shadow — warm-tinted, never pure black */
+  --shadow-soft: 0 1px 2px rgba(31, 51, 41, 0.06), 0 2px 8px rgba(31, 51, 41, 0.05);
+  --shadow-lifted: 0 4px 12px rgba(31, 51, 41, 0.08), 0 12px 32px rgba(31, 51, 41, 0.10);
+  --shadow-tag: 0 2px 4px rgba(31, 51, 41, 0.12);
+
+  /* Container widths */
+  --container-content: 1200px;
+  --container-narrow: 760px;
+
+  /* Breakpoints (Tailwind defaults kept; documented for reference) */
+  --breakpoint-xs: 30rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-stone);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  /* Visible keyboard focus everywhere — non-negotiable for a11y, never suppressed */
+  :focus-visible {
+    outline: 2px solid var(--color-fern);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    background: var(--color-pine);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0 0 var(--radius-control) 0;
+  }
+  .skip-link:focus {
+    left: 0;
+  }
+}
