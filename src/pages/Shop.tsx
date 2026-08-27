@@ -1,5 +1,10 @@
-import { PlaceholderPage } from '@/components/common/PlaceholderPage';
+import { ProductListing } from '@/components/product/ProductListing';
 
 export default function Shop() {
-  return <PlaceholderPage title="Shop" phase="Phase 3" description="Full product listing grid with filters, sorting, and pagination lands in Phase 3." />;
+  return (
+    <ProductListing
+      title="All plants & goods"
+      description="Every plant, vessel, and tool we carry — filter by category, price, or availability."
+    />
+  );
 }

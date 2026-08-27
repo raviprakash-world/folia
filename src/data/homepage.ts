@@ -1,29 +1,16 @@
-import type { Product } from '@/types/product';
+import { products } from '@/data/products';
 
 /**
- * Placeholder content for Phase 2. Shapes here (Product, category slugs, etc.)
- * are deliberately the same shapes Phase 3's MSW handlers will return, so
- * swapping this file for a TanStack Query hook later is a drop-in change,
- * not a rewrite.
+ * bestSellers/trending are now derived slices of the real catalog (src/data/products.ts)
+ * rather than hand-duplicated data — one source of truth, no drift between the
+ * homepage and the shop listing.
  */
 
-export const bestSellers: Product[] = [
-  { id: 'p1', slug: 'monstera-deliciosa', name: 'Monstera Deliciosa', price: 68, category: 'Plants', badge: 'Bestseller', rating: 4.8, reviewCount: 214 },
-  { id: 'p2', slug: 'fiddle-leaf-fig', name: 'Fiddle Leaf Fig', price: 95, category: 'Plants', rating: 4.6, reviewCount: 168 },
-  { id: 'p3', slug: 'ceramic-vessel-ash', name: 'Ceramic Vessel — Ash', price: 42, compareAtPrice: 54, category: 'Vessels', badge: 'Sale', rating: 4.9, reviewCount: 92 },
-  { id: 'p4', slug: 'snake-plant-laurentii', name: 'Snake Plant Laurentii', price: 38, category: 'Plants', rating: 4.7, reviewCount: 301 },
-  { id: 'p5', slug: 'woven-plant-basket', name: 'Woven Plant Basket', price: 56, category: 'Vessels', rating: 4.5, reviewCount: 74 },
-  { id: 'p6', slug: 'pothos-marble-queen', name: 'Pothos Marble Queen', price: 32, category: 'Plants', badge: 'New', rating: 4.8, reviewCount: 41 },
-];
+export const bestSellers = products.filter((p) => p.badge === 'Bestseller').slice(0, 6);
 
-export const trending: Product[] = [
-  { id: 'p7', slug: 'birds-nest-fern', name: "Bird's Nest Fern", price: 44, category: 'Plants', badge: 'New', rating: 4.6, reviewCount: 28 },
-  { id: 'p8', slug: 'stone-planter-round', name: 'Stone Planter — Round', price: 64, category: 'Vessels', rating: 4.7, reviewCount: 53 },
-  { id: 'p9', slug: 'calathea-orbifolia', name: 'Calathea Orbifolia', price: 58, category: 'Plants', rating: 4.4, reviewCount: 89, badge: 'Low stock' },
-  { id: 'p10', slug: 'brass-plant-mister', name: 'Brass Plant Mister', price: 28, category: 'Tools', rating: 4.9, reviewCount: 112 },
-  { id: 'p11', slug: 'zz-plant', name: 'ZZ Plant', price: 46, category: 'Plants', rating: 4.8, reviewCount: 176 },
-  { id: 'p12', slug: 'terracotta-pot-set', name: 'Terracotta Pot Set of 3', price: 36, category: 'Vessels', rating: 4.6, reviewCount: 64 },
-];
+export const trending = [...products]
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  .slice(0, 6);
 
 export const featuredCollections = [
   { slug: 'low-light-plants', name: 'Low-light Plants', description: 'For north-facing rooms and shadier corners.' },

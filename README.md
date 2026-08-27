@@ -73,7 +73,7 @@ src/
 |---|---|---|
 | 1 | Scaffolding, Tailwind, design tokens, shared UI primitives, routing, layout | ✅ Done |
 | 2 | Homepage sections, full nav (mega menu, search drawer), footer polish | ✅ Done |
-| 3 | Product listing (filters/sort/pagination), product detail, MSW mock API | Not started |
+| 3 | Product listing (filters/sort/pagination), product detail, MSW mock API | ✅ Done |
 | 4 | Cart, wishlist, Zustand stores, persistence | Not started |
 | 5 | Remaining pages, forms (RHF + Zod), mock auth | Not started |
 | 6 | Animation pass, performance, accessibility audit, SEO | Not started |
@@ -81,14 +81,38 @@ src/
 Routes not yet built render a labeled placeholder stating which phase covers them,
 rather than a broken page — check `src/pages/` and `src/routes/index.tsx`.
 
+## Mock backend
+
+`src/mocks/handlers.ts` defines the MSW-powered API: `/api/products` (filter,
+sort, paginate, search), `/api/products/:slug`, `/api/products/:slug/related`,
+`/api/categories`, `/api/collections/:slug`, `/api/reviews`. Backed by a
+generated 24-product catalog (`src/data/products.ts`, 72 reviews in
+`src/data/reviews.ts`) with an artificial 350ms delay so loading states are
+exercised, not just assumed to work.
+
+MSW only starts in dev (`src/mocks/index.ts` checks `import.meta.env.DEV`) and
+is fully tree-shaken out of the production bundle — verified by grepping
+`dist/` for `setupWorker` after a build. Swapping to a real backend later means
+changing `src/services/apiClient.ts`'s `baseURL` and deleting `src/mocks/` —
+nothing in components or hooks needs to change, since they only ever call the
+`src/services/` functions.
+
 ## Known issues (tracked, not fixed yet)
 
-- **Main bundle exceeds Vite's 500KB warning threshold** (~544KB / 172KB gzip).
-  `Navbar` lives in the non-lazy root `Layout`, and it pulls in `MegaMenu` and
-  `SearchDrawer`, which depend on `framer-motion` — so that dependency ends up
-  in the eager bundle instead of a route-split chunk. Real fix (manual chunk
-  splitting and/or lazy-loading the drawer content itself, not just routes)
-  is Phase 6 scope, not a one-line patch.
+- The Phase 2 handoff flagged the main bundle exceeding Vite's 500KB warning
+  threshold (framer-motion leaking into the eager `Layout` bundle). Phase 3's
+  route splitting on Shop/Category/ProductDetail spread enough weight into
+  lazy chunks that the warning is gone as of this build (461KB) — not because
+  the underlying cause was fixed, so re-check after Phase 4/5 add more routes.
+- Add-to-cart and the wishlist heart on the product detail page are fully
+  interactive (variant validation, quantity limits, disabled states) but
+  don't persist anywhere yet — that's Phase 4's Zustand store.
+- `Category.tsx` filters by `categorySlug` directly for real categories
+  (plants/vessels/tools), but curated collections (e.g. "gifting") that span
+  multiple categories currently just show framing copy over the full catalog
+  rather than a true cross-category filter — a real backend would resolve
+  that server-side; revisit if collections need to be genuinely curated
+  rather than category-aliased.
 
 ## Notes on scope vs. the original brief
 
