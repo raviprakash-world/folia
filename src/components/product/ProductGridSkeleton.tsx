@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/Card';
 
-export function ProductCardSkeleton() {
+function ProductCardSkeleton() {
   return (
     <Card variant="flat" className="p-4" aria-hidden="true">
       <div className="aspect-square rounded-[var(--radius-control)] bg-stone-dark animate-pulse mb-4" />

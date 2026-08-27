@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -36,9 +37,21 @@ export function Accordion({ items }: AccordionProps) {
                 />
               </button>
             </h3>
-            <div id={panelId} role="region" hidden={!open} className="pb-4 text-sm text-ink-soft">
-              {item.answer}
-            </div>
+            <AnimatePresence initial={false}>
+              {open && (
+                <motion.div
+                  id={panelId}
+                  role="region"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="overflow-hidden"
+                >
+                  <div className="pb-4 text-sm text-ink-soft">{item.answer}</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}

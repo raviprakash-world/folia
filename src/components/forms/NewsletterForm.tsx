@@ -1,35 +1,48 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { motion } from 'framer-motion';
 import { ArrowRight, Check } from 'lucide-react';
+import { subscribeToNewsletter, NewsletterError } from '@/services/newsletterService';
 import { newsletterSchema, type NewsletterFormValues } from '@/utils/validation';
 
 /**
- * No newsletter API exists yet (that's a Phase 3+ concern), so submission
- * resolves locally after validating. The validation itself is real — this
- * isn't a fake input waiting to be wired up later, only the network call is.
+ * Real MSW-backed submission (src/mocks/contactHandlers.ts), including
+ * duplicate-subscription handling — try "subscribed@example.com" to see it.
  */
 export function NewsletterForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    getValues,
     reset,
   } = useForm<NewsletterFormValues>({ resolver: zodResolver(newsletterSchema) });
 
   async function onSubmit() {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    setSubmitted(true);
-    reset();
+    setErrorMessage(null);
+    try {
+      await subscribeToNewsletter(getValues('email'));
+      setSubmitted(true);
+      reset();
+    } catch (error) {
+      setErrorMessage(error instanceof NewsletterError ? error.message : 'Something went wrong — try again.');
+    }
   }
 
   if (submitted) {
     return (
-      <p className="flex items-center gap-2 text-sm text-stone">
+      <motion.p
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="flex items-center gap-2 text-sm text-stone"
+      >
         <Check size={16} className="text-ochre" />
         You're on the list.
-      </p>
+      </motion.p>
     );
   }
 
@@ -49,8 +62,8 @@ export function NewsletterForm() {
           id="newsletter-email"
           type="email"
           placeholder="you@example.com"
-          aria-invalid={!!errors.email}
-          aria-describedby={errors.email ? 'newsletter-email-error' : undefined}
+          aria-invalid={!!errors.email || !!errorMessage}
+          aria-describedby={errors.email || errorMessage ? 'newsletter-email-error' : undefined}
           className="flex-1 min-w-0 rounded-[var(--radius-control)] bg-stone-light/10 border border-stone-light/20 px-3 py-2 text-sm text-stone placeholder:text-stone/40 focus:border-ochre transition-colors"
           {...register('email')}
         />
@@ -63,9 +76,9 @@ export function NewsletterForm() {
           <ArrowRight size={16} />
         </button>
       </div>
-      {errors.email && (
+      {(errors.email ?? errorMessage) && (
         <p id="newsletter-email-error" role="alert" className="text-xs text-rust-light">
-          {errors.email.message}
+          {errors.email?.message ?? errorMessage}
         </p>
       )}
     </form>

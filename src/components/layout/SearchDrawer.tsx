@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, X, Clock } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
@@ -14,6 +14,7 @@ interface SearchDrawerProps {
 const allProducts = [...bestSellers, ...trending];
 
 export function SearchDrawer({ open, onClose }: SearchDrawerProps) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [recent, setRecent] = useState(recentSearchesSeed);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +73,10 @@ export function SearchDrawer({ open, onClose }: SearchDrawerProps) {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
+                  if (!query.trim()) return;
                   commitSearch(query);
+                  void navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+                  handleClose();
                 }}
                 className="flex items-center gap-3 border-b-2 border-pine pb-3"
               >

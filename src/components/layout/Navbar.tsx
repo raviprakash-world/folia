@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Search, Heart, ShoppingBag, Menu, X, ChevronDown } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Menu, X, ChevronDown, User } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { Container } from '@/components/ui/Container';
 import { MobileNav } from './MobileNav';
 import { MegaMenu } from './MegaMenu';
 import { SearchDrawer } from './SearchDrawer';
+import { useCartItemCount } from '@/hooks/useCart';
+import { useWishlistCount } from '@/hooks/useWishlist';
+import { useCurrentUser } from '@/hooks/useAuth';
+import { useUIStore } from '@/store/uiStore';
 
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
@@ -13,14 +17,24 @@ const primaryLinks = [
   { label: 'About', to: '/about' },
 ];
 
-/**
- * Sticky top nav with a mega menu on "Shop" and a full search drawer.
- * Cart/wishlist counts stay stubbed at 0 until Phase 4 wires the Zustand stores.
- */
+function NavBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ochre text-pine text-[10px] font-mono font-medium">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+/** Sticky top nav with a mega menu on "Shop", a full search drawer, and live cart/wishlist counts. */
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [megaMenuOpen, setMegaMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const cartCount = useCartItemCount();
+  const wishlistCount = useWishlistCount();
+  const user = useCurrentUser();
+  const openCartDrawer = useUIStore((s) => s.openCartDrawer);
 
   return (
     <header className="relative sticky top-0 z-40 bg-stone-light/95 backdrop-blur border-b border-stone-dark">
@@ -57,6 +71,13 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-1">
+          <Link
+            to={user ? '/account' : '/account/login'}
+            aria-label={user ? `Account — ${user.firstName}` : 'Sign in'}
+            className="p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
+          >
+            <User size={20} />
+          </Link>
           <button
             type="button"
             aria-label="Search"
@@ -67,18 +88,21 @@ export function Navbar() {
           </button>
           <Link
             to="/wishlist"
-            aria-label="Wishlist"
-            className="p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
+            aria-label={`Wishlist${wishlistCount > 0 ? ` (${wishlistCount} items)` : ''}`}
+            className="relative p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
           >
             <Heart size={20} />
+            <NavBadge count={wishlistCount} />
           </Link>
-          <Link
-            to="/cart"
-            aria-label="Shopping bag"
+          <button
+            type="button"
+            aria-label={`Shopping bag${cartCount > 0 ? ` (${cartCount} items)` : ''}`}
+            onClick={openCartDrawer}
             className="relative p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
           >
             <ShoppingBag size={20} />
-          </Link>
+            <NavBadge count={cartCount} />
+          </button>
           <button
             type="button"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}

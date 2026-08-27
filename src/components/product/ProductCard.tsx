@@ -3,6 +3,7 @@ import { Star, Heart } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
 import { cn } from '@/utils/cn';
+import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
 import type { Product } from '@/types/product';
 
 interface ProductCardProps {
@@ -17,13 +18,10 @@ const badgeTone = {
   'Low stock': 'stone',
 } as const;
 
-/**
- * The wishlist heart is visual-only until Phase 4 wires the Zustand store —
- * it's part of the card's interaction design, not deferred to a later pass,
- * so the click target and layout are already correct.
- */
 export function ProductCard({ product, className }: ProductCardProps) {
   const onSale = product.compareAtPrice && product.compareAtPrice > product.price;
+  const wishlisted = useIsWishlisted(product.id);
+  const toggleWishlist = useToggleWishlist();
 
   return (
     <Card variant="raised" className={cn('p-4 group', className)}>
@@ -36,11 +34,20 @@ export function ProductCard({ product, className }: ProductCardProps) {
           )}
           <button
             type="button"
-            aria-label={`Add ${product.name} to wishlist`}
-            onClick={(e) => e.preventDefault()}
-            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-stone-light/90 text-ink-soft hover:text-rust transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            aria-label={wishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+            aria-pressed={wishlisted}
+            onClick={(e) => {
+              e.preventDefault();
+              toggleWishlist(product);
+            }}
+            className={cn(
+              'absolute top-3 right-3 z-10 p-2 rounded-full bg-stone-light/90 transition-colors',
+              wishlisted
+                ? 'text-rust opacity-100'
+                : 'text-ink-soft hover:text-rust opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+            )}
           >
-            <Heart size={16} />
+            <Heart size={16} className={wishlisted ? 'fill-rust' : ''} />
           </button>
         </div>
 

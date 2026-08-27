@@ -14,8 +14,12 @@ import { ProductCarousel } from '@/components/product/ProductCarousel';
 import { ShareButtons } from '@/components/product/ShareButtons';
 import { Accordion } from '@/components/common/Accordion';
 import { SectionHeading } from '@/components/common/SectionHeading';
+import { Breadcrumb } from '@/components/common/Breadcrumb';
 import { PageLoader } from '@/components/common/PageLoader';
 import { useProduct, useRelatedProducts } from '@/hooks/useProduct';
+import { useCartStore } from '@/store/cartStore';
+import { useUIStore } from '@/store/uiStore';
+import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
 import { cn } from '@/utils/cn';
 
 const badgeTone = { New: 'ochre', Sale: 'rust', Bestseller: 'pine', 'Low stock': 'stone' } as const;
@@ -30,11 +34,19 @@ export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data: product, isLoading, isError } = useProduct(slug);
   const { data: related } = useRelatedProducts(slug);
+  const addCartItem = useCartStore((s) => s.addItem);
+  const openCartDrawer = useUIStore((s) => s.openCartDrawer);
 
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [wishlisted, setWishlisted] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [stockNotice, setStockNotice] = useState<string | null>(null);
+
+  // Hooks must run unconditionally, so the wishlist toggle is wired with a
+  // safe fallback id — it's never actually invoked before `product` exists,
+  // since the button that calls it only renders once product data has loaded.
+  const wishlisted = useIsWishlisted(product?.id ?? '');
+  const toggleWishlist = useToggleWishlist();
 
   if (isLoading) return <PageLoader />;
 
@@ -51,25 +63,38 @@ export default function ProductDetail() {
 
   const onSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const variantBlocksAdd = product.variants.length > 0 && !selectedVariant;
+  const selectedVariantData = product.variants.find((v) => v.id === selectedVariant) ?? null;
+  const currentProduct = product; // narrowed non-null binding, safe to use inside the closure below
 
   function handleAddToCart() {
-    // Real cart state (Zustand + persistence) lands in Phase 4. This confirms
-    // the interaction and validates variant selection now, so the UI doesn't
-    // need rework once the store exists — only this handler's body changes.
     if (variantBlocksAdd) return;
+    const { clampedToMax } = addCartItem({
+      productId: currentProduct.id,
+      slug: currentProduct.slug,
+      name: currentProduct.name,
+      categorySlug: currentProduct.categorySlug,
+      price: currentProduct.price,
+      variantId: selectedVariantData?.id ?? null,
+      variantLabel: selectedVariantData?.label ?? null,
+      quantity,
+      maxQuantity: currentProduct.stockCount,
+    });
+
+    setStockNotice(clampedToMax ? "Adjusted to what's in stock — you already had some in your cart." : null);
     setJustAdded(true);
+    openCartDrawer();
     setTimeout(() => setJustAdded(false), 2000);
   }
 
   return (
     <Container className="py-12">
-      <nav aria-label="Breadcrumb" className="text-xs text-ink-soft mb-8 flex items-center gap-1.5">
-        <Link to="/shop" className="hover:text-pine">Shop</Link>
-        <span>/</span>
-        <Link to={`/collections/${product.categorySlug}`} className="hover:text-pine">{product.category}</Link>
-        <span>/</span>
-        <span className="text-ink">{product.name}</span>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: 'Shop', to: '/shop' },
+          { label: product.category, to: `/collections/${product.categorySlug}` },
+          { label: product.name },
+        ]}
+      />
 
       <div className="grid md:grid-cols-2 gap-12">
         <ProductGallery productName={product.name} />
@@ -110,7 +135,10 @@ export default function ProductDetail() {
             <VariantSelector
               variants={product.variants}
               selectedId={selectedVariant}
-              onSelect={setSelectedVariant}
+              onSelect={(id) => {
+                setSelectedVariant(id);
+                setStockNotice(null);
+              }}
             />
 
             <div className="flex items-center gap-4">
@@ -133,9 +161,9 @@ export default function ProductDetail() {
               </Button>
               <button
                 type="button"
-                onClick={() => setWishlisted((v) => !v)}
+                onClick={() => toggleWishlist(product)}
                 aria-pressed={wishlisted}
-                aria-label="Add to wishlist"
+                aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                 className={cn(
                   'p-3.5 rounded-[var(--radius-control)] border transition-colors',
                   wishlisted ? 'border-rust text-rust bg-rust-light' : 'border-stone-dark text-ink-soft hover:text-rust'
@@ -147,6 +175,7 @@ export default function ProductDetail() {
             {variantBlocksAdd && (
               <p className="text-xs text-rust -mt-2">Select a {product.variants.some((v) => v.swatch) ? 'color' : 'size'} first.</p>
             )}
+            {stockNotice && <p className="text-xs text-rust -mt-2">{stockNotice}</p>}
 
             <ShareButtons title={product.name} url={typeof window !== 'undefined' ? window.location.href : ''} />
           </div>

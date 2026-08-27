@@ -2,6 +2,8 @@ import { http, HttpResponse, delay } from 'msw';
 import { products } from '@/data/products';
 import { categories, collections } from '@/data/categories';
 import { reviews } from '@/data/reviews';
+import { authHandlers } from './authHandlers';
+import { contactHandlers } from './contactHandlers';
 import type { ProductQueryResult, SortKey } from '@/types/product';
 
 const API_DELAY_MS = 350;
@@ -99,4 +101,7 @@ export const handlers = [
     const filtered = productId ? reviews.filter((r) => r.productId === productId) : reviews;
     return HttpResponse.json(filtered);
   }),
+
+  ...authHandlers,
+  ...contactHandlers,
 ];

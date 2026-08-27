@@ -25,8 +25,10 @@ const columns = [
     heading: 'Support',
     links: [
       { label: 'FAQ', to: '/faq' },
-      { label: 'Shipping & returns', to: '/policies/shipping' },
+      { label: 'Shipping policy', to: '/policies/shipping' },
+      { label: 'Returns', to: '/policies/returns' },
       { label: 'Privacy policy', to: '/policies/privacy' },
+      { label: 'Terms & conditions', to: '/policies/terms' },
     ],
   },
 ];
