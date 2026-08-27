@@ -1,8 +1,10 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { PageLoader } from '@/components/common/PageLoader';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { AccountLayout } from '@/components/account/AccountLayout';
+import { CheckoutLayout } from '@/components/checkout/CheckoutLayout';
 
 // Every route component is lazy-loaded so the initial bundle only pays for
 // the layout shell + whichever page was requested (route-level code splitting).
@@ -19,12 +21,28 @@ const BlogList = lazy(() => import('@/pages/BlogList'));
 const BlogDetail = lazy(() => import('@/pages/BlogDetail'));
 const FAQ = lazy(() => import('@/pages/FAQ'));
 const Policy = lazy(() => import('@/pages/Policy'));
-const Account = lazy(() => import('@/pages/Account'));
 const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
+
+// Account dashboard
+const AccountOverview = lazy(() => import('@/pages/AccountOverview'));
+const AccountProfile = lazy(() => import('@/pages/AccountProfile'));
+const AccountAddresses = lazy(() => import('@/pages/AccountAddresses'));
+const AccountOrders = lazy(() => import('@/pages/AccountOrders'));
+const AccountOrderDetail = lazy(() => import('@/pages/AccountOrderDetail'));
+const AccountSettings = lazy(() => import('@/pages/AccountSettings'));
+const AccountSecurity = lazy(() => import('@/pages/AccountSecurity'));
+const AccountNotifications = lazy(() => import('@/pages/AccountNotifications'));
+
+// Checkout
+const CheckoutShipping = lazy(() => import('@/pages/CheckoutShipping'));
+const CheckoutDelivery = lazy(() => import('@/pages/CheckoutDelivery'));
+const CheckoutPayment = lazy(() => import('@/pages/CheckoutPayment'));
+const CheckoutReview = lazy(() => import('@/pages/CheckoutReview'));
+const OrderConfirmation = lazy(() => import('@/pages/OrderConfirmation'));
 
 function withSuspense(node: React.ReactNode) {
   return <Suspense fallback={<PageLoader />}>{node}</Suspense>;
@@ -54,7 +72,34 @@ export const router = createBrowserRouter([
       { path: 'account/reset-password', element: withSuspense(<ResetPassword />) },
       {
         element: <ProtectedRoute />,
-        children: [{ path: 'account', element: withSuspense(<Account />) }],
+        children: [
+          {
+            path: 'account',
+            element: <AccountLayout />,
+            children: [
+              { index: true, element: withSuspense(<AccountOverview />) },
+              { path: 'profile', element: withSuspense(<AccountProfile />) },
+              { path: 'addresses', element: withSuspense(<AccountAddresses />) },
+              { path: 'orders', element: withSuspense(<AccountOrders />) },
+              { path: 'orders/:id', element: withSuspense(<AccountOrderDetail />) },
+              { path: 'settings', element: withSuspense(<AccountSettings />) },
+              { path: 'security', element: withSuspense(<AccountSecurity />) },
+              { path: 'notifications', element: withSuspense(<AccountNotifications />) },
+            ],
+          },
+          {
+            path: 'checkout',
+            element: <CheckoutLayout />,
+            children: [
+              { index: true, element: <Navigate to="/checkout/shipping" replace /> },
+              { path: 'shipping', element: withSuspense(<CheckoutShipping />) },
+              { path: 'delivery', element: withSuspense(<CheckoutDelivery />) },
+              { path: 'payment', element: withSuspense(<CheckoutPayment />) },
+              { path: 'review', element: withSuspense(<CheckoutReview />) },
+            ],
+          },
+          { path: 'checkout/confirmation/:orderId', element: withSuspense(<OrderConfirmation />) },
+        ],
       },
       { path: '*', element: withSuspense(<NotFound />) },
     ],

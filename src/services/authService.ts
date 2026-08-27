@@ -62,3 +62,29 @@ export async function resetPassword(token: string, password: string): Promise<vo
     throw new AuthError(extractApiErrorMessage(error, 'That reset link is invalid or has expired.'));
   }
 }
+
+export async function changePassword(token: string, currentPassword: string, newPassword: string): Promise<void> {
+  try {
+    await apiClient.post(
+      '/auth/change-password',
+      { currentPassword, newPassword },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  } catch (error) {
+    throw new AuthError(extractApiErrorMessage(error, 'Something went wrong changing your password.'));
+  }
+}
+
+export async function updateProfile(
+  token: string,
+  input: { firstName: string; lastName: string; email: string }
+): Promise<User> {
+  try {
+    const { data } = await apiClient.put<User>('/auth/me', input, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch (error) {
+    throw new AuthError(extractApiErrorMessage(error, 'Something went wrong updating your profile.'));
+  }
+}

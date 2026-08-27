@@ -16,6 +16,13 @@ function toPublicUser(user: SeedUser): User {
   return { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email };
 }
 
+function resolveUserFromAuthHeader(request: Request): SeedUser | undefined {
+  const authHeader = request.headers.get('Authorization');
+  const token = authHeader?.replace('Bearer ', '');
+  const payload = token ? decodeFakeToken(token) : null;
+  return payload ? users.find((u) => u.id === payload.sub) : undefined;
+}
+
 interface LoginBody {
   email: string;
   password: string;
@@ -35,6 +42,17 @@ interface ForgotPasswordBody {
 interface ResetPasswordBody {
   token: string;
   password: string;
+}
+
+interface ChangePasswordBody {
+  currentPassword: string;
+  newPassword: string;
+}
+
+interface UpdateProfileBody {
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
 export const authHandlers = [
@@ -80,10 +98,7 @@ export const authHandlers = [
 
   http.get('/api/auth/me', async ({ request }) => {
     await delay(200);
-    const authHeader = request.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    const payload = token ? decodeFakeToken(token) : null;
-    const user = payload ? users.find((u) => u.id === payload.sub) : undefined;
+    const user = resolveUserFromAuthHeader(request);
 
     if (!user) {
       return HttpResponse.json({ message: 'Not authenticated.' }, { status: 401 });
@@ -123,5 +138,44 @@ export const authHandlers = [
     resetTokens.delete(body.token);
 
     return HttpResponse.json({ ok: true });
+  }),
+
+  // Distinct from /reset-password: this requires an active session (Bearer
+  // token) and the person's current password, rather than a mailed token —
+  // a materially different flow, not a duplicate of the same endpoint.
+  http.post('/api/auth/change-password', async ({ request }) => {
+    await delay(AUTH_DELAY_MS);
+    const user = resolveUserFromAuthHeader(request);
+    if (!user) {
+      return HttpResponse.json({ message: 'Not authenticated.' }, { status: 401 });
+    }
+
+    const body = (await request.json()) as ChangePasswordBody;
+    if (user.password !== body.currentPassword) {
+      return HttpResponse.json({ message: 'Current password is incorrect.' }, { status: 401 });
+    }
+
+    user.password = body.newPassword;
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.put('/api/auth/me', async ({ request }) => {
+    await delay(AUTH_DELAY_MS);
+    const user = resolveUserFromAuthHeader(request);
+    if (!user) {
+      return HttpResponse.json({ message: 'Not authenticated.' }, { status: 401 });
+    }
+
+    const body = (await request.json()) as UpdateProfileBody;
+    const emailTaken = users.some((u) => u.id !== user.id && u.email.toLowerCase() === body.email.toLowerCase());
+    if (emailTaken) {
+      return HttpResponse.json({ message: 'Another account already uses that email.' }, { status: 409 });
+    }
+
+    user.firstName = body.firstName;
+    user.lastName = body.lastName;
+    user.email = body.email;
+
+    return HttpResponse.json(toPublicUser(user));
   }),
 ];

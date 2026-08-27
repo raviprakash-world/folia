@@ -4,6 +4,7 @@ import { categories, collections } from '@/data/categories';
 import { reviews } from '@/data/reviews';
 import { authHandlers } from './authHandlers';
 import { contactHandlers } from './contactHandlers';
+import { addressHandlers } from './addressHandlers';
 import type { ProductQueryResult, SortKey } from '@/types/product';
 
 const API_DELAY_MS = 350;
@@ -104,4 +105,5 @@ export const handlers = [
 
   ...authHandlers,
   ...contactHandlers,
+  ...addressHandlers,
 ];

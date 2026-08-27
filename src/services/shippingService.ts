@@ -1,3 +1,5 @@
+import { isFarRegion } from '@/utils/region';
+
 const ESTIMATE_DELAY_MS = 450;
 const FREE_SHIPPING_THRESHOLD = 75;
 
@@ -10,9 +12,11 @@ export interface ShippingRate {
 
 /**
  * Cost is a flat rate keyed off the ZIP's first digit as a rough US-region
- * proxy, unless the order already clears the free-shipping threshold. A real
- * implementation would call a carrier rate API with package weight/dims —
- * that's out of scope for a portfolio mock backend.
+ * proxy (src/utils/region.ts — shared with the checkout delivery step and
+ * address book, so this heuristic exists in exactly one place), unless the
+ * order already clears the free-shipping threshold. A real implementation
+ * would call a carrier rate API with package weight/dims — that's out of
+ * scope for a portfolio mock backend.
  */
 export async function estimateShippingRate(zip: string, subtotal: number): Promise<ShippingRate> {
   await new Promise((resolve) => setTimeout(resolve, ESTIMATE_DELAY_MS));
@@ -25,10 +29,9 @@ export async function estimateShippingRate(zip: string, subtotal: number): Promi
     return { cost: 0, etaDays: '3–5 business days' };
   }
 
-  const firstDigit = Number(zip.charAt(0));
-  const isFarRegion = firstDigit <= 2 || firstDigit >= 8;
+  const farRegion = isFarRegion(zip);
   return {
-    cost: isFarRegion ? 9.5 : 6.5,
-    etaDays: isFarRegion ? '4–6 business days' : '2–4 business days',
+    cost: farRegion ? 9.5 : 6.5,
+    etaDays: farRegion ? '4–6 business days' : '2–4 business days',
   };
 }

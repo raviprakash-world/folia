@@ -18,6 +18,8 @@ interface AuthState {
   register: (input: { firstName: string; lastName: string; email: string; password: string }) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  updateProfile: (input: { firstName: string; lastName: string; email: string }) => Promise<boolean>;
   clearError: () => void;
   setHasHydrated: (value: boolean) => void;
 }
@@ -85,6 +87,34 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      changePassword: async (currentPassword, newPassword) => {
+        const { token } = get();
+        if (!token) return false;
+        set({ status: 'pending', error: null });
+        try {
+          await authService.changePassword(token, currentPassword, newPassword);
+          set({ status: 'idle', error: null });
+          return true;
+        } catch (error) {
+          set({ status: 'error', error: messageFrom(error, 'Something went wrong changing your password.') });
+          return false;
+        }
+      },
+
+      updateProfile: async (input) => {
+        const { token } = get();
+        if (!token) return false;
+        set({ status: 'pending', error: null });
+        try {
+          const user = await authService.updateProfile(token, input);
+          set({ user, status: 'idle', error: null });
+          return true;
+        } catch (error) {
+          set({ status: 'error', error: messageFrom(error, 'Something went wrong updating your profile.') });
+          return false;
+        }
+      },
 
       setHasHydrated: (value) => set({ hasHydrated: value }),
     }),

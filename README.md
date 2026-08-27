@@ -84,11 +84,14 @@ src/
 | 3 | Product listing (filters/sort/pagination), product detail, MSW mock API | ✅ Done |
 | 4 | Cart, wishlist, Zustand stores, persistence | ✅ Done |
 | 5 | Static pages, forms (RHF + Zod), mock authentication, blog, FAQ | ✅ Done |
-| 6 | Animation pass, performance, accessibility audit, SEO | Not started |
+| 6 | Account dashboard, address book, full checkout flow, orders | ✅ Done |
+| 7 | Animation pass, performance, accessibility audit, SEO | Not started |
 
 Every route now renders real content — no placeholder pages remain anywhere
-in the app (see the Phase 5 changelog at the bottom of this file for what
-that took).
+in the app (see the Phase 5 and Phase 6 changelogs at the bottom of this
+file for what each phase took). Phase 6's scope was redefined mid-project
+from the originally-planned "animation/perf/SEO" pass (now Phase 7) to
+account/checkout, since that's the larger functional gap.
 
 ## Mock backend
 
@@ -237,7 +240,66 @@ section, so the improvement benefits both call sites, not just the new one.
   product set server-side; building that mapping into the mock catalog
   wasn't worth the scope for a demo collections page.
 
-## Notes on scope vs. the original brief
+## Account, addresses & checkout
+
+Three different persistence strategies, applied deliberately per domain
+rather than one pattern forced onto everything:
+
+- **Addresses** (`src/store/addressStore.ts`) are MSW-backed
+  (`src/mocks/addressHandlers.ts` — full CRUD, server-side default-flag
+  exclusivity, auto-promotion of a new default when the current one is
+  deleted) *plus* a Zustand `persist` cache for instant paint. Unlike
+  `authStore`'s `refreshSession` (which distrusts a stale token on purpose),
+  the address cache is simply overwritten by the server's response on
+  load — addresses aren't security-sensitive, so there's no reason to
+  treat a stale local copy with suspicion, just replace it.
+- **Orders** (`src/store/orderStore.ts`) are pure client-side Zustand +
+  `persist`, the same pattern as cart/wishlist — generated locally at
+  checkout, never fetched from a backend, since you didn't ask for an
+  orders API and an order is naturally a client-side artifact of a
+  completed checkout.
+- **Checkout flow state** (`src/store/checkoutStore.ts`) is deliberately
+  **not** persisted. A hard refresh mid-checkout restarts the flow — real
+  checkouts behave the same way, and this guarantees no payment detail,
+  even a masked one, ever touches `localStorage`.
+
+**Checkout requires login; browsing doesn't.** `/checkout/*` reuses the
+exact same `ProtectedRoute` that guards `/account` — a guest gets redirected
+to `/account/login` with a return path, the identical mechanism Phase 5
+already built for the dashboard. Cart, wishlist, and product browsing remain
+fully guest-accessible (verified: `cartStore`/`wishlistStore` have zero
+imports from anywhere in the auth domain).
+
+**No duplicate shipping-cost logic.** The cart's ad-hoc ZIP shipping
+estimate (Phase 4) and checkout's structured Delivery step both need a
+"how far is this postal code" heuristic. Extracted into
+`src/utils/region.ts` (`isFarRegion`, `isValidPostalCode`) and imported by
+both `shippingService.ts` and the new `deliveryService.ts` — one heuristic,
+two consumers, verified byte-identical behavior before/after the extraction.
+
+**Payment is mock, and the failure/retry path is genuinely reachable, not
+theoretical.** `src/services/paymentService.ts` declines ~15% of
+card/UPI/net-banking payments on purpose (same reasoning as Phase 5's
+contact-form failure rate) — Cash on Delivery and Wallet always succeed,
+since neither involves real-time third-party authorization in a real
+system either. No full card number or CVV is ever stored anywhere, even
+transiently in a Zustand store — payment forms process locally and only
+the *masked* result (`"Visa •••• 4242"`, a transaction ID) ever reaches
+`checkoutStore` or a persisted `Order`.
+
+**"Download Invoice (mock PDF)"** is a real, honestly-labeled `.txt`
+download (`src/utils/invoice.ts`), not a fake `.pdf` — adding a PDF-generation
+library would mean a new dependency outside this project's established
+stack, so the UI says "mock" rather than silently misnaming a text file.
+
+**Address Book, Checkout's shipping step, and the Delivery step all reuse
+the same components** — `AddressCard` and `AddressForm` serve both the
+account dashboard's full CRUD and checkout's address-selection UI with zero
+duplication; `OrderSummary` renders the not-yet-placed Review preview, the
+Order Confirmation page, and the Order Detail page from the same `Order`
+shape.
+
+
 
 This project takes inspiration from the *feature richness* of modern premium
 plant/home-décor e-commerce sites, not from any specific company's design,
@@ -313,3 +375,78 @@ not just a grep for the word "TODO" — zero orphaned files and zero
 genuinely dead exports (the handful of type-only exports that remain
 unimported elsewhere are self-documenting domain types with no runtime
 cost, consumed within their own file; left in deliberately, not missed).
+
+## Changelog — Phase 6
+
+**Account dashboard** replaces Phase 5's placeholder: `AccountLayout`
+(desktop sidebar, mobile pill nav, breadcrumbs, animated route
+transitions) wraps Overview (real stats from actual stores, not fake
+numbers), My Profile (edit name/email), Address Book, Orders, Settings,
+Security, and Notifications. Wishlist stays a link out to its existing
+top-level page rather than being duplicated inside the dashboard shell.
+
+**Address Book**: full CRUD exactly per spec —
+`GET/POST/PUT/DELETE /api/addresses`, `Address` model matching the given
+interface field-for-field (plus a `label` nickname field, since the
+feature list explicitly asked for one beyond the literal interface).
+Default shipping/billing exclusivity enforced server-side. Search, PIN/
+postal-code validation (country-aware, 5 countries), and a mock delivery-
+availability check are all real, working features — not stubs.
+
+**Checkout flow**: Cart → Shipping → Delivery → Payment → Review →
+Confirmation, each step with back navigation, validation, loading state,
+and error state, plus a persistent progress stepper. Delivery offers
+Standard/Express/Same-Day/Pickup with real cost/eta, gated by a mock
+per-address availability check. Payment supports Credit Card, Debit Card,
+UPI, Net Banking, Wallet, and Cash on Delivery, including saved (mock)
+cards, real client-side validation, and a genuinely reachable decline/retry
+path — not just success. Order IDs are realistic (`FOL-YYYYMMDD-####`).
+
+**Order placement & confirmation**: a full `Order` object (items, every
+cost line, both addresses, delivery method, payment summary) is persisted
+on placement. The confirmation page has a real spring-animated success
+state, reuses `OrderSummary` and the existing `ShareButtons` component
+as-is, and offers a real JSON-backed mock invoice download.
+
+**Reused, not duplicated**: `AddressCard`/`AddressForm` (address book +
+checkout's address step), `Modal` (address delete confirm — same pattern
+as Phase 5's logout confirm), `OrderSummary` (Review preview, Confirmation,
+Order Detail — one component, three call sites), the extracted
+`isFarRegion` heuristic (cart's shipping estimate + checkout's delivery
+availability), `resetPasswordSchema`'s base fields (extracted into a
+shared `passwordFieldsSchema` so the new authenticated change-password
+flow doesn't duplicate the password-strength rule — fixed a first draft
+that reached into zod internals to avoid this duplication, which was the
+wrong way to reuse it).
+
+**Real bugs caught and fixed properly, not routed around**:
+- `AccountSidebar.tsx` exported a non-component constant alongside its
+  component, tripping `react-refresh` — fixed by extracting
+  `accountNavItems` to its own file, the same fix pattern as every prior
+  phase's version of this issue.
+- `AddressForm.tsx`'s use of React Hook Form's `watch()` tripped a React
+  Compiler memoization warning — fixed with RHF's `useWatch` hook, the
+  correct API for this, after confirming no other file in the codebase
+  had the same pattern needing the same fix.
+- `CheckoutDelivery.tsx` called `setState` synchronously inside a
+  `useEffect` body (same rule Phase 2's `SearchDrawer` fix caught) —
+  restructured to derive `loading`/`error`/`availability` from a single
+  result object keyed by postal code, which also fixed a latent race
+  condition (a slow response for an old address could no longer overwrite
+  a newer one).
+- Two hooks (`useDefaultShippingAddress`, `useDefaultBillingAddress`) were
+  built but never called anywhere — the same "wired but not connected"
+  pattern Phase 5 caught with `fetchCurrentUser`. Fixed by using them in
+  `CheckoutShipping.tsx` to replace inline duplicate default-lookup logic,
+  not by deleting them.
+
+**Verification**: `npx tsc -b`, `eslint . --max-warnings 0`, and
+`npm run build` all pass clean throughout — checkpointed after every
+major batch of work, not just once at the end. Re-ran Phase 5's full
+dead-code checklist (`TODO`/`FIXME`, `console.log`, `@ts-ignore`/
+`@ts-expect-error`, real `any` usage, full export-reference scan) against
+the entire codebase, not just the new files. Confirmed explicitly that
+guest shopping remains fully independent of the new auth-gated checkout
+(cart/wishlist stores have zero imports from the auth domain) and that
+the main JS bundle (464KB) stays under Vite's warning threshold despite
+the scope added this phase.

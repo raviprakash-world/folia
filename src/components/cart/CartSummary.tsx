@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Info } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { CouponInput } from './CouponInput';
 import { ShippingEstimator } from './ShippingEstimator';
@@ -14,7 +13,6 @@ interface CartSummaryProps {
 export function CartSummary({ showCheckoutButton = true }: CartSummaryProps) {
   const { subtotal, discount, shipping, tax, total } = useCartTotals();
   const shippingZip = useCartStore((s) => s.shippingZip);
-  const [showCheckoutNote, setShowCheckoutNote] = useState(false);
 
   return (
     <div className="flex flex-col gap-5">
@@ -54,19 +52,9 @@ export function CartSummary({ showCheckoutButton = true }: CartSummaryProps) {
       </dl>
 
       {showCheckoutButton && (
-        <div>
-          <Button variant="primary" size="lg" className="w-full" onClick={() => setShowCheckoutNote(true)}>
-            Proceed to checkout
-          </Button>
-          {showCheckoutNote && (
-            <p className="flex gap-2 text-xs text-ink-soft mt-3 leading-relaxed">
-              <Info size={14} className="shrink-0 mt-0.5" />
-              This is a portfolio project — checkout isn't connected to a payment
-              processor. In a production build, this would move to address and
-              payment collection.
-            </p>
-          )}
-        </div>
+        <Button variant="primary" size="lg" className="w-full">
+          <Link to="/checkout/shipping">Proceed to checkout</Link>
+        </Button>
       )}
     </div>
   );
