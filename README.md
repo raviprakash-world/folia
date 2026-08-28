@@ -19,6 +19,7 @@ docker-compose.yml Postgres + Redis + api, wired for local/production use
 
 ## Getting started
 
+
 ```bash
 npm install                          # installs all workspaces
 cp .env.example .env                 # for docker-compose
