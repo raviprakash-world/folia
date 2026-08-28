@@ -9,3 +9,14 @@ export function generateOrderId(date: Date = new Date()): string {
 export function generateTransactionId(): string {
   return `txn_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
+
+export function generateInvoiceNumber(orderId: string): string {
+  // Deterministic from the order id — same order always gets the same invoice number.
+  let hash = 0;
+  for (let i = 0; i < orderId.length; i++) {
+    hash = (hash << 5) - hash + orderId.charCodeAt(i);
+    hash |= 0;
+  }
+  const digits = String(Math.abs(hash)).slice(0, 6).padStart(6, '0');
+  return `INV-${digits}`;
+}

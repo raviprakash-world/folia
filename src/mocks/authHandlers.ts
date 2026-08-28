@@ -13,7 +13,14 @@ const users: SeedUser[] = [...seedUsers];
 const resetTokens = new Map<string, string>(); // token -> email
 
 function toPublicUser(user: SeedUser): User {
-  return { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email };
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    phone: user.phone,
+    avatarUrl: user.avatarUrl,
+  };
 }
 
 function resolveUserFromAuthHeader(request: Request): SeedUser | undefined {
@@ -53,6 +60,8 @@ interface UpdateProfileBody {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
+  avatarUrl?: string;
 }
 
 export const authHandlers = [
@@ -175,6 +184,8 @@ export const authHandlers = [
     user.firstName = body.firstName;
     user.lastName = body.lastName;
     user.email = body.email;
+    user.phone = body.phone;
+    user.avatarUrl = body.avatarUrl;
 
     return HttpResponse.json(toPublicUser(user));
   }),

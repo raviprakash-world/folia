@@ -77,7 +77,7 @@ export async function changePassword(token: string, currentPassword: string, new
 
 export async function updateProfile(
   token: string,
-  input: { firstName: string; lastName: string; email: string }
+  input: { firstName: string; lastName: string; email: string; phone?: string; avatarUrl?: string }
 ): Promise<User> {
   try {
     const { data } = await apiClient.put<User>('/auth/me', input, {

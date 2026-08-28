@@ -11,7 +11,12 @@ import { submitContactForm } from '@/services/contactService';
 import { contactSchema } from '@/utils/validation';
 import type { ContactFormValues } from '@/utils/validation';
 
-export function ContactForm() {
+interface ContactFormProps {
+  defaultSubject?: string;
+  defaultMessage?: string;
+}
+
+export function ContactForm({ defaultSubject, defaultMessage }: ContactFormProps) {
   const [submitState, setSubmitState] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -20,7 +25,10 @@ export function ContactForm() {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<ContactFormValues>({ resolver: zodResolver(contactSchema) });
+  } = useForm<ContactFormValues>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: { subject: defaultSubject, message: defaultMessage },
+  });
 
   async function onSubmit(values: ContactFormValues) {
     setSubmitState('idle');

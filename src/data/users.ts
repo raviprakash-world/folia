@@ -3,6 +3,8 @@ export interface SeedUser {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
+  avatarUrl?: string;
   /** Plain text on purpose — this is a mock backend, not a real credential store. */
   password: string;
 }

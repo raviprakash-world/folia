@@ -48,6 +48,7 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
       </div>
 
       <p className="text-sm text-ink-soft">{address.fullName}</p>
+      {address.companyName && <p className="text-xs text-ink-soft/80">{address.companyName}</p>}
       <p className="text-sm text-ink-soft">
         {address.addressLine1}
         {address.addressLine2 ? `, ${address.addressLine2}` : ''}
@@ -57,6 +58,12 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
         {address.city}, {address.state} {address.postalCode}
       </p>
       <p className="font-mono text-xs text-ink-soft mt-1">{address.phone}</p>
+      {address.deliveryInstructions && (
+        <p className="text-xs text-ink-soft/80 mt-1 italic">"{address.deliveryInstructions}"</p>
+      )}
+      {address.preferredTimeSlot && address.preferredTimeSlot !== 'anytime' && (
+        <p className="text-xs text-fern-dark mt-1 capitalize">Prefers {address.preferredTimeSlot} delivery</p>
+      )}
 
       {(onEdit || onDelete) && (
         <div className="flex gap-3 mt-3 pt-3 border-t border-stone-dark">

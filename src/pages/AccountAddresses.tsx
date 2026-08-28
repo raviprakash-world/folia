@@ -9,7 +9,7 @@ import { Alert } from '@/components/common/Alert';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAddressStore } from '@/store/addressStore';
 import { useAddressBootstrap } from '@/hooks/useAddresses';
-import type { Address } from '@/types/address';
+import type { Address, GeoPlaceholder } from '@/types/address';
 import type { AddressFormValues } from '@/utils/validation';
 
 export default function AccountAddresses() {
@@ -46,13 +46,17 @@ export default function AccountAddresses() {
     setFormOpen(true);
   }
 
-  async function handleFormSubmit(values: AddressFormValues): Promise<boolean> {
+  async function handleFormSubmit(values: AddressFormValues, geo: GeoPlaceholder | null): Promise<boolean> {
     const input = {
       ...values,
       email: values.email || undefined,
+      alternatePhone: values.alternatePhone || undefined,
+      companyName: values.companyName || undefined,
       addressLine2: values.addressLine2 || undefined,
       landmark: values.landmark || undefined,
+      deliveryInstructions: values.deliveryInstructions || undefined,
       label: values.label || undefined,
+      geo: geo ?? undefined,
     };
     const result = editingAddress ? await editAddress(editingAddress.id, input) : await addAddress(input);
     if (result) {

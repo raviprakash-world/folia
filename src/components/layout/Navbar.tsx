@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { Search, Heart, ShoppingBag, Menu, X, ChevronDown, User } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Menu, X, ChevronDown, User, Bell } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { Container } from '@/components/ui/Container';
 import { MobileNav } from './MobileNav';
@@ -10,6 +10,7 @@ import { useCartItemCount } from '@/hooks/useCart';
 import { useWishlistCount } from '@/hooks/useWishlist';
 import { useCurrentUser } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
+import { useNotificationStore } from '@/store/notificationStore';
 
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
@@ -34,6 +35,9 @@ export function Navbar() {
   const cartCount = useCartItemCount();
   const wishlistCount = useWishlistCount();
   const user = useCurrentUser();
+  const unreadCount = useNotificationStore((s) =>
+    s.hasHydrated ? s.notifications.filter((n) => !n.read && !n.archived).length : 0
+  );
   const openCartDrawer = useUIStore((s) => s.openCartDrawer);
 
   return (
@@ -76,7 +80,11 @@ export function Navbar() {
             aria-label={user ? `Account — ${user.firstName}` : 'Sign in'}
             className="p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
           >
-            <User size={20} />
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+            ) : (
+              <User size={20} />
+            )}
           </Link>
           <button
             type="button"
@@ -86,6 +94,14 @@ export function Navbar() {
           >
             <Search size={20} />
           </button>
+          <Link
+            to="/account/notifications"
+            aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+            className="relative p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark transition-colors"
+          >
+            <Bell size={20} />
+            <NavBadge count={unreadCount} />
+          </Link>
           <Link
             to="/wishlist"
             aria-label={`Wishlist${wishlistCount > 0 ? ` (${wishlistCount} items)` : ''}`}

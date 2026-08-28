@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/utils/cn';
 
-type TagTone = 'pine' | 'ochre' | 'rust' | 'stone';
+export type TagTone = 'pine' | 'ochre' | 'rust' | 'stone';
 
 interface TagProps {
   children: ReactNode;

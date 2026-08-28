@@ -10,6 +10,7 @@ import { useAddressStore } from '@/store/addressStore';
 import { useAddressBootstrap, useDefaultShippingAddress, useDefaultBillingAddress } from '@/hooks/useAddresses';
 import { useCheckoutStore } from '@/store/checkoutStore';
 import type { AddressFormValues } from '@/utils/validation';
+import type { GeoPlaceholder } from '@/types/address';
 
 export default function CheckoutShipping() {
   useAddressBootstrap();
@@ -46,13 +47,17 @@ export default function CheckoutShipping() {
     }
   }, [billingSameAsShipping, billingAddressId, addresses, defaultBillingAddress, setBillingAddressId]);
 
-  async function handleAddAddress(values: AddressFormValues): Promise<boolean> {
+  async function handleAddAddress(values: AddressFormValues, geo: GeoPlaceholder | null): Promise<boolean> {
     const input = {
       ...values,
       email: values.email || undefined,
+      alternatePhone: values.alternatePhone || undefined,
+      companyName: values.companyName || undefined,
       addressLine2: values.addressLine2 || undefined,
       landmark: values.landmark || undefined,
+      deliveryInstructions: values.deliveryInstructions || undefined,
       label: values.label || undefined,
+      geo: geo ?? undefined,
     };
     const created = await addAddress(input);
     if (created) {

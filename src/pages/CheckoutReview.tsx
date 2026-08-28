@@ -8,8 +8,11 @@ import { useCartStore } from '@/store/cartStore';
 import { useCheckoutStore } from '@/store/checkoutStore';
 import { useAddressStore } from '@/store/addressStore';
 import { useOrderStore } from '@/store/orderStore';
+import { useNotificationStore } from '@/store/notificationStore';
 import { computeSubtotal, computeDiscount, computeTax, computeTotal } from '@/utils/pricing';
+import { formatCurrency } from '@/utils/currency';
 import { generateOrderId } from '@/utils/orderId';
+import { assignCourier, generateTrackingNumber } from '@/utils/tracking';
 import type { Order, OrderItem } from '@/types/order';
 
 const PLACE_ORDER_DELAY_MS = 700;
@@ -18,6 +21,10 @@ export default function CheckoutReview() {
   const navigate = useNavigate();
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Generated once on mount (not at submit time) so the courier/tracking
+  // assignment shown in the preview — both deterministically seeded by
+  // order id — matches exactly what gets persisted on "Place order".
+  const [orderId] = useState(() => generateOrderId());
 
   const cartItems = useCartStore((s) => s.items);
   const coupon = useCartStore((s) => s.coupon);
@@ -25,6 +32,7 @@ export default function CheckoutReview() {
 
   const addresses = useAddressStore((s) => s.addresses);
   const addOrder = useOrderStore((s) => s.addOrder);
+  const addNotification = useNotificationStore((s) => s.addNotification);
 
   const shippingAddressId = useCheckoutStore((s) => s.shippingAddressId);
   const billingSameAsShipping = useCheckoutStore((s) => s.billingSameAsShipping);
@@ -61,14 +69,17 @@ export default function CheckoutReview() {
     slug: item.slug,
     name: item.name,
     categorySlug: item.categorySlug,
+    variantId: item.variantId,
     variantLabel: item.variantLabel,
     price: item.price,
     quantity: item.quantity,
   }));
 
+  const courierId = assignCourier(orderId);
+
   const previewOrder: Order = {
-    id: 'preview',
-    createdAt: new Date().toISOString().slice(0, 10),
+    id: orderId,
+    createdAt: new Date().toISOString(),
     status: 'confirmed',
     items,
     subtotal,
@@ -82,6 +93,11 @@ export default function CheckoutReview() {
     deliveryMethod,
     estimatedDelivery: deliveryEta,
     payment,
+    courierId,
+    trackingNumber: generateTrackingNumber(orderId, courierId),
+    customerNotes: null,
+    cancellation: null,
+    returnRequest: null,
   };
 
   async function handlePlaceOrder() {
@@ -89,11 +105,22 @@ export default function CheckoutReview() {
     setError(null);
     try {
       await new Promise((resolve) => setTimeout(resolve, PLACE_ORDER_DELAY_MS));
-      const order: Order = { ...previewOrder, id: generateOrderId() };
-      addOrder(order);
+      addOrder(previewOrder);
+      addNotification({
+        type: 'order',
+        title: 'Order Placed',
+        message: `Order ${previewOrder.id} was placed successfully.`,
+        href: `/account/orders/${previewOrder.id}`,
+      });
+      addNotification({
+        type: 'order',
+        title: 'Payment Successful',
+        message: `${previewOrder.payment.displayLabel} — ${formatCurrency(previewOrder.total)} charged.`,
+        href: `/account/orders/${previewOrder.id}`,
+      });
       clearCart();
       resetCheckout();
-      void navigate(`/checkout/confirmation/${order.id}`);
+      void navigate(`/checkout/confirmation/${previewOrder.id}`);
     } catch {
       setError("Couldn't place your order — try again.");
       setPlacing(false);

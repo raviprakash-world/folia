@@ -13,6 +13,9 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
+  /** Data URL from a local mock file upload — never a real server-hosted image. Size-capped in the UI (2MB). */
+  avatarUrl?: string;
 }
 
 export interface AuthSession {

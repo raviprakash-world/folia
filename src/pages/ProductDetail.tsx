@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Heart, Star, Check } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
@@ -18,6 +18,7 @@ import { Breadcrumb } from '@/components/common/Breadcrumb';
 import { PageLoader } from '@/components/common/PageLoader';
 import { useProduct, useRelatedProducts } from '@/hooks/useProduct';
 import { useCartStore } from '@/store/cartStore';
+import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useUIStore } from '@/store/uiStore';
 import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
 import { cn } from '@/utils/cn';
@@ -47,6 +48,18 @@ export default function ProductDetail() {
   // since the button that calls it only renders once product data has loaded.
   const wishlisted = useIsWishlisted(product?.id ?? '');
   const toggleWishlist = useToggleWishlist();
+  const recordView = useRecentlyViewedStore((s) => s.recordView);
+
+  useEffect(() => {
+    if (!product) return;
+    recordView({
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      categorySlug: product.categorySlug,
+      price: product.price,
+    });
+  }, [product, recordView]);
 
   if (isLoading) return <PageLoader />;
 

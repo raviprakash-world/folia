@@ -19,7 +19,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
-  updateProfile: (input: { firstName: string; lastName: string; email: string }) => Promise<boolean>;
+  updateProfile: (input: { firstName: string; lastName: string; email: string; phone?: string; avatarUrl?: string }) => Promise<boolean>;
   clearError: () => void;
   setHasHydrated: (value: boolean) => void;
 }

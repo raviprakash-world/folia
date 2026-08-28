@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/common/Alert';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
+import { useNotificationStore } from '@/store/notificationStore';
 import { changePasswordSchema } from '@/utils/validation';
 import type { ChangePasswordFormValues } from '@/utils/validation';
 
@@ -17,6 +18,7 @@ export default function AccountSecurity() {
   const status = useAuthStore((s) => s.status);
   const error = useAuthStore((s) => s.error);
   const showToast = useToastStore((s) => s.showToast);
+  const addNotification = useNotificationStore((s) => s.addNotification);
   const [saved, setSaved] = useState(false);
 
   const {
@@ -32,6 +34,7 @@ export default function AccountSecurity() {
     if (ok) {
       setSaved(true);
       reset();
+      addNotification({ type: 'security', title: 'Password Changed', message: 'Your password was updated successfully.' });
     }
   }
 

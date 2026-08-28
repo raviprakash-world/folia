@@ -50,8 +50,8 @@ export default function OrderConfirmation() {
         <Button variant="outline">
           <Link to={`/account/orders/${order.id}`}>Track order</Link>
         </Button>
-        <Button variant="outline" icon={<Package size={14} />} onClick={() => downloadInvoice(order)}>
-          Download invoice (mock)
+        <Button variant="outline" icon={<Package size={14} />} onClick={() => void downloadInvoice(order)}>
+          Download invoice
         </Button>
         <ShareButtons title={`My Folia order ${order.id}`} url={typeof window !== 'undefined' ? window.location.href : ''} />
       </div>
