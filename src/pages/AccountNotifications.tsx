@@ -119,7 +119,7 @@ export default function AccountNotifications() {
         <button
           type="button"
           onClick={() => setShowArchived((v) => !v)}
-          className="text-xs text-ink-soft hover:text-pine transition-colors underline"
+          className="text-xs text-ink-soft hover:text-heading transition-colors underline"
         >
           {showArchived ? 'Show active' : 'Show archived'}
         </button>
@@ -183,7 +183,7 @@ export default function AccountNotifications() {
                       type="button"
                       onClick={() => archiveNotification(n.id)}
                       aria-label="Archive"
-                      className="p-1.5 text-ink-soft hover:text-pine transition-colors"
+                      className="p-1.5 text-ink-soft hover:text-heading transition-colors"
                     >
                       <Archive size={14} />
                     </button>
@@ -204,7 +204,7 @@ export default function AccountNotifications() {
       )}
 
       <div className="pt-8 border-t border-stone-dark">
-        <h2 className="font-display text-lg font-semibold text-pine mb-3">Notification preferences</h2>
+        <h2 className="font-display text-lg font-semibold text-heading mb-3">Notification preferences</h2>
         <div className="flex gap-2.5 text-xs text-ink-soft bg-stone-dark/30 rounded-[var(--radius-control)] p-3 mb-5">
           <Info size={14} className="shrink-0 mt-0.5" />
           <p>These preferences are saved, but this demo doesn't have a real email or SMS system behind it.</p>

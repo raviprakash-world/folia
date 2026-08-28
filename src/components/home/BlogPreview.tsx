@@ -10,7 +10,7 @@ export function BlogPreview() {
         eyebrow="The journal"
         title="Notes on plant care"
         action={
-          <Link to="/blog" className="text-sm font-medium text-fern hover:text-pine transition-colors">
+          <Link to="/blog" className="text-sm font-medium text-fern hover:text-heading transition-colors">
             Read the journal
           </Link>
         }

@@ -20,7 +20,7 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
       <div className="flex items-center justify-between">
         <h2 className="font-mono text-xs uppercase tracking-wider text-ink-soft">Filters</h2>
         {hasActiveFilters && (
-          <button type="button" onClick={onReset} className="text-xs text-fern hover:text-pine underline">
+          <button type="button" onClick={onReset} className="text-xs text-fern hover:text-heading underline">
             Clear all
           </button>
         )}
@@ -47,7 +47,7 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
                 >
                   {active && <Check size={11} className="text-stone-light" />}
                 </span>
-                <span className={active ? 'text-pine font-medium' : 'text-ink-soft'}>{cat.name}</span>
+                <span className={active ? 'text-heading font-medium' : 'text-ink-soft'}>{cat.name}</span>
               </button>
             );
           })}

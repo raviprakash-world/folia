@@ -6,10 +6,14 @@
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
+/* Class-based dark mode (manual light/dark/system selector), not the
+   media-query-only default — toggled by adding/removing `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
   Folia design tokens.
   Palette named, not numbered — every color has a job, not a scale position.
-  See /src/styles/tokens.md for the rationale behind each choice.
+  See ARCHITECTURE.md's "Dark mode" section for the full palette rationale.
 */
 @theme {
   /* Color */
@@ -27,6 +31,15 @@
   --color-ochre-light: #d9a555;
   --color-rust: #a6553c;
   --color-rust-light: #f3e2dc;
+  /*
+    Heading text is its own token, deliberately separate from `pine` — pine
+    is also used as a *fill* color (buttons, hero/footer blocks, tags),
+    which must stay a fixed dark green in both themes since those blocks
+    pair it with light text. Heading text sits directly on the page
+    background instead, so it's the one role that needs to invert.
+    Starts equal to pine in light mode; overridden below for dark mode.
+  */
+  --color-heading: #1f3329;
 
   /* Type */
   --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", sans-serif;
@@ -38,7 +51,7 @@
   --radius-card: 14px;
   --radius-tag: 3px;
 
-  /* Shadow — warm-tinted, never pure black */
+  /* Shadow — warm-tinted, never pure black. Overridden for dark mode below. */
   --shadow-soft: 0 1px 2px rgba(31, 51, 41, 0.06), 0 2px 8px rgba(31, 51, 41, 0.05);
   --shadow-lifted: 0 4px 12px rgba(31, 51, 41, 0.08), 0 12px 32px rgba(31, 51, 41, 0.10);
   --shadow-tag: 0 2px 4px rgba(31, 51, 41, 0.12);
@@ -49,6 +62,35 @@
 
   /* Breakpoints (Tailwind defaults kept; documented for reference) */
   --breakpoint-xs: 30rem;
+}
+
+/*
+  Dark mode overrides. `stone`/`ink` (surfaces, borders, body text) invert —
+  they only ever play one role each, so a straight swap is safe. `pine`,
+  `fern`, `ochre`, and `rust` stay close to their light-mode values since
+  they're used as fill+contrasting-text pairs (buttons, tags, badges) that
+  would break if inverted wholesale; a few get a touch brighter for
+  legibility as isolated text/icons against a now-dark background.
+*/
+.dark {
+  --color-stone: #16211b;
+  --color-stone-light: #1e2b23;
+  --color-stone-dark: #33453a;
+  --color-ink: #ede9df;
+  --color-ink-soft: #a8a79c;
+  --color-heading: #f1efe6;
+
+  --color-fern: #7fa88f;
+  --color-fern-light: #9ac1aa;
+  --color-fern-dark: #8fbba0;
+  --color-ochre: #d9a555;
+  --color-ochre-light: #e6bc7e;
+  --color-rust: #c97e62;
+  --color-rust-light: #3d2420;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-lifted: 0 4px 12px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.3);
+  --shadow-tag: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 @layer base {
@@ -66,6 +108,16 @@
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
+  }
+
+  /* Smooth theme transitions — scoped to the properties that actually
+     change between themes, not a blanket `*` transition (expensive, and
+     would also animate unrelated hover/motion states). */
+  body,
+  [class*="bg-"],
+  [class*="text-"],
+  [class*="border-"] {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   /* Visible keyboard focus everywhere — non-negotiable for a11y, never suppressed */

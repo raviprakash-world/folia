@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useAddressStore } from '@/store/addressStore';
 import { useOrderStore } from '@/store/orderStore';
 import { useToastStore } from '@/store/toastStore';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 function exportAccountData(data: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -46,6 +47,14 @@ export default function AccountSettings() {
       <PageHeader title="Account Settings" />
 
       <div className="flex flex-col gap-6">
+        <div className="p-4 rounded-[var(--radius-card)] bg-stone-light border border-stone-dark">
+          <h2 className="text-sm font-medium text-ink mb-1">Appearance</h2>
+          <p className="text-xs text-ink-soft mb-3">
+            "System" follows your device's setting automatically, including if it changes while you're here.
+          </p>
+          <ThemeToggle />
+        </div>
+
         <div className="p-4 rounded-[var(--radius-card)] bg-stone-light border border-stone-dark">
           <h2 className="text-sm font-medium text-ink mb-1">Export your data</h2>
           <p className="text-xs text-ink-soft mb-3">

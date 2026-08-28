@@ -41,14 +41,14 @@ export function ProductCarousel({ products }: ProductCarouselProps) {
       <button
         type="button"
         aria-label="Previous products"
-        className={`${prevClass} hidden md:flex absolute top-1/2 -left-4 -translate-y-1/2 z-10 items-center justify-center w-10 h-10 rounded-full bg-stone-light shadow-[var(--shadow-lifted)] text-pine disabled:opacity-30`}
+        className={`${prevClass} hidden md:flex absolute top-1/2 -left-4 -translate-y-1/2 z-10 items-center justify-center w-10 h-10 rounded-full bg-stone-light shadow-[var(--shadow-lifted)] text-heading disabled:opacity-30`}
       >
         <ChevronLeft size={18} />
       </button>
       <button
         type="button"
         aria-label="Next products"
-        className={`${nextClass} hidden md:flex absolute top-1/2 -right-4 -translate-y-1/2 z-10 items-center justify-center w-10 h-10 rounded-full bg-stone-light shadow-[var(--shadow-lifted)] text-pine disabled:opacity-30`}
+        className={`${nextClass} hidden md:flex absolute top-1/2 -right-4 -translate-y-1/2 z-10 items-center justify-center w-10 h-10 rounded-full bg-stone-light shadow-[var(--shadow-lifted)] text-heading disabled:opacity-30`}
       >
         <ChevronRight size={18} />
       </button>

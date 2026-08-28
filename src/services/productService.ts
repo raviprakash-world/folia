@@ -20,8 +20,3 @@ export async function fetchProductBySlug(slug: string): Promise<Product> {
   const { data } = await apiClient.get<Product>(`/products/${slug}`);
   return data;
 }
-
-export async function fetchRelatedProducts(slug: string): Promise<Product[]> {
-  const { data } = await apiClient.get<Product[]>(`/products/${slug}/related`);
-  return data;
-}

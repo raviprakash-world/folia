@@ -129,7 +129,7 @@ export default function CheckoutReview() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-pine mb-1">Review your order</h1>
+      <h1 className="font-display text-2xl font-semibold text-heading mb-1">Review your order</h1>
       <p className="text-sm text-ink-soft mb-8">Check everything looks right before you place it.</p>
 
       {error && (

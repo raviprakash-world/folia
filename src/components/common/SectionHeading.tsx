@@ -13,7 +13,7 @@ export function SectionHeading({ eyebrow, title, action }: SectionHeadingProps) 
         {eyebrow && (
           <p className="font-mono text-xs uppercase tracking-wider text-fern mb-2">{eyebrow}</p>
         )}
-        <h2 className="font-display text-3xl font-semibold text-pine">{title}</h2>
+        <h2 className="font-display text-3xl font-semibold text-heading">{title}</h2>
       </div>
       {action}
     </div>

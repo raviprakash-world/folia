@@ -16,7 +16,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
         <span key={item.label} className="flex items-center gap-1.5">
           {i > 0 && <span aria-hidden="true">/</span>}
           {item.to ? (
-            <Link to={item.to} className="hover:text-pine transition-colors">
+            <Link to={item.to} className="hover:text-heading transition-colors">
               {item.label}
             </Link>
           ) : (

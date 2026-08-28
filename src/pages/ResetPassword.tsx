@@ -41,7 +41,7 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <Container className="py-20 max-w-sm text-center">
-        <h1 className="font-display text-2xl font-semibold text-pine">Missing reset link</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Missing reset link</h1>
         <p className="text-sm text-ink-soft mt-2">
           This page needs a reset token from the email link.{' '}
           <Link to="/account/forgot-password" className="text-fern underline">Request a new one</Link>.
@@ -54,7 +54,7 @@ export default function ResetPassword() {
     return (
       <Container className="py-20 max-w-sm text-center">
         <CheckCircle2 size={28} className="text-fern mx-auto mb-4" />
-        <h1 className="font-display text-2xl font-semibold text-pine">Password updated</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Password updated</h1>
         <p className="text-sm text-ink-soft mt-2">You can sign in with your new password now.</p>
         <Button variant="primary" className="mt-6">
           <Link to="/account/login">Sign in</Link>
@@ -65,7 +65,7 @@ export default function ResetPassword() {
 
   return (
     <Container className="py-20 max-w-sm">
-      <h1 className="font-display text-3xl font-semibold text-pine">Set a new password</h1>
+      <h1 className="font-display text-3xl font-semibold text-heading">Set a new password</h1>
 
       {errorMessage && (
         <Alert tone="error" className="mt-5">

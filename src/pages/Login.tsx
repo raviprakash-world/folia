@@ -44,7 +44,7 @@ export default function Login() {
 
   return (
     <Container className="py-20 max-w-sm">
-      <h1 className="font-display text-3xl font-semibold text-pine">Sign in</h1>
+      <h1 className="font-display text-3xl font-semibold text-heading">Sign in</h1>
       <p className="text-sm text-ink-soft mt-2">
         Demo account: <span className="font-mono">demo@folia.example</span> / <span className="font-mono">folia-demo</span>
       </p>
@@ -64,7 +64,7 @@ export default function Login() {
             <input type="checkbox" className="w-4 h-4 accent-fern" {...register('rememberMe')} onChange={() => clearError()} />
             Remember me
           </label>
-          <Link to="/account/forgot-password" className="text-fern hover:text-pine transition-colors">
+          <Link to="/account/forgot-password" className="text-fern hover:text-heading transition-colors">
             Forgot password?
           </Link>
         </div>
@@ -75,7 +75,7 @@ export default function Login() {
       </form>
 
       <p className="text-sm text-ink-soft mt-6 text-center">
-        New here? <Link to="/account/register" className="text-fern hover:text-pine transition-colors">Create an account</Link>
+        New here? <Link to="/account/register" className="text-fern hover:text-heading transition-colors">Create an account</Link>
       </p>
     </Container>
   );

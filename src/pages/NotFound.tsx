@@ -9,7 +9,7 @@ export default function NotFound() {
       <div className="flex justify-center mb-6">
         <Tag tone="rust" tilted>404</Tag>
       </div>
-      <h1 className="font-display text-4xl font-semibold text-pine">This page didn't take root.</h1>
+      <h1 className="font-display text-4xl font-semibold text-heading">This page didn't take root.</h1>
       <p className="mt-3 text-ink-soft max-w-[46ch] mx-auto">
         The page you're looking for doesn't exist, or the link's out of date. Try the shop,
         or head back home.

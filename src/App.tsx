@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router } from '@/routes';
 import { useAuthStore } from '@/store/authStore';
+import { useThemeSync } from '@/hooks/useThemeSync';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,6 +17,7 @@ const queryClient = new QueryClient({
 function App() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const refreshSession = useAuthStore((s) => s.refreshSession);
+  useThemeSync();
 
   // Runs once, right after the persisted auth store rehydrates, to verify a
   // saved token is still valid against the mock backend.

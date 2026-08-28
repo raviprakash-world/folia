@@ -87,7 +87,7 @@ export function OrderSummary({ order }: { order: Order }) {
         </div>
         <div className="flex justify-between text-base font-medium border-t border-stone-dark pt-2 mt-1">
           <dt className="text-ink">Total</dt>
-          <dd className="text-pine">{formatCurrency(order.total)}</dd>
+          <dd className="text-heading">{formatCurrency(order.total)}</dd>
         </div>
       </dl>
     </div>

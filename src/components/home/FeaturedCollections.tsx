@@ -17,9 +17,9 @@ export function FeaturedCollections() {
           >
             <ArrowUpRight
               size={20}
-              className="absolute top-5 right-5 text-pine opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-5 right-5 text-heading opacity-0 group-hover:opacity-100 transition-opacity"
             />
-            <h3 className="font-display text-xl font-semibold text-pine">{collection.name}</h3>
+            <h3 className="font-display text-xl font-semibold text-heading">{collection.name}</h3>
             <p className="text-sm text-ink-soft mt-1">{collection.description}</p>
           </Link>
         ))}

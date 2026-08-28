@@ -2,7 +2,12 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { PageLoader } from '@/components/common/PageLoader';
 
-export function ProtectedRoute() {
+interface ProtectedRouteProps {
+  requireRole?: 'admin';
+  redirectTo?: string;
+}
+
+export function ProtectedRoute({ requireRole, redirectTo = '/account/login' }: ProtectedRouteProps = {}) {
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const location = useLocation();
@@ -10,7 +15,11 @@ export function ProtectedRoute() {
   if (!hasHydrated) return <PageLoader />;
 
   if (!user) {
-    return <Navigate to="/account/login" state={{ from: location }} replace />;
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+  }
+
+  if (requireRole && user.role !== requireRole) {
+    return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
   return <Outlet />;

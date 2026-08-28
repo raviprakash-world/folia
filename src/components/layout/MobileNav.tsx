@@ -32,7 +32,7 @@ export function MobileNav({ open, onClose, links }: MobileNavProps) {
                   onClick={onClose}
                   className={({ isActive }) =>
                     `block py-3 text-base font-medium border-b border-stone-dark/60 last:border-0 ${
-                      isActive ? 'text-pine' : 'text-ink-soft'
+                      isActive ? 'text-heading' : 'text-ink-soft'
                     }`
                   }
                 >

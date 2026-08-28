@@ -5,6 +5,7 @@ import { Tag } from '@/components/ui/Tag';
 import { ArrowRight } from 'lucide-react';
 import { FeaturedCollections } from '@/components/home/FeaturedCollections';
 import { BestSellers } from '@/components/home/BestSellers';
+import { RecommendedForYou } from '@/components/home/RecommendedForYou';
 import { TrendingProducts } from '@/components/home/TrendingProducts';
 import { Benefits } from '@/components/home/Benefits';
 import { Testimonials } from '@/components/home/Testimonials';
@@ -32,7 +33,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="lg"
-                className="!text-stone-light !border-stone-light hover:!bg-stone-light hover:!text-pine"
+                className="!text-stone-light !border-stone-light hover:!bg-stone-light hover:!text-heading"
               >
                 <Link to="/about">Our approach</Link>
               </Button>
@@ -48,6 +49,7 @@ export default function Home() {
 
       <FeaturedCollections />
       <BestSellers />
+      <RecommendedForYou />
       <TrendingProducts />
       <Benefits />
       <Testimonials />

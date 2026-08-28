@@ -47,7 +47,7 @@ export function CartSummary({ showCheckoutButton = true }: CartSummaryProps) {
         </div>
         <div className="flex justify-between text-base font-medium border-t border-stone-dark pt-2 mt-1">
           <dt className="text-ink">Total</dt>
-          <dd className="text-pine">{formatCurrency(total)}</dd>
+          <dd className="text-heading">{formatCurrency(total)}</dd>
         </div>
       </dl>
 

@@ -28,7 +28,7 @@ export function ShareButtons({ title, url }: ShareButtonsProps) {
     <button
       type="button"
       onClick={() => void handleShare()}
-      className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-pine transition-colors"
+      className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-heading transition-colors"
     >
       {copied ? <Check size={15} className="text-fern" /> : canNativeShare ? <Share2 size={15} /> : <Link2 size={15} />}
       {copied ? 'Link copied' : canNativeShare ? 'Share' : 'Copy link'}

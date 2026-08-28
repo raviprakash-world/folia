@@ -4,11 +4,15 @@ import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
 import { CartLineItem } from '@/components/cart/CartLineItem';
 import { CartSummary } from '@/components/cart/CartSummary';
+import { SectionHeading } from '@/components/common/SectionHeading';
+import { ProductCarousel } from '@/components/product/ProductCarousel';
 import { useCartStore } from '@/store/cartStore';
+import { useCartComplements } from '@/hooks/useRecommendations';
 
 export default function Cart() {
   const items = useCartStore((s) => s.items);
   const hasHydrated = useCartStore((s) => s.hasHydrated);
+  const complements = useCartComplements();
 
   if (!hasHydrated) {
     return (
@@ -26,7 +30,7 @@ export default function Cart() {
     return (
       <Container className="py-24 text-center">
         <ShoppingBag size={36} className="text-ink-soft/40 mx-auto mb-4" />
-        <h1 className="font-display text-3xl font-semibold text-pine">Your cart is empty</h1>
+        <h1 className="font-display text-3xl font-semibold text-heading">Your cart is empty</h1>
         <p className="text-ink-soft mt-2">Nothing here yet — browse the shop to find something for your space.</p>
         <Button variant="primary" className="mt-6">
           <Link to="/shop">Browse the shop</Link>
@@ -37,7 +41,7 @@ export default function Cart() {
 
   return (
     <Container className="py-16">
-      <h1 className="font-display text-3xl font-semibold text-pine mb-10">
+      <h1 className="font-display text-3xl font-semibold text-heading mb-10">
         Your cart <span className="text-ink-soft font-sans text-lg font-normal">({items.length} {items.length === 1 ? 'item' : 'items'})</span>
       </h1>
 
@@ -54,6 +58,13 @@ export default function Cart() {
           <CartSummary />
         </aside>
       </div>
+
+      {complements.length > 0 && (
+        <div className="mt-16">
+          <SectionHeading title="Complete Your Setup" />
+          <ProductCarousel products={complements} />
+        </div>
+      )}
     </Container>
   );
 }

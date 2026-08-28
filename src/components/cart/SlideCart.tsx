@@ -47,12 +47,12 @@ export function SlideCart() {
             className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-stone-light shadow-[var(--shadow-lifted)] flex flex-col"
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-stone-dark">
-              <h2 className="font-display text-lg font-semibold text-pine">Your cart</h2>
+              <h2 className="font-display text-lg font-semibold text-heading">Your cart</h2>
               <button
                 type="button"
                 onClick={closeCartDrawer}
                 aria-label="Close cart"
-                className="p-1.5 text-ink-soft hover:text-pine"
+                className="p-1.5 text-ink-soft hover:text-heading"
               >
                 <X size={20} />
               </button>

@@ -47,7 +47,7 @@ export function ProductReviews({ productId, averageRating, reviewCount }: Produc
     <div className="grid md:grid-cols-[240px_1fr] gap-10">
       <div>
         <div className="flex items-baseline gap-2">
-          <span className="font-display text-4xl font-semibold text-pine">{averageRating ?? '—'}</span>
+          <span className="font-display text-4xl font-semibold text-heading">{averageRating ?? '—'}</span>
           <div>
             <div className="flex text-ochre">
               {Array.from({ length: 5 }).map((_, i) => (

@@ -54,7 +54,7 @@ export default function FAQ() {
         <div className="flex flex-col gap-10">
           {grouped.map((group) => (
             <div key={group.category}>
-              <h2 className="font-display text-xl font-semibold text-pine mb-2">{group.category}</h2>
+              <h2 className="font-display text-xl font-semibold text-heading mb-2">{group.category}</h2>
               <Accordion items={group.entries.map((e) => ({ question: e.question, answer: e.answer }))} />
             </div>
           ))}

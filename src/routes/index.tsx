@@ -5,6 +5,7 @@ import { PageLoader } from '@/components/common/PageLoader';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AccountLayout } from '@/components/account/AccountLayout';
 import { CheckoutLayout } from '@/components/checkout/CheckoutLayout';
+import { AdminLayout } from '@/components/admin/AdminLayout';
 
 // Every route component is lazy-loaded so the initial bundle only pays for
 // the layout shell + whichever page was requested (route-level code splitting).
@@ -43,6 +44,15 @@ const CheckoutDelivery = lazy(() => import('@/pages/CheckoutDelivery'));
 const CheckoutPayment = lazy(() => import('@/pages/CheckoutPayment'));
 const CheckoutReview = lazy(() => import('@/pages/CheckoutReview'));
 const OrderConfirmation = lazy(() => import('@/pages/OrderConfirmation'));
+
+// Admin
+const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
+const AdminOverview = lazy(() => import('@/pages/AdminOverview'));
+const AdminRevenue = lazy(() => import('@/pages/AdminRevenue'));
+const AdminOrders = lazy(() => import('@/pages/AdminOrders'));
+const AdminProducts = lazy(() => import('@/pages/AdminProducts'));
+const AdminCustomers = lazy(() => import('@/pages/AdminCustomers'));
+const AdminSearch = lazy(() => import('@/pages/AdminSearch'));
 
 function withSuspense(node: React.ReactNode) {
   return <Suspense fallback={<PageLoader />}>{node}</Suspense>;
@@ -99,6 +109,24 @@ export const router = createBrowserRouter([
             ],
           },
           { path: 'checkout/confirmation/:orderId', element: withSuspense(<OrderConfirmation />) },
+        ],
+      },
+      { path: 'admin/login', element: withSuspense(<AdminLogin />) },
+      {
+        element: <ProtectedRoute requireRole="admin" redirectTo="/admin/login" />,
+        children: [
+          {
+            path: 'admin',
+            element: <AdminLayout />,
+            children: [
+              { index: true, element: withSuspense(<AdminOverview />) },
+              { path: 'revenue', element: withSuspense(<AdminRevenue />) },
+              { path: 'orders', element: withSuspense(<AdminOrders />) },
+              { path: 'products', element: withSuspense(<AdminProducts />) },
+              { path: 'customers', element: withSuspense(<AdminCustomers />) },
+              { path: 'search', element: withSuspense(<AdminSearch />) },
+            ],
+          },
         ],
       },
       { path: '*', element: withSuspense(<NotFound />) },

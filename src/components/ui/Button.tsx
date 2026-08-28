@@ -14,9 +14,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary: 'bg-pine text-stone-light hover:bg-pine-light active:bg-pine',
-  secondary: 'bg-ochre text-pine hover:bg-ochre-light active:bg-ochre',
-  ghost: 'bg-transparent text-pine hover:bg-stone-dark',
-  outline: 'bg-transparent text-pine border border-pine hover:bg-pine hover:text-stone-light',
+  secondary: 'bg-ochre text-heading hover:bg-ochre-light active:bg-ochre',
+  ghost: 'bg-transparent text-heading hover:bg-stone-dark',
+  outline: 'bg-transparent text-heading border border-pine hover:bg-pine hover:text-stone-light',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

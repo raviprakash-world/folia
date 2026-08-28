@@ -10,7 +10,7 @@ export function TrendingProducts() {
           <p className="font-mono text-xs uppercase tracking-wider text-fern mb-2">
             Right now
           </p>
-          <h2 className="font-display text-3xl font-semibold text-pine">Trending this week</h2>
+          <h2 className="font-display text-3xl font-semibold text-heading">Trending this week</h2>
         </div>
         <ProductCarousel products={trending} />
       </Container>

@@ -20,6 +20,7 @@ function toPublicUser(user: SeedUser): User {
     email: user.email,
     phone: user.phone,
     avatarUrl: user.avatarUrl,
+    role: user.role,
   };
 }
 

@@ -21,7 +21,7 @@ export function ProductTabs({ description, specs }: ProductTabsProps) {
             onClick={() => setTab(t)}
             className={cn(
               'pb-3 text-sm font-medium capitalize border-b-2 -mb-px transition-colors',
-              tab === t ? 'border-pine text-pine' : 'border-transparent text-ink-soft hover:text-ink'
+              tab === t ? 'border-pine text-heading' : 'border-transparent text-ink-soft hover:text-ink'
             )}
           >
             {t === 'specs' ? 'Specifications' : 'Description'}

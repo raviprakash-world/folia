@@ -14,7 +14,7 @@ export function FeaturedPost({ post }: { post: BlogPost }) {
         <Tag tone="ochre" tilted className="mb-3">
           Featured
         </Tag>
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-pine leading-tight group-hover:text-fern transition-colors">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-heading leading-tight group-hover:text-fern transition-colors">
           {post.title}
         </h2>
         <p className="text-ink-soft mt-3">{post.excerpt}</p>

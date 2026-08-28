@@ -13,7 +13,7 @@ interface TagProps {
 
 const toneStyles: Record<TagTone, string> = {
   pine: 'bg-pine text-stone-light',
-  ochre: 'bg-ochre text-pine',
+  ochre: 'bg-ochre text-heading',
   rust: 'bg-rust text-rust-light',
   stone: 'bg-stone-dark text-ink',
 };

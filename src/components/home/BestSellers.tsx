@@ -11,7 +11,7 @@ export function BestSellers() {
         eyebrow="Most loved"
         title="Best sellers"
         action={
-          <Link to="/shop" className="text-sm font-medium text-fern hover:text-pine transition-colors">
+          <Link to="/shop" className="text-sm font-medium text-fern hover:text-heading transition-colors">
             View all
           </Link>
         }

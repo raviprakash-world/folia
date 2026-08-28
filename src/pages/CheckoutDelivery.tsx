@@ -82,7 +82,7 @@ export default function CheckoutDelivery() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-pine mb-1">Delivery method</h1>
+      <h1 className="font-display text-2xl font-semibold text-heading mb-1">Delivery method</h1>
       <p className="text-sm text-ink-soft mb-6">
         Shipping to {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postalCode}
       </p>

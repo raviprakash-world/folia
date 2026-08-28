@@ -16,6 +16,8 @@ export interface User {
   phone?: string;
   /** Data URL from a local mock file upload — never a real server-hosted image. Size-capped in the UI (2MB). */
   avatarUrl?: string;
+  /** Defaults to 'customer' when absent — only the seeded demo admin account has 'admin'. */
+  role?: 'customer' | 'admin';
 }
 
 export interface AuthSession {

@@ -4,10 +4,16 @@ interface UIState {
   cartDrawerOpen: boolean;
   openCartDrawer: () => void;
   closeCartDrawer: () => void;
+  searchOverlayOpen: boolean;
+  openSearchOverlay: () => void;
+  closeSearchOverlay: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   cartDrawerOpen: false,
   openCartDrawer: () => set({ cartDrawerOpen: true }),
   closeCartDrawer: () => set({ cartDrawerOpen: false }),
+  searchOverlayOpen: false,
+  openSearchOverlay: () => set({ searchOverlayOpen: true }),
+  closeSearchOverlay: () => set({ searchOverlayOpen: false }),
 }));

@@ -39,7 +39,7 @@ export default function About() {
         <div className="grid sm:grid-cols-3 gap-8">
           {values.map((v) => (
             <div key={v.title}>
-              <h3 className="font-display text-lg font-semibold text-pine">{v.title}</h3>
+              <h3 className="font-display text-lg font-semibold text-heading">{v.title}</h3>
               <p className="text-sm text-ink-soft mt-2 leading-relaxed">{v.body}</p>
             </div>
           ))}
@@ -48,7 +48,7 @@ export default function About() {
 
       <Container className="py-8 pb-24">
         <div className="rounded-[var(--radius-card)] bg-stone-dark/40 p-10 text-center">
-          <h2 className="font-display text-2xl font-semibold text-pine">Have a question before you order?</h2>
+          <h2 className="font-display text-2xl font-semibold text-heading">Have a question before you order?</h2>
           <p className="text-ink-soft mt-2 max-w-[50ch] mx-auto">
             We answer care questions even if you haven't bought anything yet — happy to help you figure out what'll actually survive your space.
           </p>

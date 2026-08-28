@@ -15,7 +15,7 @@ export default function BlogDetail() {
   if (!post) {
     return (
       <Container className="py-24 text-center">
-        <h1 className="font-display text-2xl font-semibold text-pine">Article not found</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Article not found</h1>
         <p className="text-ink-soft mt-2">
           <Link to="/blog" className="text-fern underline">Back to the journal</Link>.
         </p>
@@ -28,7 +28,7 @@ export default function BlogDetail() {
       <Breadcrumb items={[{ label: 'Journal', to: '/blog' }, { label: post.title }]} />
 
       <Tag tone="stone" className="mb-4">{post.category}</Tag>
-      <h1 className="font-display text-4xl font-semibold text-pine leading-tight">{post.title}</h1>
+      <h1 className="font-display text-4xl font-semibold text-heading leading-tight">{post.title}</h1>
 
       <div className="flex items-center gap-3 text-xs text-ink-soft mt-4 font-mono">
         <span>{post.author}</span>

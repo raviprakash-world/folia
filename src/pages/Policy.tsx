@@ -10,7 +10,7 @@ export default function Policy() {
   if (!policy) {
     return (
       <Container className="py-24 text-center">
-        <h1 className="font-display text-2xl font-semibold text-pine">Page not found</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Page not found</h1>
         <p className="text-ink-soft mt-2">
           <Link to="/" className="text-fern underline">Back home</Link>.
         </p>
@@ -21,7 +21,7 @@ export default function Policy() {
   return (
     <Container className="py-16 max-w-2xl">
       <Breadcrumb items={[{ label: 'Home', to: '/' }, { label: policy.title }]} />
-      <h1 className="font-display text-4xl font-semibold text-pine">{policy.title}</h1>
+      <h1 className="font-display text-4xl font-semibold text-heading">{policy.title}</h1>
       <p className="font-mono text-xs text-ink-soft mt-2">Last updated {policy.updatedAt}</p>
 
       <div className="flex flex-col gap-8 mt-10">

@@ -16,7 +16,8 @@ import { Accordion } from '@/components/common/Accordion';
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { Breadcrumb } from '@/components/common/Breadcrumb';
 import { PageLoader } from '@/components/common/PageLoader';
-import { useProduct, useRelatedProducts } from '@/hooks/useProduct';
+import { useProduct } from '@/hooks/useProduct';
+import { useSimilarProducts, useFrequentlyBoughtTogether, useCustomersAlsoViewed } from '@/hooks/useRecommendations';
 import { useCartStore } from '@/store/cartStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useUIStore } from '@/store/uiStore';
@@ -34,7 +35,9 @@ const genericFaq = [
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data: product, isLoading, isError } = useProduct(slug);
-  const { data: related } = useRelatedProducts(slug);
+  const similarProducts = useSimilarProducts(product);
+  const frequentlyBoughtTogether = useFrequentlyBoughtTogether(product);
+  const customersAlsoViewed = useCustomersAlsoViewed(product);
   const addCartItem = useCartStore((s) => s.addItem);
   const openCartDrawer = useUIStore((s) => s.openCartDrawer);
 
@@ -66,7 +69,7 @@ export default function ProductDetail() {
   if (isError || !product) {
     return (
       <Container className="py-24 text-center">
-        <h1 className="font-display text-2xl font-semibold text-pine">Product not found</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Product not found</h1>
         <p className="text-ink-soft mt-2">
           It may have sold out permanently. <Link to="/shop" className="text-fern underline">Browse the shop</Link>.
         </p>
@@ -118,7 +121,7 @@ export default function ProductDetail() {
               {product.badge}
             </Tag>
           )}
-          <h1 className="font-display text-3xl font-semibold text-pine">{product.name}</h1>
+          <h1 className="font-display text-3xl font-semibold text-heading">{product.name}</h1>
 
           {product.rating && (
             <div className="flex items-center gap-1.5 mt-2">
@@ -211,10 +214,24 @@ export default function ProductDetail() {
         <ProductReviews productId={product.id} averageRating={product.rating} reviewCount={product.reviewCount} />
       </div>
 
-      {related && related.length > 0 && (
+      {similarProducts.length > 0 && (
         <div className="mt-16">
-          <SectionHeading title="You might also like" />
-          <ProductCarousel products={related} />
+          <SectionHeading title="Similar Products" />
+          <ProductCarousel products={similarProducts} />
+        </div>
+      )}
+
+      {frequentlyBoughtTogether.length > 0 && (
+        <div className="mt-16">
+          <SectionHeading title="Frequently Bought Together" />
+          <ProductCarousel products={frequentlyBoughtTogether} />
+        </div>
+      )}
+
+      {customersAlsoViewed.length > 0 && (
+        <div className="mt-16">
+          <SectionHeading title="Customers Also Viewed" />
+          <ProductCarousel products={customersAlsoViewed} />
         </div>
       )}
     </Container>

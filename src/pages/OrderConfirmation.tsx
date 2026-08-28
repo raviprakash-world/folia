@@ -15,7 +15,7 @@ export default function OrderConfirmation() {
   if (!order) {
     return (
       <Container className="py-24 text-center">
-        <h1 className="font-display text-2xl font-semibold text-pine">Order not found</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Order not found</h1>
         <p className="text-ink-soft mt-2">
           <Link to="/account/orders" className="text-fern underline">View your orders</Link>.
         </p>
@@ -35,7 +35,7 @@ export default function OrderConfirmation() {
           <CheckCircle2 size={36} className="text-fern" />
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.3 }}>
-          <h1 className="font-display text-3xl font-semibold text-pine">Order confirmed</h1>
+          <h1 className="font-display text-3xl font-semibold text-heading">Order confirmed</h1>
           <p className="text-ink-soft mt-2">
             Order <span className="font-mono text-ink">{order.id}</span> — estimated delivery{' '}
             {order.estimatedDelivery.toLowerCase()}.
@@ -61,7 +61,7 @@ export default function OrderConfirmation() {
       </div>
 
       <div className="text-center mt-10">
-        <Link to="/account/orders" className="inline-flex items-center gap-1.5 text-sm text-fern hover:text-pine transition-colors">
+        <Link to="/account/orders" className="inline-flex items-center gap-1.5 text-sm text-fern hover:text-heading transition-colors">
           View all orders
           <ArrowRight size={14} />
         </Link>

@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { OrderRow } from '@/components/order/OrderRow';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ProductCard } from '@/components/product/ProductCard';
+import { ProductCarousel } from '@/components/product/ProductCarousel';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
 import { useAddressStore } from '@/store/addressStore';
@@ -11,6 +12,7 @@ import { useOrderStore } from '@/store/orderStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useAddressBootstrap } from '@/hooks/useAddresses';
+import { usePersonalizedRecommendations } from '@/hooks/useRecommendations';
 import { getEffectiveOrderStatus } from '@/utils/refund';
 import { formatCurrency } from '@/utils/currency';
 import { products } from '@/data/products';
@@ -25,6 +27,7 @@ export default function AccountOverview() {
   const wishlistCount = useWishlistStore((s) => s.items.length);
   const recentlyViewed = useRecentlyViewedStore((s) => s.items);
   const clearRecentlyViewed = useRecentlyViewedStore((s) => s.clearHistory);
+  const picksForYou = usePersonalizedRecommendations(4);
 
   if (!user) return null; // ProtectedRoute guarantees this never renders without a user
 
@@ -62,16 +65,16 @@ export default function AccountOverview() {
             className="p-4 rounded-[var(--radius-card)] bg-stone-light border border-stone-dark hover:border-fern transition-colors"
           >
             <Icon size={16} className="text-fern mb-2" />
-            <p className="font-display text-2xl font-semibold text-pine">{value}</p>
+            <p className="font-display text-2xl font-semibold text-heading">{value}</p>
             <p className="text-xs text-ink-soft mt-0.5">{label}</p>
           </Link>
         ))}
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-lg font-semibold text-pine">Recent orders</h2>
+        <h2 className="font-display text-lg font-semibold text-heading">Recent orders</h2>
         {orders.length > 0 && (
-          <Link to="/account/orders" className="flex items-center gap-1 text-sm text-fern hover:text-pine transition-colors">
+          <Link to="/account/orders" className="flex items-center gap-1 text-sm text-fern hover:text-heading transition-colors">
             View all
             <ArrowRight size={14} />
           </Link>
@@ -88,10 +91,17 @@ export default function AccountOverview() {
         </div>
       )}
 
+      {picksForYou.length > 0 && (
+        <div className="mb-14">
+          <h2 className="font-display text-lg font-semibold text-heading mb-4">Picks for You</h2>
+          <ProductCarousel products={picksForYou} />
+        </div>
+      )}
+
       {recentlyViewedProducts.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold text-pine flex items-center gap-2">
+            <h2 className="font-display text-lg font-semibold text-heading flex items-center gap-2">
               <Eye size={17} className="text-fern" />
               Recently viewed
             </h2>

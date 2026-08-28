@@ -27,7 +27,7 @@ export function ProductListing({ title, description, fixedCategory }: ProductLis
   return (
     <Container className="py-16">
       <div className="mb-10">
-        <h1 className="font-display text-4xl font-semibold text-pine">{title}</h1>
+        <h1 className="font-display text-4xl font-semibold text-heading">{title}</h1>
         {description && <p className="text-ink-soft mt-2 max-w-[60ch]">{description}</p>}
       </div>
 
@@ -43,7 +43,7 @@ export function ProductListing({ title, description, fixedCategory }: ProductLis
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen(true)}
-                className="lg:hidden flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-pine"
+                className="lg:hidden flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-heading"
               >
                 <SlidersHorizontal size={16} />
                 Filters
@@ -120,7 +120,7 @@ export function ProductListing({ title, description, fixedCategory }: ProductLis
           />
           <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-xs bg-stone-light p-6 overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-lg font-semibold text-pine">Filters</h2>
+              <h2 className="font-display text-lg font-semibold text-heading">Filters</h2>
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen(false)}

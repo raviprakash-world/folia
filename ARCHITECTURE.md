@@ -9,8 +9,8 @@ phase. This file covers *why it's built the way it is*.
 
 React 19 · TypeScript (strict) · Vite · Tailwind CSS v4 · React Router v7 ·
 Framer Motion · Zustand · TanStack Query · React Hook Form + Zod · Axios ·
-MSW · jsPDF (one deliberate exception — see Notable Decisions) · Lucide
-React · Swiper · ESLint + Prettier.
+MSW · jsPDF and recharts (two deliberate exceptions — see Notable
+Decisions) · Lucide React · Swiper · ESLint + Prettier.
 
 ## Layered architecture
 
@@ -90,6 +90,16 @@ Two kinds of client state, deliberately not mixed:
     └─ /review
   /checkout/confirmation/:orderId   (own page, no stepper chrome)
 
+/admin/login                    AdminLogin (public — reuses authStore.login)
+── ProtectedRoute requireRole="admin" redirectTo="/admin/login" ──
+  /admin                        AdminLayout
+    ├─ /                        Overview
+    ├─ /revenue
+    ├─ /orders
+    ├─ /products
+    ├─ /customers
+    └─ /search
+
 /*                              404
 ```
 
@@ -97,7 +107,11 @@ Every route component is `lazy()`-loaded. `/checkout/*` reuses the exact
 same `ProtectedRoute` as `/account/*` — a guest gets redirected to login
 with a return path, not a separate guest-checkout implementation. Browsing,
 cart, and wishlist stay fully guest-accessible; only placing an order and
-the account dashboard require a session.
+the account dashboard require a session. `/admin/*` reuses the same
+`ProtectedRoute` component with two added props (`requireRole`,
+`redirectTo`) rather than a second route-guard component — a logged-in
+customer without the admin role is redirected to `/admin/login`, same as
+a logged-out visitor.
 
 ## State management — every Zustand store
 
@@ -112,18 +126,30 @@ the account dashboard require a session.
 | `notificationStore` | Yes | Notification center feed. One-time seed for types with no live trigger (price drop, promotion). |
 | `preferencesStore` | Yes | Notification-preference toggles (email/SMS opt-ins) — separate from the notification *feed* above. |
 | `recentlyViewedStore` | Yes | Last 20 viewed products, deduplicated, most-recent-first. |
+| `themeStore` | Yes (mode only) | Light/dark/system preference. Live `systemPrefersDark` tracked separately, never persisted, so "System" always reflects the actual current OS setting. |
+| `searchStore` | Yes | Recent searches (max 10, deduplicated) and search analytics events — both feed the admin Search Analytics page directly, not just a hypothetical future one. |
 | `toastStore` | No | Ephemeral toast queue. |
-| `uiStore` | No | Slide-cart drawer open/closed — lets `ProductDetail` (a different branch of the route tree) open a drawer that lives in `Navbar`. |
+| `uiStore` | No | Cross-tree ephemeral UI state — slide-cart drawer and search overlay open/closed, letting components in different route-tree branches (e.g. `ProductDetail` and `Navbar`) coordinate a shared drawer without prop-drilling. |
+
+**No dedicated admin store.** The admin dashboard reads from the stores
+above (`orderStore`, `wishlistStore`, `recentlyViewedStore`,
+`searchStore`) via `hooks/useAdminAnalytics.ts` — every number on every
+admin page is *derived*, computed fresh from existing state plus the
+deterministic mock baseline described under "Analytics & Admin
+Dashboard" below, never stored redundantly in a parallel structure.
 
 **The `hasHydrated` pattern**, used by every persisted store except the
-two intentionally-ephemeral ones: Zustand's `persist` middleware resolves
-asynchronously even for synchronous storage like `localStorage` (at least
-one microtask). Without a `hasHydrated` flag, gated in the UI, a page
-reload would flash the *default* empty state (cart badge "0", "not logged
-in", empty preference toggles) for one tick before the real persisted data
-loads. Every store above implements this identically: a boolean field, an
-`onRehydrateStorage` callback that flips it, and consumers check it before
-rendering anything derived from persisted state.
+three intentionally-ephemeral ones (`checkoutStore`, `toastStore`,
+`uiStore`): Zustand's `persist` middleware resolves asynchronously even
+for synchronous storage like `localStorage` (at least one microtask).
+Without a `hasHydrated` flag, gated in the UI, a page reload would flash
+the *default* empty state (cart badge "0", "not logged in", "System" theme
+highlighted instead of a saved "Dark") for one tick before the real
+persisted data loads. Every persisted store implements this identically: a
+boolean field, an `onRehydrateStorage` callback that flips it, and
+consumers check it before rendering anything derived from persisted state.
+`themeStore` was the last holdout to get this (caught during Phase 8's
+regression pass) — all 10 persisted stores now implement it consistently.
 
 ## Service layer — src/services/
 
@@ -133,7 +159,7 @@ in dev, tree-shaken out of production entirely — see Mock backend below).
 | Service | Backs |
 |---|---|
 | `apiClient.ts` | Shared Axios instance (`baseURL: '/api'`) |
-| `productService.ts` | Product listing/detail/related |
+| `productService.ts` | Product listing/detail |
 | `categoryService.ts` | Categories, collections |
 | `reviewService.ts` | Product reviews |
 | `authService.ts` | login/register/logout/me/forgot/reset/change-password/update-profile |
@@ -152,7 +178,6 @@ in dev, tree-shaken out of production entirely — see Mock backend below).
 |---|---|---|
 | GET | `/api/products` | Filter/sort/paginate/search |
 | GET | `/api/products/:slug` | Single product |
-| GET | `/api/products/:slug/related` | Same-category products |
 | GET | `/api/categories` | Category list |
 | GET | `/api/collections/:slug` | Curated collection metadata |
 | GET | `/api/reviews?productId=` | Reviews for a product |
@@ -213,6 +238,175 @@ job or timer (which wouldn't survive a page reload in a client-only app),
 state is computed fresh each time from a fixed request/event timestamp and
 the current time.
 
+## Dark mode
+
+Implemented via CSS variables under a `.dark` class selector
+(`@custom-variant dark (&:where(.dark, .dark *))` in `index.css`), not
+`dark:` utility prefixes scattered across components — Tailwind v4
+utilities reference CSS variables at runtime rather than baking in hex
+values, so overriding a variable's value under `.dark` re-colors every
+existing usage of that utility automatically.
+
+**The one token that couldn't just invert**: `pine` is used both as
+heading *text* (would need to become light in dark mode) and brand *fill*
+for buttons/hero/footer/tags (needs to stay dark green in both modes,
+since those blocks pair it with light text). Resolved with a second,
+independent token — `--color-heading` — requiring a single scripted
+rename of `text-pine` → `text-heading` at its call sites, rather than
+maintaining two colors that happened to share a value in light mode only
+by coincidence.
+
+- `themeStore.ts` + `useThemeSync.ts` (mounted once at `App` root): persisted
+  mode, live system-preference tracking via `matchMedia`, applies
+  `.dark` to `document.documentElement`.
+- FOIT/FOUT prevention is a synchronous inline script in `index.html`,
+  reading the same localStorage key the store persists to — this has to
+  happen before React mounts, since `useEffect`-based theme application
+  runs after first paint.
+- `stone`/`ink` (backgrounds, surfaces, borders, body text) invert
+  cleanly — each plays exactly one role. `pine`/`fern`/`ochre`/`rust`
+  mostly stay close to their light-mode values (used as fill+contrasting-
+  text pairs that would break if inverted), with a few brightened for
+  legibility as isolated text/icons against a dark background.
+- Shadows switch from pine-tinted low-opacity (light mode) to
+  higher-opacity black (dark mode) — a shadow tinted the same color as an
+  already-dark background does nothing useful.
+
+## Search algorithm & recommendation engine
+
+Both built on the same underlying signal: what a person has wishlisted,
+recently viewed, purchased, and searched for (`hooks/useUserSignals.ts`,
+one extraction point, not recomputed separately by each consumer) — but
+they solve different problems with deliberately separate scoring
+functions (see "Notable decisions" below for why they aren't unified into
+one).
+
+### Search algorithm
+
+`components/layout/SearchOverlay.tsx` (thin, always-mounted, owns the
+global ⌘K/Ctrl+K listener) plus the `React.lazy`-loaded
+`SearchOverlayContent.tsx` for the actual UI. Product matching reuses the
+*existing* MSW-backed `useProducts` hook rather than re-implementing
+filtering client-side — the debounced query is sent to
+`GET /api/products?search=`, and only the already-matched results are
+then ranked.
+
+Ranking (`utils/searchRanking.ts`'s `scoreProduct`) is additive point
+scoring, highest wins, ties broken by product ID for full determinism:
+
+| Signal | Points |
+|---|---|
+| Exact name match | 10,000 |
+| Prefix name match | 5,000 |
+| Category name matches the query | 800 |
+| Bestseller badge | 400 |
+| Purchased before (this session's order history) | 350 |
+| Recently viewed | 300 |
+| Wishlisted | 300 |
+| Trending (top of the homepage's trending list) | 200 |
+| Rating | rating × 20 (max 100) |
+
+Categories, collections, and blog posts are ranked separately
+(`utils/textMatch.ts`'s `sortByRelevance`) with a simpler exact >
+prefix > contains ordering — these datasets are small enough (a handful
+of categories, ~10 blog posts) that the full multi-signal product
+algorithm would be overkill. `findDidYouMean` runs only when a query
+returns zero results, using real Levenshtein edit distance (threshold
+scaled to query length: 1 for ≤5 characters, 2 for longer) against every
+product/category/collection name — verified against hand-checked test
+cases before being trusted, not assumed correct.
+
+### Recommendation engine
+
+`utils/recommendations.ts` — five pure functions, all deterministic
+(seeded by product ID via the same `hashOrderId` hash used for courier
+assignment, or by the person's actual accumulated signals; never
+`Math.random()`):
+
+- **`getFrequentlyBoughtTogether`** — a fixed complementary-category chain
+  (`{ plants: [vessels, tools], vessels: [plants, tools], tools: [plants, vessels] }`),
+  seeded pick within the matching category so the same product always
+  recommends the same complement.
+- **`getSimilarProducts`** — category match (500 pts) + price proximity
+  (up to 200 pts, linearly decaying) + care-level match (100 pts) +
+  rating (×10). The closest honest proxies this catalog has for
+  "tags, color, size," which aren't real fields in its schema.
+- **`getCustomersAlsoViewed`** — explicitly mocked (no real cross-customer
+  data exists behind it), a deterministic pseudo-shuffle seeded by
+  `productId::candidateId` pairs.
+- **`getCartComplements`** — `getFrequentlyBoughtTogether` applied to
+  every item currently in the cart, deduplicated, excluding items already
+  present.
+- **`getPersonalizedRecommendations`** — favorite categories derived from
+  weighted signal frequency (purchases ×4, wishlist ×3, recently-viewed
+  ×2), boosted by recent-search-term matches (+300) and bestseller status
+  (+150). Falls back to bestsellers entirely for signal-less guests.
+
+Four sections consume these, all reusing the existing `ProductCarousel`/
+`SectionHeading` components: Home's "Recommended for You," Product
+Detail's "Similar Products"/"Frequently Bought Together"/"Customers Also
+Viewed," Cart's "Complete Your Setup," Dashboard's "Picks for You."
+
+## Analytics & Admin Dashboard
+
+`/admin/*`, gated by `ProtectedRoute requireRole="admin"`. No dedicated
+Zustand store — every number is derived, computed by
+`hooks/useAdminAnalytics.ts` from the existing customer-facing stores
+plus a deterministic mock baseline.
+
+### The honesty problem this section exists to solve
+
+This is a client-only app: one browser, one `localStorage`, one real
+customer. Metrics like "Total Customers" or "Customer Lifetime Value" are
+inherently multi-customer and cannot be honestly computed from that
+alone. Rather than hardcode plausible-looking numbers, `data/mockPlatformHistory.ts`
+generates a deterministic ~90-day baseline (~140 mock customers, weighted
+order-status distribution, mild weekend/trend variation, cross-referencing
+the real product catalog) using a seeded PRNG
+(`utils/seededRandom.ts` — mulberry32, seeded via the existing
+`hashOrderId` hash, verified for determinism/distribution/seed-sensitivity
+in isolation before being trusted). `utils/analytics.ts`'s
+`getUnifiedOrders` is the one join point every metric goes through,
+merging this baseline with real live orders from `orderStore` — **a real
+order placed in the demo genuinely moves every chart derived from
+orders**, not just the mock baseline sitting inertly underneath it.
+
+What's genuinely 100% real, no baseline involved: the search
+click-through rate and no-result-search list (both computed directly from
+real logged `SearchAnalyticsEvent`s in `searchStore`), and the
+"Frequently Bought Together" *analytics* table on the Products page
+(real product co-occurrence counted across the combined order history —
+distinct from, and a genuine complement to, the recommendation engine's
+fixed category-chain logic above).
+
+### Widget library (`components/admin/`)
+
+`StatCard`, `MetricCard` (includes a real period-over-period trend — this
+window's revenue vs. the equal-length window immediately before it),
+`LineChartWidget`, `AreaChartWidget`, `BarChartWidget`, `PieChartWidget`,
+`TableWidget`, `ActivityFeed`. Charts are theme-aware by construction:
+colors are passed as literal `"var(--color-fern)"` strings directly into
+recharts' `stroke`/`fill` props, so toggling `.dark` re-colors every
+chart instantly through the same CSS-variable mechanism the rest of the
+app's theming relies on — no JS re-render or re-coloring logic needed.
+Every chart carries `role="img"` with a real `aria-label` description as
+a screen-reader text alternative. Chart mount/update animation is gated
+by a live `usePrefersReducedMotion` hook — recharts animates via its own
+internal `requestAnimationFrame` logic, not CSS, so the app's existing
+global reduced-motion CSS override (which only catches CSS
+transitions/animations) has no effect on it; this needed a separate,
+explicit fix.
+
+### Six pages
+
+Overview, Revenue (daily/weekly/monthly/yearly, gross/net/discounts/
+shipping), Orders (per-day volume, status breakdown, delivery/
+cancellation/return rates), Products (best/worst sellers, most-viewed/
+wishlisted/returned, frequently-bought-together pairs), Customers,
+Search — each with a date-range filter and a CSV export button that
+genuinely downloads the visible data (`Blob`/`URL.createObjectURL`
+client-side, no fake "export started" toast with nothing behind it).
+
 ## Notable decisions
 
 **Fictional couriers, not the real ones.** Blue Dart, Delhivery, DTDC,
@@ -255,6 +449,36 @@ read is simpler, stateless, and correct after any reload.
 (inherited from Phase 4's cart design) — a placed order's total shouldn't
 change retroactively if a product's price changes later.
 
+**One CSS token can't serve two incompatible roles, so `pine`/`heading`
+were split rather than compromised.** Covered in detail under "Dark mode"
+above — noted here too since it's the kind of decision that determines
+whether a feature request touches 5 files or 50, and it's worth being
+able to find from either section.
+
+**Recommendation scoring and search scoring are deliberately separate
+functions, not one function serving both.** `scoreProduct` (search) needs
+a typed query to score exact/prefix matches against; recommendations have
+no query, only accumulated signals. Sharing the small pieces that
+actually overlap (`getMatchQuality`, `UserSignals`, `hashOrderId`) while
+keeping the two scoring functions themselves separate avoided forcing an
+awkward "optional query" parameter into logic that's conceptually
+different, just to technically reuse one function.
+
+**recharts is a second deliberate, scoped exception to "continue using
+the existing stack,"** for the same reason jsPDF was: a real analytics
+dashboard needs a real charting library, and building one from scratch
+would be far more code than adopting a well-established one. Chart colors
+are passed as literal CSS-variable strings rather than resolved hex
+values, so theming stays entirely CSS-driven — consistent with how the
+rest of the app's dark mode works, rather than introducing a second,
+JS-based re-coloring mechanism just for charts.
+
+**Admin is a role on the same `User` type, not a parallel account
+system.** A `role?: 'customer' | 'admin'` field and one extended
+`ProtectedRoute` prop were enough — building a separate admin
+authentication stack would have duplicated the entire session/token/
+hydration machinery `authStore` already handles correctly.
+
 ## Known simplifications, documented rather than hidden
 
 - **Guest and account carts aren't merged** on login — cart state is
@@ -281,6 +505,28 @@ change retroactively if a product's price changes later.
   exists; a curated collection like "gifting" shows the full catalog
   under that collection's framing copy rather than a true cross-category
   product filter.
+- **"Frequently Bought Together" doesn't have the exact category chain
+  the feature was specified with.** This catalog has 3 categories
+  (Plants/Vessels/Tools), not literal Fertilizer/Plant Food/Decorative
+  Pebbles products — `utils/recommendations.ts` applies the same
+  complementary-category *pattern* (a plant needs a vessel and care
+  tools) to what actually exists in the catalog.
+- **"Similar Products" doesn't score by tags, color, or size**, because
+  this catalog doesn't track those as real product fields. It uses
+  category, price proximity, and care-level as the closest honest
+  proxies — not invented data pretending to be real attributes.
+- **"Customers Also Viewed" has no real cross-customer behavioral data
+  behind it** — there's no backend tracking what other people viewed. It's
+  a deterministic pseudo-selection seeded by product ID, documented as a
+  mock in the code rather than presented as if it were real.
+- **The admin dashboard's customer-count metrics (Total/Active/New/
+  Returning Customers, Lifetime Value) are a deterministic mock baseline
+  combined with this session's real data**, not real multi-tenant
+  analytics — this client-only app has exactly one real customer per
+  browser. Every chart genuinely responds to real orders placed in the
+  demo (see "Analytics & Admin Dashboard" above), but the underlying
+  ~140-customer baseline is synthetic, seeded, and documented as such in
+  both the code and this file, not silently presented as live data.
 
 ## Folder structure
 
@@ -289,8 +535,10 @@ src/
 ├── components/
 │   ├── common/      # FormField, PasswordInput, Alert, Toast, Modal,
 │   │                #   LoadingOverlay, Breadcrumb, PageHeader, Accordion,
-│   │                #   EmptyState, PageLoader, Logo, Pagination
-│   ├── layout/      # Navbar, Footer, MobileNav, MegaMenu, SearchDrawer, Layout
+│   │                #   EmptyState, PageLoader, Logo, Pagination,
+│   │                #   ThemeToggle, HighlightText
+│   ├── layout/      # Navbar, Footer, MobileNav, MegaMenu, SearchOverlay,
+│   │                #   SearchOverlayContent, Layout
 │   ├── ui/          # Button, Tag, Card, Container — design-system primitives
 │   ├── product/     # Listing, filters, gallery, variants, reviews, cards
 │   ├── cart/        # SlideCart, CartLineItem, CartSummary, CouponInput,
@@ -304,19 +552,32 @@ src/
 │   ├── checkout/    # CheckoutLayout, CheckoutStepper, DeliveryOptionCard,
 │   │                #   PaymentForms
 │   ├── order/       # OrderSummary, OrderRow, TrackingTimeline
+│   ├── home/        # BestSellers, TrendingProducts, RecommendedForYou,
+│   │                #   FeaturedCollections, Benefits, Testimonials,
+│   │                #   PromoBanners, BlogPreview
+│   ├── admin/       # AdminLayout, AdminSidebar, AdminMobileNav,
+│   │                #   StatCard, MetricCard, TableWidget, ActivityFeed,
+│   │                #   DateRangeFilter, ExportButton, charts/ (Line,
+│   │                #   Area, Bar, Pie widgets)
 │   └── forms/       # NewsletterForm
 ├── pages/           # Route-level components, all lazy-loaded
 ├── routes/          # Router config
 ├── hooks/           # useProducts, useCart, useWishlist, useAuth, useBlog,
-│                    #   useAddresses, useOrderTracking, etc.
+│                    #   useAddresses, useOrderTracking, useUserSignals,
+│                    #   useSearchResults, useRecommendations, useThemeSync,
+│                    #   useFocusTrap, useAdminAnalytics,
+│                    #   usePrefersReducedMotion, etc.
 ├── services/        # API layer — see table above
 ├── store/           # Zustand stores — see table above
 ├── utils/           # cn, pricing, currency, validation schemas, fakeJwt,
 │                    #   apiError, region, tracking, refund, orderId,
-│                    #   packageDetails, invoice (PDF), orderStatus
+│                    #   packageDetails, invoice (PDF), orderStatus,
+│                    #   textMatch, searchRanking, recommendations,
+│                    #   seededRandom, analytics
 ├── mocks/           # MSW handlers — see table above
 ├── data/            # Mock content fixtures — products, reviews, blog,
 │                    #   faq, policies, users, couriers, countries,
-│                    #   deliveryMethods, paymentMethods, trackingStages
+│                    #   deliveryMethods, paymentMethods, trackingStages,
+│                    #   trendingSearches, mockPlatformHistory
 └── types/           # Shared TypeScript types, one file per domain
 ```

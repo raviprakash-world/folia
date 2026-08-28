@@ -236,17 +236,17 @@ export default function AccountOrderDetail() {
       </div>
 
       <div className="mb-12">
-        <h2 className="font-display text-lg font-semibold text-pine mb-4">Delivery tracking</h2>
+        <h2 className="font-display text-lg font-semibold text-heading mb-4">Delivery tracking</h2>
         <TrackingTimeline order={order} />
       </div>
 
       <div className="mb-10">
-        <h2 className="font-display text-lg font-semibold text-pine mb-4">Order summary</h2>
+        <h2 className="font-display text-lg font-semibold text-heading mb-4">Order summary</h2>
         <OrderSummary order={order} />
       </div>
 
       <div className="mb-10 max-w-md">
-        <h2 className="font-display text-lg font-semibold text-pine mb-3">Notes</h2>
+        <h2 className="font-display text-lg font-semibold text-heading mb-3">Notes</h2>
         <textarea
           value={notesDraft}
           onChange={(e) => setNotesDraft(e.target.value)}

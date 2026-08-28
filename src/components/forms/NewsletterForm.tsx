@@ -71,7 +71,7 @@ export function NewsletterForm() {
           type="submit"
           disabled={isSubmitting}
           aria-label="Subscribe"
-          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] bg-ochre text-pine hover:bg-ochre-light transition-colors disabled:opacity-50"
+          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] bg-ochre text-heading hover:bg-ochre-light transition-colors disabled:opacity-50"
         >
           <ArrowRight size={16} />
         </button>

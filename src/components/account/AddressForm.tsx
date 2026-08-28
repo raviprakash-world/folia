@@ -211,7 +211,7 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
           <button
             type="button"
             onClick={handleDetectLocation}
-            className="flex items-center gap-1.5 text-xs text-fern hover:text-pine transition-colors"
+            className="flex items-center gap-1.5 text-xs text-fern hover:text-heading transition-colors"
           >
             <MapPin size={12} />
             Detect my location (mock)

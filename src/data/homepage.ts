@@ -64,4 +64,4 @@ export const megaMenuCategories = [
   },
 ];
 
-export const recentSearchesSeed = ['fiddle leaf fig', 'ceramic planter', 'low light'];
+

@@ -74,7 +74,7 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
                 e.stopPropagation();
                 onEdit();
               }}
-              className="flex items-center gap-1.5 text-xs text-ink-soft hover:text-pine transition-colors"
+              className="flex items-center gap-1.5 text-xs text-ink-soft hover:text-heading transition-colors"
             >
               <Pencil size={12} />
               Edit

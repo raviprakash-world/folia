@@ -21,7 +21,7 @@ export default function Search() {
 
   return (
     <Container className="py-16">
-      <h1 className="font-display text-3xl font-semibold text-pine mb-2">
+      <h1 className="font-display text-3xl font-semibold text-heading mb-2">
         {query ? `Results for "${query}"` : 'Search'}
       </h1>
       {query && (

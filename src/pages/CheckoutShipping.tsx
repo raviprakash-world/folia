@@ -72,7 +72,7 @@ export default function CheckoutShipping() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-pine mb-1">Shipping address</h1>
+      <h1 className="font-display text-2xl font-semibold text-heading mb-1">Shipping address</h1>
       <p className="text-sm text-ink-soft mb-6">Choose where your order should ship.</p>
 
       {status === 'pending' && addresses.length === 0 && (
@@ -110,7 +110,7 @@ export default function CheckoutShipping() {
           <button
             type="button"
             onClick={() => setFormOpen(true)}
-            className="flex items-center gap-1.5 text-sm text-fern hover:text-pine transition-colors mb-10"
+            className="flex items-center gap-1.5 text-sm text-fern hover:text-heading transition-colors mb-10"
           >
             <Plus size={14} />
             Add a new address

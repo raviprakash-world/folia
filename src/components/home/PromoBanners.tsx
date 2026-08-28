@@ -13,7 +13,7 @@ const promos = [
     title: 'Gift a plant, not a guess',
     description: 'Gift cards never wilt.',
     to: '/shop/gift-cards',
-    tone: 'bg-ochre text-pine',
+    tone: 'bg-ochre text-heading',
   },
 ];
 

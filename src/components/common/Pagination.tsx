@@ -32,7 +32,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         onClick={() => onPageChange(page - 1)}
         disabled={page === 1}
         aria-label="Previous page"
-        className="p-2 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        className="p-2 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark disabled:opacity-30 disabled:pointer-events-none transition-colors"
       >
         <ChevronLeft size={18} />
       </button>
@@ -50,7 +50,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
             aria-current={p === page ? 'page' : undefined}
             className={cn(
               'w-9 h-9 rounded-[var(--radius-control)] font-mono text-sm transition-colors',
-              p === page ? 'bg-pine text-stone-light' : 'text-ink-soft hover:bg-stone-dark hover:text-pine'
+              p === page ? 'bg-pine text-stone-light' : 'text-ink-soft hover:bg-stone-dark hover:text-heading'
             )}
           >
             {p}
@@ -63,7 +63,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         onClick={() => onPageChange(page + 1)}
         disabled={page === totalPages}
         aria-label="Next page"
-        className="p-2 rounded-[var(--radius-control)] text-ink-soft hover:text-pine hover:bg-stone-dark disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        className="p-2 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark disabled:opacity-30 disabled:pointer-events-none transition-colors"
       >
         <ChevronRight size={18} />
       </button>

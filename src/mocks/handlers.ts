@@ -68,17 +68,6 @@ export const handlers = [
     return HttpResponse.json(product);
   }),
 
-  // GET /api/products/:slug/related — same category, excluding self
-  http.get('/api/products/:slug/related', async ({ params }) => {
-    await delay(API_DELAY_MS);
-    const product = products.find((p) => p.slug === params.slug);
-    if (!product) return HttpResponse.json([]);
-    const related = products
-      .filter((p) => p.categorySlug === product.categorySlug && p.id !== product.id)
-      .slice(0, 4);
-    return HttpResponse.json(related);
-  }),
-
   // GET /api/categories
   http.get('/api/categories', async () => {
     await delay(API_DELAY_MS);

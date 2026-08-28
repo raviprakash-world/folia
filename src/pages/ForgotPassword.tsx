@@ -37,7 +37,7 @@ export default function ForgotPassword() {
     return (
       <Container className="py-20 max-w-sm text-center">
         <Mail size={28} className="text-fern mx-auto mb-4" />
-        <h1 className="font-display text-2xl font-semibold text-pine">Check your email</h1>
+        <h1 className="font-display text-2xl font-semibold text-heading">Check your email</h1>
         <p className="text-sm text-ink-soft mt-2">
           If an account exists for that address, a reset link is on its way.
         </p>
@@ -49,7 +49,7 @@ export default function ForgotPassword() {
             </p>
             <Link
               to={`/account/reset-password?token=${devToken}`}
-              className="text-sm text-fern hover:text-pine underline break-all"
+              className="text-sm text-fern hover:text-heading underline break-all"
             >
               Continue to reset password
             </Link>
@@ -61,7 +61,7 @@ export default function ForgotPassword() {
 
   return (
     <Container className="py-20 max-w-sm">
-      <h1 className="font-display text-3xl font-semibold text-pine">Reset your password</h1>
+      <h1 className="font-display text-3xl font-semibold text-heading">Reset your password</h1>
       <p className="text-sm text-ink-soft mt-2">Enter your email and we'll send a link to reset it.</p>
 
       {errorMessage && (
@@ -78,7 +78,7 @@ export default function ForgotPassword() {
       </form>
 
       <p className="text-sm text-ink-soft mt-6 text-center">
-        <Link to="/account/login" className="text-fern hover:text-pine transition-colors">Back to sign in</Link>
+        <Link to="/account/login" className="text-fern hover:text-heading transition-colors">Back to sign in</Link>
       </p>
     </Container>
   );

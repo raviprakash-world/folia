@@ -294,3 +294,320 @@ cost); nothing genuinely orphaned remains. Bundle impact of this phase's
 largest addition (jsPDF) confirmed via the actual build output: main
 chunk 465.78KB, up only ~1.5KB from 464.22KB before jsPDF was added —
 everything else it pulls in is lazy.
+
+## Phase 8 — Premium User Experience (Dark Mode, Advanced Search, Recommendation Engine)
+
+### Dark mode
+
+Full light/dark/system theming, implemented via CSS variables rather than
+`dark:` utility prefixes scattered across components — meaning most of the
+app required **zero component changes** to support both themes.
+
+The one hard problem: `pine` (the brand color) plays two incompatible
+roles — heading *text* (needs to invert to light in dark mode, since dark
+green on a dark background is unreadable) and brand *fill* for buttons/
+hero/footer/tags (needs to stay dark green in both modes, since those
+blocks pair it with light text and would break if it inverted). Resolved
+with one new token, `--color-heading`, independent of `pine`, requiring a
+single scripted rename of `text-pine` → `text-heading` at its 53 call
+sites — verified zero false-positive collision risk before running it
+(confirmed `pine-light` is never used as text, only as a `bg-` hover
+state), and confirmed afterward that all 20 `bg-pine` brand-fill usages
+were untouched. Everything else (the `stone`/`ink` families — page
+backgrounds, card surfaces, borders, body text) inverts automatically via
+`.dark` CSS variable overrides, since Tailwind v4 utilities reference
+variables at runtime rather than baking in hex values.
+
+- **`themeStore.ts`**: persisted `mode` (light/dark/system); live
+  `systemPrefersDark` tracked separately, never persisted, so "System"
+  always reflects the actual current OS setting rather than a stale
+  snapshot from whenever the preference was last saved.
+- **`useThemeSync.ts`**: applies the resolved theme to `<html class="dark">`
+  and listens for live `prefers-color-scheme` changes — "System" mode
+  updates immediately if the OS setting changes, no reload needed.
+  Mounted once, at `App` root.
+- **FOIT/FOUT prevention**: a synchronous inline script in `index.html`'s
+  `<head>`, reading the same `folia-theme` localStorage key the store
+  persists to, sets the `.dark` class before first paint — React's
+  `useEffect`-based theme application runs after paint, too late to avoid
+  a flash on a slow device.
+- **`ThemeToggle.tsx`**: one component, two renderings (compact icon-only
+  for the Navbar, labeled for Account Settings) — same store, not two
+  implementations.
+- **Theme-aware shadows**: dark-mode shadow variables switch from
+  pine-tinted low-opacity to higher-opacity black, since a shadow based on
+  a dark color is nearly invisible against an already-dark background.
+- **Two requirements didn't map onto this app, flagged rather than faked**:
+  no code blocks exist anywhere (this is a storefront, not a docs site),
+  and no real photographic images exist (a Phase 1 decision — every
+  "photo" is a `bg-stone-dark` placeholder, which inverts automatically
+  along with every other surface token).
+
+### Advanced Search
+
+Replaced the Phase 2 `SearchDrawer` (a dropdown that locally filtered a
+hardcoded product subset, and whose "recent searches" were never actually
+persisted despite looking like it) with a full command-palette overlay.
+
+- **`SearchOverlay.tsx`** (thin, always-mounted — owns the global ⌘K/
+  Ctrl+K listener) + **`SearchOverlayContent.tsx`** (the actual heavy UI,
+  `React.lazy`-loaded so its ~12KB plus the ranking/matching logic it
+  pulls in never touches the main bundle until someone actually opens
+  search). Full-screen, backdrop blur, Framer Motion animation.
+- **`useFocusTrap.ts`**: extracted from `Modal.tsx`'s existing inline
+  focus-trap implementation, since the overlay needed the identical
+  Tab-cycling/Escape/focus-restoration behavior and writing it a second
+  time would have been exactly the duplicate logic this phase's
+  instructions explicitly ruled out. `Modal` now uses the same hook.
+- **`searchStore.ts`**: persisted recent searches (max 10, deduplicated,
+  most-recent-first) — a real fix, not just a rewrite, since Phase 2's
+  version was never actually persisted. Also logs search analytics events
+  (query, result count, clicked result) for a future admin dashboard that
+  doesn't exist yet in this app — the capture point is real, documented
+  as forward-looking infrastructure rather than oversold as a finished
+  dashboard.
+- **`trendingSearches.ts`**: deterministic date-based rotation (a fixed
+  pool, sliced by day-of-year ÷ rotation period) — never `Math.random()`.
+- **`textMatch.ts`**: highlight-range splitting (reused by `HighlightText.tsx`
+  across every suggestion type), relevance scoring for the smaller
+  category/collection/blog datasets, and a real Levenshtein-distance
+  "did you mean" — verified against known test cases before trusting it.
+- **`searchRanking.ts`**: the explicitly-required reusable ranking
+  utility — a pure function (`scoreProduct`/`rankProducts`), no UI
+  component embeds this logic. Scores exact/prefix match, category
+  relevance, bestseller status, recently-viewed/wishlist/purchase-
+  history/trending signals, and rating.
+- **`useSearchResults.ts`**: composes the debounced query with the
+  *existing* MSW-backed `useProducts` hook (extended with a minimal,
+  backward-compatible `enabled` option, not a parallel hook) plus static
+  category/collection/blog matching — reuses established data sources
+  rather than re-fetching or re-filtering independently.
+- Full keyboard navigation (Arrow Up/Down/Enter/Escape/Tab), a premium
+  zero-results state (did-you-mean, trending fallback, popular
+  categories, continue-browsing action), loading skeletons, and result
+  counts.
+
+### Recommendation Engine
+
+- **`useUserSignals.ts`**: extracted shared signal-gathering (wishlist,
+  recently-viewed, purchase history, search history) so `useSearchResults`
+  and the new recommendation hooks compute the same signals once, not
+  twice. While extracting it, found and fixed a real memoization bug: the
+  original code mapped over store arrays *inside* the Zustand selector
+  itself, which creates a new array reference every render regardless of
+  whether the underlying data changed — quietly undermining "memoized
+  ranking," one of this phase's explicit requirements. Fixed by selecting
+  the raw stable array first, deriving via `useMemo` second.
+- **`recommendations.ts`**: the deterministic engine —
+  `getFrequentlyBoughtTogether` (category-chain, seeded pick),
+  `getSimilarProducts` (category + price proximity + care-level + rating),
+  `getCustomersAlsoViewed` (honestly mocked — no real cross-customer data
+  exists behind it, documented as such), `getCartComplements`,
+  `getPersonalizedRecommendations` (weighted category frequency from
+  wishlist/recently-viewed/purchases, boosted by search-history matches,
+  falls back to bestsellers for signal-less guests). Every function is
+  pure and seeded by product ID or actual persisted signals — no
+  `Math.random()` anywhere in the chain, so results are stable across
+  reloads for the same account state.
+- **Two gaps in the brief that don't map onto this catalog, documented
+  rather than hidden**: this catalog has 3 categories (Plants/Vessels/
+  Tools), not the brief's literal Fertilizer/Plant Food/Decorative
+  Pebbles chain — the same complementary-category *pattern* is applied to
+  what actually exists. Similarly, "tags, color, size" aren't real fields
+  in this catalog's schema — `getSimilarProducts` uses category, price
+  proximity, and care-level as the closest honest proxies.
+- **Four sections wired**, all reusing the existing `ProductCarousel`/
+  `SectionHeading` components (zero new UI primitives): Home's
+  "Recommended for You," Product Detail's three-way split ("Similar
+  Products" / "Frequently Bought Together" / "Customers Also Viewed"),
+  Cart's "Complete Your Setup," Dashboard's "Picks for You."
+- **Real cleanup, not orphaned code**: replacing Product Detail's old
+  MSW-fetched "You might also like" section (same-category-only, Phase 3)
+  with the richer client-side `getSimilarProducts` made `useRelatedProducts`,
+  `fetchRelatedProducts`, and their MSW handler genuinely dead — confirmed
+  via grep for zero remaining call sites before removing all three,
+  consistent with the no-dead-code discipline maintained since Phase 5.
+
+### Bugs caught and fixed during this phase's regression passes
+
+- The same `react-hooks/set-state-in-effect` issue hit for a third time
+  in this project (Phase 2's `SearchDrawer`, Phase 7's `CheckoutDelivery`,
+  now `SearchOverlayContent`'s active-index reset) — fixed this time using
+  React's own documented "adjust state during render" pattern (compare
+  against a previous value stored in state, `setState` conditionally
+  during render) rather than an effect, which avoids the extra
+  effect-triggered render pass entirely.
+- Found `themeStore` was the only persisted store in the entire app *not*
+  implementing the `hasHydrated` gating pattern every other store uses —
+  the same class of bug caught in `preferencesStore` during Phase 7's
+  regression pass. The actual page theme was already protected by the
+  inline anti-flash script, but `ThemeToggle`'s active-button state could
+  have flashed "System" before flipping to a saved "Dark" preference.
+  Fixed for consistency; all 10 persisted stores in the app now implement
+  the pattern identically.
+- The dead-export scan caught `recentSearchesSeed` (orphaned once the old
+  `SearchDrawer` was deleted) and a docstring on `scoreProduct` that
+  overclaimed a reuse that didn't actually materialize (recommendation
+  scoring has no text query to match against, so `recommendations.ts`
+  ended up with its own scoring functions instead). Caught my own first
+  correction of that docstring being itself slightly wrong — it
+  misattributed which file a shared type lived in — by checking the
+  actual imports before finalizing the fix rather than trusting the first
+  pass.
+
+### Verification
+
+`npx tsc -b`, `eslint . --max-warnings 0`, `npm run build`, and
+`npm run preview` all checkpointed after every major sub-phase (dark
+mode, then search, then recommendations), not once at the end. 15 routes
+across every phase confirmed HTTP 200 through the production preview
+build after each checkpoint. Bundle impact tracked precisely at every
+step: dark mode added 2.47KB to the main chunk; search added 0.61KB
+(`SearchOverlayContent` correctly isolated into its own lazy chunk,
+confirmed in the build output); the recommendation engine moved the main
+chunk by roughly 60 bytes. No chunk-size warning at any checkpoint.
+
+## Phase 9 — Admin Analytics Dashboard
+
+**A real bug fix before this phase started**: `SearchOverlayContent.tsx`
+had a Zustand selector calling `.map()` inline
+(`useRecentlyViewedStore((s) => s.items.map(...))`), returning a brand-new
+array reference on every single call. Zustand's `useStore` is built on
+React's `useSyncExternalStore`, which calls the selector multiple times
+per render to detect concurrent-mode tearing — when the selector always
+returns "something different," React concludes the snapshot changed and
+re-renders to reconcile, which calls the selector again, forever. This is
+a well-documented Zustand/`useSyncExternalStore` failure mode, and a more
+severe version of a pattern already partially fixed earlier this project
+(`useUserSignals.ts`) — that earlier fix was described as a memoization
+optimization, which undersold it; it's a correctness bug, not just wasted
+computation. Grepped the entire codebase for the same anti-pattern before
+calling it fixed; this was the only remaining instance.
+
+### Admin authentication
+
+Extends the *existing* `User`/`SeedUser` types with an optional `role`
+field rather than building a parallel user system — a seeded demo admin
+account (`admin@folia.example` / `folia-admin`) is just another row in
+the same mock user list. `ProtectedRoute` gained an optional `requireRole`
+prop and configurable `redirectTo`, reused for both `/account/*` and
+`/admin/*` rather than a second route-guard component.
+`AdminLogin.tsx` reuses the exact same `authStore.login` action and
+`loginSchema` as customer login — a real customer account can
+authenticate there, but is immediately signed back out with an
+explanation rather than left in a confusing half-logged-in state on the
+admin screen.
+
+### The mock data problem, and how it's handled honestly
+
+This app has no real backend — one browser, one `localStorage`, one
+customer. Several requested metrics (Total/Active/New/Returning
+Customers, Customer Lifetime Value, Most Viewed, Most Wishlisted) are
+inherently *multi-customer* and can't be honestly derived from a single
+session. Rather than hardcode fabricated numbers, `utils/seededRandom.ts`
+(a deterministic mulberry32 PRNG, seeded via the existing `hashOrderId`
+hash rather than reimplementing string-hashing — verified for
+determinism, distribution, and seed-sensitivity in isolation before
+trusting it) generates `data/mockPlatformHistory.ts`: ~90 days of
+baseline mock orders across ~140 mock customers, cross-referencing the
+*real* product catalog, with weighted status distribution and mild
+weekend/trend variation. `utils/analytics.ts` merges this baseline with
+real live data from `orderStore`/`wishlistStore`/`recentlyViewedStore`/
+`searchStore` at one join point (`getUnifiedOrders`) — meaning **placing
+a real order in the demo genuinely moves every chart derived from
+orders**, not just the baseline. Every metric that *can* be computed
+honestly from real data alone is — the search click-through rate and
+no-result-search list come entirely from real logged
+`SearchAnalyticsEvent`s, and "Frequently Bought Together" analytics use
+real product co-occurrence counted from the combined order history
+(distinct from, and a genuine complement to, the Phase 8 recommendation
+engine's category-chain logic).
+
+### Widget library (`components/admin/`)
+
+`StatCard`, `MetricCard` (with a real period-over-period revenue trend —
+this window's gross revenue vs. the equal-length window immediately
+before it, not a placeholder number), `LineChartWidget`, `AreaChartWidget`,
+`BarChartWidget`, `PieChartWidget`, `TableWidget`, `ActivityFeed`. Charts
+are theme-aware by construction, not by JS re-coloring logic: colors are
+passed as literal `"var(--color-fern)"` strings directly into recharts'
+`stroke`/`fill` props, so toggling `.dark` on `<html>` re-colors every
+chart instantly through the same CSS-variable mechanism the rest of the
+app's dark mode already relies on.
+
+### Six admin pages
+
+Overview, Revenue (all 4 granularities, gross/net/discounts/shipping),
+Orders (per-day volume, status breakdown, delivery/cancellation/return
+rates), Products (best/worst sellers, most-viewed/wishlisted/returned,
+frequently-bought-together pairs), Customers, Search — each composed
+from the shared widget library, a date-range filter, and a CSV export
+button that genuinely downloads the visible data (client-side
+`Blob`/`URL.createObjectURL`, no fake "export started" toast with
+nothing behind it).
+
+### Accessibility
+
+- **Reduced motion, done properly, not just claimed**: recharts animates
+  chart mount/update via its own internal `requestAnimationFrame` logic,
+  not CSS — the app's existing global
+  `@media (prefers-reduced-motion: reduce)` CSS override (which disables
+  CSS transitions/animations) has **no effect on it**. A live
+  `usePrefersReducedMotion` hook (same `matchMedia` pattern as theme's
+  system-preference tracking) is wired into all four chart widgets,
+  passing `isAnimationActive={false}` when the preference is set.
+- Every chart carries a `role="img"` wrapper with a real `aria-label`
+  description of its content (result counts, ranges, status breakdowns)
+  as a text alternative — genuinely readable by a screen reader, not a
+  decorative label.
+- Keyboard navigation: every interactive admin element (`NavLink`,
+  native `<select>` for date range, `<button>` for export/logout) is a
+  standard focusable element, no custom-built controls that would need
+  extra `tabIndex`/keydown handling. The logout confirmation reuses the
+  same `Modal` + `useFocusTrap` hook as everywhere else in the app.
+- High-contrast (forced-colors mode): every admin file was grepped for
+  hardcoded hex colors and non-token Tailwind color classes — zero found,
+  confirming every color reference goes through the same CSS-variable
+  token system the rest of the app's dark mode relies on. SVG chart
+  fills/strokes are a known, common limitation of data-visualization
+  libraries under forced-colors mode (browsers don't automatically remap
+  SVG paint the way they do backgrounds/borders on HTML elements) — the
+  `role="img" aria-label` text alternative on every chart is the
+  mitigation, not a claim that the charts themselves fully repaint under
+  forced-colors.
+
+### Verification
+
+`npx tsc -b`, `eslint . --max-warnings 0`, `npm run build`, and
+`npm run preview` all checkpointed after every major addition. The full
+code-quality checklist (no TODO/FIXME, no `console.log`, no
+`@ts-ignore`/`@ts-expect-error`, no real `any`) passed clean. The dead-
+export scan caught two real issues, not just self-documenting types:
+`MetricCard` was built but never actually used anywhere (fixed by wiring
+it into `AdminOverview` with the real revenue-trend calculation
+mentioned above, not a forced/artificial use), and `productsMatchingTerm`
+in `analytics.ts` was genuinely dead (removed, along with its
+now-unused import) rather than retrofitted into an awkward feature just
+to justify its existence. A TypeScript literal-type-widening issue
+surfaced while fixing the first of these — an ESLint
+`no-unnecessary-type-assertion` warning was correct in isolation
+(removing the assertion didn't change the ternary's own type) but
+removing it broke a downstream consumer, because the object literal's
+property was widened to `string` by the surrounding `useMemo` callback's
+lack of an explicit return type. Fixed at the actual source (an explicit
+`useMemo<T>()` type parameter) rather than re-adding the assertion the
+linter had correctly flagged. 23 routes (13 storefront + 3 auth + 7
+admin) confirmed HTTP 200 through the production preview build. Every
+admin file confirmed to use zero hardcoded colors. Zero new Zustand
+stores created — admin analytics is entirely derived via hooks reading
+the existing `orderStore`/`wishlistStore`/`recentlyViewedStore`/
+`searchStore`, per the phase's explicit "extend existing stores, don't
+create parallel implementations" instruction. `recharts`'s core chart
+renderer (`CartesianChart`, ~339KB) confirmed isolated into its own lazy
+chunk in the build output — the main bundle only contains the dynamic-
+`import()` module reference needed for route-based code splitting
+(verified by grep: real admin page copy like "Total customers" does not
+appear in the main chunk), not actual admin page content. Main bundle
+grew by ~5.8KB total across this entire phase — `AdminLayout` is eagerly
+bundled, matching the same established pattern as `AccountLayout` and
+`CheckoutLayout`, not a new inconsistency.

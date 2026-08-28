@@ -36,6 +36,11 @@ Requires Node 20+.
 **Demo account:** `demo@folia.example` / `folia-demo` — the only account that
 survives a page reload (see "Known simplifications" in ARCHITECTURE.md for why).
 
+**Demo admin account:** `admin@folia.example` / `folia-admin` — sign in at
+`/admin/login` for the analytics dashboard.
+
+**Try ⌘K / Ctrl+K** anywhere in the app for the command-palette search.
+
 ## Design system
 
 Every color, font, radius, and shadow used in the UI is a token defined once in
@@ -62,12 +67,14 @@ See "Folder structure" in `ARCHITECTURE.md` for the full annotated tree.
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Scaffolding, Tailwind, design tokens, shared UI primitives, routing, layout | ✅ Done |
-| 2 | Homepage sections, full nav (mega menu, search drawer), footer polish | ✅ Done |
+| 2 | Homepage sections, full nav (mega menu, search), footer polish | ✅ Done |
 | 3 | Product listing (filters/sort/pagination), product detail, MSW mock API | ✅ Done |
 | 4 | Cart, wishlist, Zustand stores, persistence | ✅ Done |
 | 5 | Static pages, forms (RHF + Zod), mock authentication, blog, FAQ | ✅ Done |
 | 6 | Account dashboard, address book, full checkout flow, orders | ✅ Done |
 | 7 | Order tracking, returns/cancellation, notification center, dashboard analytics, PDF invoices | ✅ Done |
+| 8 | Dark mode, command-palette search (⌘K), deterministic recommendation engine | ✅ Done |
+| 9 | Admin analytics dashboard (revenue/orders/products/customers/search), mock role-based auth | ✅ Done |
 
 Every route renders real content — no placeholder pages exist anywhere in
 the app, and every list/detail screen (orders, addresses, notifications) has
@@ -91,6 +98,29 @@ The short version:
 - **Delivery tracking and refund status** are computed from real elapsed
   time (deterministically seeded per order), not random and not live.
 - **Invoices are real PDFs** (via jsPDF), generated from mock order data.
+- **Dark mode is fully real** — persisted, system-aware, no flash on load.
+  The one genuinely mock-adjacent piece: search's "trending searches" and
+  the recommendation engine's "Customers Also Viewed" are deterministic,
+  documented mocks (no live trending data, no real cross-customer
+  behavior) — never random, always the same for the same inputs.
+- **The admin analytics dashboard combines a deterministic mock platform
+  baseline (~90 days, ~140 mock customers) with your real live session
+  data** — this is a client-only app with exactly one real customer per
+  browser, so multi-customer metrics can't be 100% real. A real order
+  placed in the demo genuinely moves every chart derived from orders;
+  the search click-through rate and no-result-search list are 100% real,
+  computed from actual logged search events. Full explanation in
+  `ARCHITECTURE.md`'s "Analytics & Admin Dashboard" section.
+
+Full write-ups of the theme system, the search ranking algorithm, the
+recommendation engine, and the analytics dashboard are dedicated,
+clearly-headed sections in `ARCHITECTURE.md` — not scattered across
+separate files, so the reasoning behind related decisions stays together.
+- **Dark mode is fully real** — persisted, system-aware, no flash on load.
+  The one genuinely mock-adjacent piece: search's "trending searches" and
+  the recommendation engine's "Customers Also Viewed" are deterministic,
+  documented mocks (no live trending data, no real cross-customer
+  behavior) — never random, always the same for the same inputs.
 
 Full detail on every one of these — including the handful of documented
 simplifications (partial returns, guest/account cart merging) — is in
