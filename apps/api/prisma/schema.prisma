@@ -1,0 +1,16 @@
+// Folia API — Prisma schema
+//
+// Phase 0 scope: connectivity + migration pipeline only. Business models
+// (User, Session, Role, Permission, and everything after) are explicitly
+// Phase 1's deliverable per the project's own phase breakdown — adding
+// them here would be starting Phase 1 before Phase 0 is reviewed, which
+// the brief's own rules say not to do.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
