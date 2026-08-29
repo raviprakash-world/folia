@@ -70,4 +70,18 @@ describe('env.validation', () => {
     });
     expect(result.CORS_ORIGINS).toBe('http://a.com,http://b.com');
   });
+
+  it('accepts valid JWT expiry duration formats', () => {
+    for (const value of ['15m', '1h', '30d', '7 days', '900']) {
+      expect(() =>
+        validate({ ...validBaseConfig, JWT_ACCESS_EXPIRY: value }),
+      ).not.toThrow();
+    }
+  });
+
+  it('rejects an invalid JWT expiry format (the exact scenario this validation exists to catch)', () => {
+    expect(() =>
+      validate({ ...validBaseConfig, JWT_ACCESS_EXPIRY: 'fifteen minutes' }),
+    ).toThrow(/JWT_ACCESS_EXPIRY/);
+  });
 });

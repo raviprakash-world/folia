@@ -3,6 +3,7 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { AppConfigService } from './config/app-config.service';
@@ -14,6 +15,7 @@ async function bootstrap() {
 
   app.useLogger(app.get(Logger));
   app.use(helmet());
+  app.use(cookieParser());
   app.enableCors({ origin: config.corsOrigins, credentials: true });
 
   // Every route the frontend calls is prefixed with /api — matches the

@@ -1,10 +1,8 @@
 // Folia API — Prisma schema
 //
-// Phase 0 scope: connectivity + migration pipeline only. Business models
-// (User, Session, Role, Permission, and everything after) are explicitly
-// Phase 1's deliverable per the project's own phase breakdown — adding
-// them here would be starting Phase 1 before Phase 0 is reviewed, which
-// the brief's own rules say not to do.
+// Phase 1: Authentication & Users. Adds User, Session, Role, Permission,
+// PasswordResetToken, and EmailVerificationToken — the tables this
+// project's own phase breakdown assigns to Phase 1.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,4 +11,303 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+/// A user's account. Passwords are never stored in plaintext — passwordHash
+/// is an Argon2id hash (see auth/auth.service.ts). role is a required
+/// relation, not a free-text string, so RBAC checks always resolve
+/// against a real, seeded Role row.
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+
+  firstName String
+  lastName  String
+  phone     String?
+  avatarUrl String?
+
+  emailVerified   Boolean   @default(false)
+  emailVerifiedAt DateTime?
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft delete — never hard-delete a user (order history, audit trails,
+  /// and other tables reference user IDs and shouldn't dangle).
+  deletedAt DateTime?
+
+  @@index([roleId])
+  @@map("users")
+}
+
+/// A named role (e.g. "customer", "admin") — a set of permissions, not a
+/// free-text string on User, so every permission check resolves against
+/// real seeded data rather than string comparison scattered through the
+/// codebase.
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  users       User[]
+  permissions Permission[] @relation("RolePermissions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+/// A single, fine-grained capability (e.g. "orders:read", "products:write").
+/// Phase 1 seeds a minimal set for "customer" and "admin"; Phase 9's admin
+/// RBAC work extends this without a schema change — new permissions are
+/// new rows, not new columns.
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  description String?
+
+  roles Role[] @relation("RolePermissions")
+
+  createdAt DateTime @default(now())
+
+  @@map("permissions")
+}
+
+/// One issued refresh token per row (hashed, never stored raw) — this is
+/// what makes "Sessions" and "Device Tracking" real capabilities rather
+/// than just a JWT claim: a user (or an admin) can see and individually
+/// revoke each active session, and a compromised refresh token can be
+/// revoked without invalidating every other session.
+model Session {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash  String    @unique
+  userAgent         String?
+  ipAddress         String?
+  deviceName        String?
+  createdAt         DateTime  @default(now())
+  lastUsedAt        DateTime  @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Short-lived, single-use, hashed reset tokens. devToken is returned
+/// directly by the API in non-production environments only (see
+/// auth.service.ts) — there is no email-sending infrastructure yet
+/// (that's Phase 8's "Notifications: Email" deliverable), so this mirrors
+/// exactly how the frontend's existing mock backend already behaves
+/// (apps/web/src/mocks/authHandlers.ts's devToken pattern), rather than
+/// pretending email delivery exists when it doesn't.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Same devToken pattern as PasswordResetToken, same reason.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+// --- Phase 2: Product Catalog ---
+
+enum CategoryType {
+  CATEGORY
+  COLLECTION
+}
+
+/// Categories and collections share one table (identical shape — slug,
+/// name, description) with a `type` discriminator, rather than two
+/// near-duplicate tables. Matches apps/web/src/types/product.ts's
+/// `Category` type exactly — used for both GET /categories (type=CATEGORY)
+/// and GET /collections/:slug (type=COLLECTION).
+model Category {
+  id          String       @id @default(uuid())
+  slug        String       @unique
+  name        String
+  description String
+  type        CategoryType
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+/// Explicitly requested in Phase 2's schema list. Not yet surfaced
+/// anywhere in apps/web's UI or Product type — included as real,
+/// queryable infrastructure ahead of the frontend feature that will
+/// eventually use it, not a placeholder.
+model Brand {
+  id   String  @id @default(uuid())
+  slug String  @unique
+  name String
+
+  products Product[]
+
+  @@map("brands")
+}
+
+/// DECLARATION ORDER MATTERS: PostgreSQL enums compare by the position a
+/// value was declared in, not alphabetically or by insertion time.
+/// ProductsService's "featured" sort relies on BESTSELLER being the LAST
+/// value declared here so that `ORDER BY badge DESC` puts bestsellers
+/// first — reordering this enum without updating that sort logic (and
+/// its explicit `nulls: 'last'` handling — Postgres's DESC default is
+/// NULLS FIRST, which would otherwise put every non-badged product ahead
+/// of actual bestsellers) will silently break "featured" sort. See
+/// products.service.ts's buildOrderBy() for the full explanation.
+enum ProductBadge {
+  NEW
+  SALE
+  LOW_STOCK
+  BESTSELLER
+}
+
+enum CareLevel {
+  EASY
+  MODERATE
+  ADVANCED
+}
+
+model Product {
+  id              String        @id @default(uuid())
+  slug            String        @unique
+  name            String
+  price           Decimal       @db.Decimal(10, 2)
+  compareAtPrice  Decimal?      @db.Decimal(10, 2)
+  description     String
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  brandId String?
+  brand   Brand?  @relation(fields: [brandId], references: [id])
+
+  badge      ProductBadge?
+  careLevel  CareLevel?
+  rating     Decimal?      @db.Decimal(2, 1)
+  reviewCount Int          @default(0)
+
+  inStock    Boolean @default(true)
+  stockCount Int     @default(0)
+
+  variants ProductVariant[]
+  specs    ProductSpec[]
+  images   ProductImage[]
+  reviews  Review[]
+  tags     Tag[]            @relation("ProductTags")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft delete — matches User's pattern (Phase 1). A deleted product
+  /// shouldn't vanish from historical order line items that reference it.
+  deletedAt DateTime?
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@map("products")
+}
+
+/// Matches apps/web's ProductVariant exactly — a simple label + optional
+/// color swatch + in-stock flag, not a full SKU/pricing-per-variant
+/// system (the frontend's product page doesn't price variants
+/// differently, so this doesn't invent that capability speculatively).
+model ProductVariant {
+  id      String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label   String
+  swatch  String?
+  inStock Boolean @default(true)
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+/// Matches apps/web's ProductSpec exactly (label/value pairs — "Light: Bright indirect").
+model ProductSpec {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  value     String
+
+  @@index([productId])
+  @@map("product_specs")
+}
+
+/// Explicitly requested in Phase 2's schema list. apps/web deliberately
+/// uses placeholder blocks instead of real product photography (a
+/// documented Phase 1 frontend decision, apps/web/ARCHITECTURE.md) — this
+/// table exists as real, queryable infrastructure for whenever that
+/// changes, not because the current frontend renders it.
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  position  Int     @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+/// Explicitly requested in Phase 2's schema list. Same status as Brand/
+/// ProductImage — real infrastructure, not yet consumed by apps/web's
+/// Product type (which has no `tags` field currently).
+model Tag {
+  id   String @id @default(uuid())
+  name String @unique
+
+  products Product[] @relation("ProductTags")
+
+  @@map("tags")
+}
+
+/// Matches apps/web's Review type exactly.
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  author    String
+  rating    Int
+  title     String
+  body      String
+  date      DateTime
+  verified  Boolean  @default(false)
+
+  @@index([productId])
+  @@map("reviews")
 }

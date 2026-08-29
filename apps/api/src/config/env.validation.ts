@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   Min,
   validateSync,
@@ -55,10 +56,24 @@ class EnvironmentVariables {
   JWT_REFRESH_SECRET!: string;
 
   @IsString()
+  @Matches(
+    /^\d+(\s?(y|yr|yrs|year|years|w|week|weeks|d|day|days|h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds|ms|msec|msecs|millisecond|milliseconds))?$/i,
+    {
+      message:
+        'JWT_ACCESS_EXPIRY must be a duration like "15m", "1h", or "30d"',
+    },
+  )
   @IsOptional()
   JWT_ACCESS_EXPIRY = '15m';
 
   @IsString()
+  @Matches(
+    /^\d+(\s?(y|yr|yrs|year|years|w|week|weeks|d|day|days|h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds|ms|msec|msecs|millisecond|milliseconds))?$/i,
+    {
+      message:
+        'JWT_REFRESH_EXPIRY must be a duration like "15m", "1h", or "30d"',
+    },
+  )
   @IsOptional()
   JWT_REFRESH_EXPIRY = '30d';
 

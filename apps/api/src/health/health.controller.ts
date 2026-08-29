@@ -10,15 +10,20 @@ import {
 } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { Public } from '../auth/decorators/public.decorator';
 
 /**
  * Excluded from the public Swagger doc (infra/ops endpoint, not part of
- * the documented product API) and explicitly version-neutral — load
+ * the documented product API), explicitly version-neutral — load
  * balancer probes and uptime monitors shouldn't need to know an API
- * version to check liveness. Caught by actually booting the app and
- * inspecting the real registered route (it came back as `/api/v1/health`
- * under the global versioning config before this fix), not assumed correct.
+ * version to check liveness (caught by actually booting the app and
+ * inspecting the real registered route, not assumed correct) — and
+ * @Public(): JwtAuthGuard became global once AuthModule was wired into
+ * app.module.ts, and a health check requiring a valid access token would
+ * break every infra probe hitting it. Caught by reviewing the new global
+ * guard chain against every existing controller, not assumed fine.
  */
+@Public()
 @ApiExcludeController()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {

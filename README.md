@@ -19,7 +19,6 @@ docker-compose.yml Postgres + Redis + api, wired for local/production use
 
 ## Getting started
 
-
 ```bash
 npm install                          # installs all workspaces
 cp .env.example .env                 # for docker-compose
@@ -59,8 +58,10 @@ designing the backend's conventions, not assumed compatible.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Foundation — NestJS, Prisma, Postgres, Redis, Docker, logging, validation, exception handling, Swagger, health checks, CI | In review |
-| 1–10 | See the backend development brief | Not started |
+| 0 | Foundation — NestJS, Prisma, Postgres, Redis, Docker, logging, validation, exception handling, Swagger, health checks, CI | Complete |
+| 1 | Authentication & Users — register/login/logout/refresh/password reset/email verification/profile/avatar/RBAC/sessions | Complete |
+| 2 | Product Catalog — products/categories/collections/brands/variants/images/specs/tags, real catalog data migrated from the frontend | Complete |
+| 3–10 | See the backend development brief | Not started |
 
 ## Known issues
 

@@ -1,0 +1,5 @@
+export const REFRESH_TOKEN_COOKIE_NAME = 'folia_refresh_token';
+export const REFRESH_TOKEN_TTL_DAYS_DEFAULT = 7;
+export const REFRESH_TOKEN_TTL_DAYS_REMEMBER_ME = 30;
+export const PASSWORD_RESET_TTL_MINUTES = 30;
+export const EMAIL_VERIFICATION_TTL_HOURS = 24;
