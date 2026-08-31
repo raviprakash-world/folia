@@ -100,6 +100,42 @@ export default defineConfig(({ mode }) => {
             },
           }
         : {}),
+      ...(env.VITE_REAL_RECOMMENDATIONS_API === 'true'
+        ? {
+            '/api/recommendations': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/recommendations/, '/api/v1/recommendations'),
+            },
+          }
+        : {}),
+      ...(env.VITE_REAL_NOTIFICATIONS_API === 'true'
+        ? {
+            '/api/notifications': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/notifications/, '/api/v1/notifications'),
+            },
+          }
+        : {}),
+      ...(env.VITE_REAL_COUPONS_API === 'true'
+        ? {
+            '/api/coupons': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/coupons/, '/api/v1/coupons'),
+            },
+          }
+        : {}),
+      ...(env.VITE_REAL_SHIPPING_API === 'true'
+        ? {
+            '/api/shipping': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/shipping/, '/api/v1/shipping'),
+            },
+          }
+        : {}),
     },
   },
   build: {

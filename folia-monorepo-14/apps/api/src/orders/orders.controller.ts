@@ -7,6 +7,7 @@ import { CancelOrderDto } from './dto/cancel-order.dto';
 import { ReturnOrderDto } from './dto/return-order.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { AuthenticatedUser } from '../users/user.types';
 
 @ApiTags('orders')
@@ -63,12 +64,22 @@ export class OrdersController {
     summary:
       'Only allowed while processing/confirmed/shipped and not already cancelled.',
   })
-  cancel(
+  async cancel(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: CancelOrderDto,
   ) {
-    return this.ordersService.requestCancellation(user.id, id, dto);
+    const result = await this.ordersService.requestCancellation(
+      user.id,
+      id,
+      dto,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
+      orderId: id,
+      userId: user.id,
+    });
+    return result;
   }
 
   @Post('orders/:id/return')
@@ -76,12 +87,18 @@ export class OrdersController {
     summary:
       'Only allowed for delivered orders within 30 days, with no existing return request.',
   })
-  requestReturn(
+  async requestReturn(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: ReturnOrderDto,
   ) {
-    return this.ordersService.requestReturn(user.id, id, dto);
+    const result = await this.ordersService.requestReturn(user.id, id, dto);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.ORDER_RETURN_REQUESTED, {
+      orderId: id,
+      userId: user.id,
+    });
+    return result;
   }
 
   @Get('orders/:id/tracking')

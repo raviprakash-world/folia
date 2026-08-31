@@ -40,6 +40,7 @@ model User {
   orders                  Order[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  notifications           Notification[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -847,4 +848,40 @@ model AuditLog {
   @@index([resource, resourceId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// Phase 15 — real FK with cascade delete, deliberately unlike
+/// AuditLog's no-FK design just above: an audit trail needs to survive
+/// user deletion for compliance, but a notification inbox has no
+/// reason to outlive its user. No `archived` field, despite the
+/// frontend type having one — audited directly against every real call
+/// site before this migration: none of the six real trigger points
+/// (order placed/cancelled/return-requested, payment successful,
+/// profile updated, password changed) ever set it, so it wasn't
+/// carried into the real schema. A stated cut, not an oversight.
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  href      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+/// Matches apps/web/src/types/notification.ts's NotificationType exactly
+/// (uppercased, matching this schema's existing enum convention).
+enum NotificationType {
+  ORDER
+  SHIPPING
+  PROMOTION
+  WISHLIST
+  ACCOUNT
+  SECURITY
 }

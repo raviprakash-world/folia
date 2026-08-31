@@ -16,7 +16,7 @@ import {
 import { PageHeader } from '@/components/common/PageHeader';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { useNotificationStore } from '@/store/notificationStore';
+import { useNotifications } from '@/hooks/useNotifications';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { cn } from '@/utils/cn';
 import type { NotificationType } from '@/types/notification';
@@ -59,12 +59,8 @@ function timeAgo(iso: string): string {
 }
 
 export default function AccountNotifications() {
-  const notifications = useNotificationStore((s) => s.notifications);
-  const seedIfEmpty = useNotificationStore((s) => s.seedIfEmpty);
-  const markAsRead = useNotificationStore((s) => s.markAsRead);
-  const markAllAsRead = useNotificationStore((s) => s.markAllAsRead);
-  const archiveNotification = useNotificationStore((s) => s.archiveNotification);
-  const deleteNotification = useNotificationStore((s) => s.deleteNotification);
+  const { notifications, seedIfEmpty, markAsRead, markAllAsRead, archiveNotification, deleteNotification } =
+    useNotifications();
 
   const prefs = usePreferencesStore((s) => s.notifications);
   const prefsHydrated = usePreferencesStore((s) => s.hasHydrated);
@@ -93,7 +89,7 @@ export default function AccountNotifications() {
         description={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
         action={
           unreadCount > 0 && (
-            <Button variant="outline" size="sm" icon={<CheckCheck size={14} />} onClick={markAllAsRead}>
+            <Button variant="outline" size="sm" icon={<CheckCheck size={14} />} onClick={() => void markAllAsRead()}>
               Mark all read
             </Button>
           )
@@ -161,7 +157,7 @@ export default function AccountNotifications() {
                 )}
               >
                 {n.href ? (
-                  <Link to={n.href} onClick={() => markAsRead(n.id)} className="flex-1 min-w-0">
+                  <Link to={n.href} onClick={() => void markAsRead(n.id)} className="flex-1 min-w-0">
                     {content}
                   </Link>
                 ) : (
@@ -171,7 +167,7 @@ export default function AccountNotifications() {
                   {!n.read && (
                     <button
                       type="button"
-                      onClick={() => markAsRead(n.id)}
+                      onClick={() => void markAsRead(n.id)}
                       aria-label="Mark as read"
                       className="p-1.5 text-ink-soft hover:text-fern transition-colors"
                     >
@@ -190,7 +186,7 @@ export default function AccountNotifications() {
                   )}
                   <button
                     type="button"
-                    onClick={() => deleteNotification(n.id)}
+                    onClick={() => void deleteNotification(n.id)}
                     aria-label="Delete"
                     className="p-1.5 text-ink-soft hover:text-rust transition-colors"
                   >

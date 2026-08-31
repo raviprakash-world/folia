@@ -19,6 +19,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -37,6 +38,7 @@ import { UsersService } from '../users/users.service';
 import { toPublicUser } from '../users/user.types';
 import { AppConfigService } from '../config/app-config.service';
 import { STORAGE_SERVICE } from '../storage/storage.interface';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { AuthenticatedUser, PublicUser } from '../users/user.types';
 import type { StorageService } from '../storage/storage.interface';
 
@@ -50,6 +52,7 @@ export class AuthController {
     private readonly usersService: UsersService,
     private readonly sessionsService: SessionsService,
     private readonly config: AppConfigService,
+    private readonly eventEmitter: EventEmitter2,
     @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
   ) {}
 
@@ -175,6 +178,10 @@ export class AuthController {
     @Body() dto: UpdateProfileDto,
   ): Promise<PublicUser> {
     const updated = await this.usersService.updateProfile(user.id, dto);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.PROFILE_UPDATED, {
+      userId: user.id,
+    });
     return toPublicUser(updated);
   }
 
@@ -250,6 +257,10 @@ export class AuthController {
       dto.currentPassword,
       dto.newPassword,
     );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.PASSWORD_CHANGED, {
+      userId: user.id,
+    });
     return { ok: true };
   }
 

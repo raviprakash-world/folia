@@ -1402,7 +1402,7 @@ async function main() {
   // is switched from MSW to this real API, the same demo credentials
   // continue to work unchanged.
   console.log('Seeding demo accounts...');
-  await prisma.user.upsert({
+  const demoUser = await prisma.user.upsert({
     where: { email: 'demo@folia.example' },
     update: {},
     create: {
@@ -1591,6 +1591,57 @@ async function main() {
       minSubtotal: 25,
     },
   });
+
+  console.log('Seeding notifications...');
+  // No natural unique key on Notification (unlike coupon.code/user.email
+  // above) to upsert() against, so idempotency is a plain existence
+  // check instead — running this seed again after notifications already
+  // exist for the demo user is a no-op, not a duplicate-adding operation.
+  const existingNotificationCount = await prisma.notification.count({
+    where: { userId: demoUser.id },
+  });
+  if (existingNotificationCount === 0) {
+    const now = Date.now();
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    await prisma.notification.createMany({
+      data: [
+        {
+          userId: demoUser.id,
+          type: 'ORDER',
+          title: 'Order Placed',
+          message: 'Your order was placed successfully.',
+          read: true,
+          createdAt: new Date(now - 6 * DAY_MS),
+        },
+        {
+          userId: demoUser.id,
+          type: 'ACCOUNT',
+          title: 'Profile Updated',
+          message: 'Your profile details were saved.',
+          read: true,
+          createdAt: new Date(now - 4 * DAY_MS),
+        },
+        {
+          userId: demoUser.id,
+          type: 'PROMOTION',
+          title: 'Free shipping this week',
+          message: 'Orders over $75 ship free — no code needed.',
+          href: '/shop',
+          read: false,
+          createdAt: new Date(now - 2 * DAY_MS),
+        },
+        {
+          userId: demoUser.id,
+          type: 'WISHLIST',
+          title: 'Price drop on your wishlist',
+          message: 'An item on your wishlist is now on sale.',
+          href: '/wishlist',
+          read: false,
+          createdAt: new Date(now - 1 * DAY_MS),
+        },
+      ],
+    });
+  }
 
   console.log('Seed complete.');
 }

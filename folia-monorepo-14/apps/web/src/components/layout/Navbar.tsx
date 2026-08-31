@@ -9,7 +9,7 @@ import { useCartItemCount } from '@/hooks/useCart';
 import { useWishlistCount } from '@/hooks/useWishlist';
 import { useCurrentUser } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
-import { useNotificationStore } from '@/store/notificationStore';
+import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 const primaryLinks = [
@@ -34,9 +34,7 @@ export function Navbar() {
   const cartCount = useCartItemCount();
   const wishlistCount = useWishlistCount();
   const user = useCurrentUser();
-  const unreadCount = useNotificationStore((s) =>
-    s.hasHydrated ? s.notifications.filter((n) => !n.read && !n.archived).length : 0
-  );
+  const unreadCount = useUnreadNotificationCount();
   const openCartDrawer = useUIStore((s) => s.openCartDrawer);
   const openSearchOverlay = useUIStore((s) => s.openSearchOverlay);
 
