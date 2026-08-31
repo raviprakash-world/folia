@@ -1,0 +1,850 @@
+// Folia API — Prisma schema
+//
+// Phase 1: Authentication & Users. Adds User, Session, Role, Permission,
+// PasswordResetToken, and EmailVerificationToken — the tables this
+// project's own phase breakdown assigns to Phase 1.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A user's account. Passwords are never stored in plaintext — passwordHash
+/// is an Argon2id hash (see auth/auth.service.ts). role is a required
+/// relation, not a free-text string, so RBAC checks always resolve
+/// against a real, seeded Role row.
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+
+  firstName String
+  lastName  String
+  phone     String?
+  avatarUrl String?
+
+  emailVerified   Boolean   @default(false)
+  emailVerifiedAt DateTime?
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  sessions                Session[]
+  cart                    Cart?
+  wishlistItems           WishlistItem[]
+  addresses               Address[]
+  orders                  Order[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft delete — never hard-delete a user (order history, audit trails,
+  /// and other tables reference user IDs and shouldn't dangle).
+  deletedAt DateTime?
+
+  @@index([roleId])
+  @@map("users")
+}
+
+/// A named role (e.g. "customer", "admin") — a set of permissions, not a
+/// free-text string on User, so every permission check resolves against
+/// real seeded data rather than string comparison scattered through the
+/// codebase.
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  users       User[]
+  permissions Permission[] @relation("RolePermissions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+/// A single, fine-grained capability (e.g. "orders:read", "products:write").
+/// Phase 1 seeds a minimal set for "customer" and "admin"; Phase 9's admin
+/// RBAC work extends this without a schema change — new permissions are
+/// new rows, not new columns.
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  description String?
+
+  roles Role[] @relation("RolePermissions")
+
+  createdAt DateTime @default(now())
+
+  @@map("permissions")
+}
+
+/// One issued refresh token per row (hashed, never stored raw) — this is
+/// what makes "Sessions" and "Device Tracking" real capabilities rather
+/// than just a JWT claim: a user (or an admin) can see and individually
+/// revoke each active session, and a compromised refresh token can be
+/// revoked without invalidating every other session.
+model Session {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash  String    @unique
+  userAgent         String?
+  ipAddress         String?
+  deviceName        String?
+  createdAt         DateTime  @default(now())
+  lastUsedAt        DateTime  @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Short-lived, single-use, hashed reset tokens. devToken is returned
+/// directly by the API in non-production environments only (see
+/// auth.service.ts) — there is no email-sending infrastructure yet
+/// (that's Phase 8's "Notifications: Email" deliverable), so this mirrors
+/// exactly how the frontend's existing mock backend already behaves
+/// (apps/web/src/mocks/authHandlers.ts's devToken pattern), rather than
+/// pretending email delivery exists when it doesn't.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Same devToken pattern as PasswordResetToken, same reason.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+// --- Phase 2: Product Catalog ---
+
+enum CategoryType {
+  CATEGORY
+  COLLECTION
+}
+
+/// Categories and collections share one table (identical shape — slug,
+/// name, description) with a `type` discriminator, rather than two
+/// near-duplicate tables. Matches apps/web/src/types/product.ts's
+/// `Category` type exactly — used for both GET /categories (type=CATEGORY)
+/// and GET /collections/:slug (type=COLLECTION).
+model Category {
+  id          String       @id @default(uuid())
+  slug        String       @unique
+  name        String
+  description String
+  type        CategoryType
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+/// Explicitly requested in Phase 2's schema list. Not yet surfaced
+/// anywhere in apps/web's UI or Product type — included as real,
+/// queryable infrastructure ahead of the frontend feature that will
+/// eventually use it, not a placeholder.
+model Brand {
+  id   String  @id @default(uuid())
+  slug String  @unique
+  name String
+
+  products Product[]
+
+  @@map("brands")
+}
+
+/// DECLARATION ORDER MATTERS: PostgreSQL enums compare by the position a
+/// value was declared in, not alphabetically or by insertion time.
+/// ProductsService's "featured" sort relies on BESTSELLER being the LAST
+/// value declared here so that `ORDER BY badge DESC` puts bestsellers
+/// first — reordering this enum without updating that sort logic (and
+/// its explicit `nulls: 'last'` handling — Postgres's DESC default is
+/// NULLS FIRST, which would otherwise put every non-badged product ahead
+/// of actual bestsellers) will silently break "featured" sort. See
+/// products.service.ts's buildOrderBy() for the full explanation.
+enum ProductBadge {
+  NEW
+  SALE
+  LOW_STOCK
+  BESTSELLER
+}
+
+enum CareLevel {
+  EASY
+  MODERATE
+  ADVANCED
+}
+
+model Product {
+  id              String        @id @default(uuid())
+  slug            String        @unique
+  name            String
+  price           Decimal       @db.Decimal(10, 2)
+  compareAtPrice  Decimal?      @db.Decimal(10, 2)
+  description     String
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  brandId String?
+  brand   Brand?  @relation(fields: [brandId], references: [id])
+
+  badge      ProductBadge?
+  careLevel  CareLevel?
+  rating     Decimal?      @db.Decimal(2, 1)
+  reviewCount Int          @default(0)
+
+  inStock    Boolean @default(true)
+  stockCount Int     @default(0)
+
+  variants ProductVariant[]
+  specs    ProductSpec[]
+  images   ProductImage[]
+  reviews  Review[]
+  inventoryItems InventoryItem[]
+  cartItems      CartItem[]
+  wishlistedBy   WishlistItem[]
+  tags     Tag[]            @relation("ProductTags")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft delete — matches User's pattern (Phase 1). A deleted product
+  /// shouldn't vanish from historical order line items that reference it.
+  deletedAt DateTime?
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@map("products")
+}
+
+/// Matches apps/web's ProductVariant exactly — a simple label + optional
+/// color swatch + in-stock flag, not a full SKU/pricing-per-variant
+/// system (the frontend's product page doesn't price variants
+/// differently, so this doesn't invent that capability speculatively).
+model ProductVariant {
+  id      String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label   String
+  swatch  String?
+  inStock Boolean @default(true)
+  inventoryItems InventoryItem[]
+  cartItems      CartItem[]
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+/// Matches apps/web's ProductSpec exactly (label/value pairs — "Light: Bright indirect").
+model ProductSpec {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String
+  value     String
+
+  @@index([productId])
+  @@map("product_specs")
+}
+
+/// Explicitly requested in Phase 2's schema list. apps/web deliberately
+/// uses placeholder blocks instead of real product photography (a
+/// documented Phase 1 frontend decision, apps/web/ARCHITECTURE.md) — this
+/// table exists as real, queryable infrastructure for whenever that
+/// changes, not because the current frontend renders it.
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  position  Int     @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+/// Explicitly requested in Phase 2's schema list. Same status as Brand/
+/// ProductImage — real infrastructure, not yet consumed by apps/web's
+/// Product type (which has no `tags` field currently).
+model Tag {
+  id   String @id @default(uuid())
+  name String @unique
+
+  products Product[] @relation("ProductTags")
+
+  @@map("tags")
+}
+
+/// Matches apps/web's Review type exactly.
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  author    String
+  rating    Int
+  title     String
+  body      String
+  date      DateTime
+  verified  Boolean  @default(false)
+
+  @@index([productId])
+  @@map("reviews")
+}
+
+// --- Phase 3: Inventory ---
+
+model Warehouse {
+  id       String  @id @default(uuid())
+  code     String  @unique
+  name     String
+  isActive Boolean @default(true)
+  /// Exactly one warehouse should be the default at any time — enforced
+  /// in WarehousesService.setDefault(), not at the schema level (Prisma/
+  /// Postgres don't support a "only one row where X=true" constraint
+  /// without a partial unique index, which is a reasonable upgrade for
+  /// Phase 10's "database indexes" hardening pass, not needed to make
+  /// this phase's actual behavior correct).
+  isDefault Boolean @default(false)
+
+  inventoryItems InventoryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("warehouses")
+}
+
+/// One row per (product, variant, warehouse) — a product with no variants
+/// still gets exactly one InventoryItem per warehouse (variantId null); a
+/// product with variants gets one per variant per warehouse. This is the
+/// real stock-tracking unit; Product.stockCount/inStock and
+/// ProductVariant.inStock (both from Phase 2) are kept in sync as a
+/// derived cache whenever InventoryService adjusts stock here — Phase 2's
+/// read path (ProductsService, already built and tested) needed zero
+/// changes because of this design.
+model InventoryItem {
+  id        String  @id @default(uuid())
+  sku       String  @unique
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  quantityOnHand  Int @default(0)
+  quantityReserved Int @default(0)
+  reorderPoint    Int @default(0)
+
+  reservations StockReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, variantId, warehouseId])
+  @@index([warehouseId])
+  @@map("inventory_items")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  COMMITTED
+  RELEASED
+  EXPIRED
+}
+
+/// A hold against available stock (quantityOnHand - quantityReserved)
+/// that hasn't yet become a real deduction — created when someone adds an
+/// item to their cart at checkout time, before an order is confirmed.
+/// referenceId/referenceType are a plain string reference rather than a
+/// hard foreign key to a Cart or Order table, since neither exists yet in
+/// this backend (Phase 4/Phase 5's job) — this avoids Phase 3 reaching
+/// forward into schema those phases own.
+enum ReservationReferenceType {
+  CART
+  ORDER
+}
+
+model StockReservation {
+  id              String            @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem     @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  quantity        Int
+  referenceType   ReservationReferenceType
+  referenceId     String
+  status          ReservationStatus @default(ACTIVE)
+  expiresAt       DateTime
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([inventoryItemId])
+  @@index([referenceType, referenceId])
+  @@map("stock_reservations")
+}
+
+// --- Phase 4: Cart & Wishlist ---
+
+/// One cart per identity — either a logged-in user (userId) or an
+/// anonymous visitor (guestToken, delivered via an httpOnly cookie, same
+/// pattern as Session's refresh token). Never both null; enforced in
+/// CartService, not the schema (Prisma/Postgres don't have a clean way to
+/// express "at least one of these two columns is non-null" declaratively).
+model Cart {
+  id         String  @id @default(uuid())
+  userId     String? @unique
+  user       User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestToken String? @unique
+
+  items CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("carts")
+}
+
+/// unitPrice is a snapshot taken when the item is added — matches
+/// apps/web/src/types/cart.ts's CartItem doc comment exactly ("Unit price
+/// at the moment it was added — the cart doesn't retroactively track
+/// price changes"). The unique constraint on (cartId, productId,
+/// variantId) is what makes "add to cart" idempotent at the database
+/// level — adding the same product+variant again is a quantity update,
+/// not a second row, mirroring apps/web's buildLineId composite-key logic.
+model CartItem {
+  id        String         @id @default(uuid())
+  cartId    String
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int
+  unitPrice Decimal        @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId, variantId])
+  @@map("cart_items")
+}
+
+/// Backend-persisted wishlist is user-scoped only (requires
+/// authentication) — unlike cart, which supports anonymous guests. This
+/// mirrors how the frontend's *current* wishlist already behaves as a
+/// product-affinity list rather than a checkout artifact, and avoids
+/// building the same guest-identity plumbing a second time for a feature
+/// that doesn't obviously need it.
+model WishlistItem {
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  addedAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@map("wishlist_items")
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+/// Matches apps/web/src/types/cart.ts's Coupon shape, plus isActive/
+/// expiresAt for real admin lifecycle management (Phase 9's job to expose
+/// management endpoints for; this phase just needs the data to validate
+/// against).
+model Coupon {
+  id          String     @id @default(uuid())
+  code        String     @unique
+  type        CouponType
+  value       Decimal    @db.Decimal(10, 2)
+  description String
+  minSubtotal Decimal?   @db.Decimal(10, 2)
+  isActive    Boolean    @default(true)
+  expiresAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("coupons")
+}
+
+// --- Phase 5: Checkout ---
+
+enum AddressType {
+  HOME
+  OFFICE
+  OTHER
+}
+
+enum DeliveryTimeSlot {
+  MORNING
+  AFTERNOON
+  EVENING
+  ANYTIME
+}
+
+/// Matches apps/web/src/types/address.ts's Address exactly, field for
+/// field — including the geo placeholder (never a real geolocation
+/// lookup, same as the frontend's own explicit "mock" labeling).
+model Address {
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName        String
+  phone           String
+  alternatePhone  String?
+  email           String?
+  companyName     String?
+
+  addressLine1        String
+  addressLine2         String?
+  landmark             String?
+  deliveryInstructions String?
+
+  city       String
+  state      String
+  country    String
+  postalCode String
+
+  type  AddressType
+  label String?
+
+  preferredTimeSlot DeliveryTimeSlot?
+  geoLat            Float?
+  geoLng            Float?
+
+  isDefaultShipping Boolean @default(false)
+  isDefaultBilling  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+enum DeliveryMethodType {
+  STANDARD
+  EXPRESS
+  SAME_DAY
+  PICKUP
+}
+
+enum PaymentMethodType {
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  NET_BANKING
+  COD
+  WALLET
+}
+
+enum OrderStatus {
+  PROCESSING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+  REFUNDED
+}
+
+enum CourierId {
+  SWIFTPOST
+  CASCADE_EXPRESS
+  TRAILRUNNER
+  NORTHLINE
+  QUICKHATCH
+}
+
+/// Matches apps/web/src/types/order.ts's Order exactly. Addresses are
+/// snapshotted as JSON (see shippingAddressSnapshot/billingAddressSnapshot
+/// below), not a live FK to Address, deliberately — an order's shipping/
+/// billing address must stay exactly what it was at checkout even if the
+/// customer later edits or deletes that address from their address book.
+model Order {
+  /// NOT @default(uuid()) — deliberately supplied explicitly at creation
+  /// by OrdersService, matching apps/web/src/utils/orderId.ts's
+  /// generateOrderId() format ("FOL-YYYYMMDD-NNNN") exactly. This is the
+  /// same string the frontend already displays as the order id/number,
+  /// and it's also the seed hashOrderId() uses to deterministically
+  /// assign a courier and tracking number — a random UUID here would
+  /// break that derivation entirely.
+  id        String      @id
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  /// Phase 11 hardening. Client-supplied (a UUID generated once per
+  /// checkout attempt, sent as an Idempotency-Key header) — a
+  /// double-submitted checkout (double-click, a network retry
+  /// resubmitting the same request) reuses the same key, and
+  /// OrdersService.checkout() checks for an existing order with this
+  /// (userId, idempotencyKey) pair BEFORE doing any real work, returning
+  /// the original order instead of creating a second one, charging
+  /// twice, or decrementing inventory twice. Nullable because it's
+  /// optional — a caller that doesn't send the header simply doesn't get
+  /// this protection, rather than checkout failing outright; a real
+  /// production frontend should always send one, but a missing header
+  /// shouldn't be a hard error for what's otherwise a valid request.
+  /// @@unique below is scoped to (userId, idempotencyKey) rather than
+  /// idempotencyKey alone — two different users independently generating
+  /// the same UUID (astronomically unlikely, but not architecturally
+  /// prevented) should never collide with each other.
+  idempotencyKey String?
+  status    OrderStatus @default(PROCESSING)
+
+  items OrderItem[]
+
+  subtotal     Decimal  @db.Decimal(10, 2)
+  discount     Decimal  @db.Decimal(10, 2) @default(0)
+  couponCode   String?
+  shippingCost Decimal  @db.Decimal(10, 2)
+  tax          Decimal  @db.Decimal(10, 2)
+  total        Decimal  @db.Decimal(10, 2)
+
+  /// The full Address object (apps/web/src/types/address.ts's shape,
+  /// including id) as it was at checkout time, stored as JSON rather than
+  /// duplicated as ~12 flat columns twice over (shipping + billing) — an
+  /// order needs to preserve the WHOLE address exactly as shown at
+  /// checkout, not just a queryable subset, and nothing about these
+  /// fields is ever filtered/sorted on independently. The live Address
+  /// row (if it still exists) may since have been edited or deleted;
+  /// this snapshot is what stays authoritative for the order.
+  shippingAddressSnapshot Json
+  billingAddressSnapshot  Json
+
+  deliveryMethod     DeliveryMethodType
+  estimatedDelivery  String
+
+  paymentMethod        PaymentMethodType
+  paymentDisplayLabel  String
+  paymentTransactionId String
+
+  courierId       CourierId
+  trackingNumber  String
+
+  customerNotes String?
+
+  cancellation  CancellationRequest?
+  returnRequest ReturnRequest?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId])
+  @@map("orders")
+}
+
+/// Matches apps/web/src/types/order.ts's OrderItem exactly — a snapshot
+/// of product name/slug/category/price at the moment of purchase, same
+/// reasoning as CartItem's price snapshot (Phase 4) and Order's address
+/// snapshot above: an order must stay historically accurate even if the
+/// product is later renamed, repriced, or deleted.
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  slug         String
+  name         String
+  categorySlug String
+  variantId    String?
+  variantLabel String?
+  price    Decimal @db.Decimal(10, 2)
+  quantity Int
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// --- Phase 6: Order Management (cancellation, returns, tracking) ---
+
+enum CancellationReason {
+  CHANGED_MIND
+  FOUND_CHEAPER
+  ORDERED_BY_MISTAKE
+  SHIPPING_TOO_SLOW
+  OTHER
+}
+
+enum ReturnReason {
+  NO_LONGER_NEEDED
+  WRONG_ITEM
+  DAMAGED_IN_TRANSIT
+  NOT_AS_DESCRIBED
+  CHANGED_MIND
+  OTHER
+}
+
+/// Matches apps/web/src/types/order.ts's CancellationRequest. Deliberately
+/// has NO refundStatus column — apps/web/src/utils/refund.ts's
+/// deriveRefundStatus() computes it from elapsed time since requestedAt
+/// at READ time, never stores "refunded" directly (a real design choice
+/// worth preserving exactly, not simplifying away: it means a background
+/// job never needs to exist just to flip a status after some delay).
+/// hasRefund is false only when nothing was ever charged (a COD order
+/// cancelled before delivery) — matches the frontend's
+/// `refundStatus: RefundStatus | null` nullability exactly, just
+/// represented as a boolean since "null" here always means "no refund
+/// applies," not "refund not yet computed."
+model CancellationRequest {
+  id          String             @id @default(uuid())
+  orderId     String             @unique
+  order       Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reason      CancellationReason
+  note        String?
+  hasRefund   Boolean
+  requestedAt DateTime           @default(now())
+
+  @@map("cancellation_requests")
+}
+
+/// Matches apps/web's ReturnRequest — always has a real refund to derive
+/// (a return only happens post-delivery, so payment — including COD
+/// cash collected on delivery — has always already happened by then),
+/// unlike CancellationRequest's hasRefund flag.
+model ReturnRequest {
+  id          String       @id @default(uuid())
+  orderId     String       @unique
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reason      ReturnReason
+  note        String?
+  requestedAt DateTime     @default(now())
+
+  @@map("return_requests")
+}
+
+// --- Phase 7: Search ---
+
+/// Logs every search query actually performed, so "trending searches" can
+/// be computed from real usage (GROUP BY term, ORDER BY count) instead of
+/// the frontend's current static pool (apps/web/src/data/trendingSearches.ts).
+/// Deliberately minimal — no userId FK, no session tracking; this is
+/// aggregate-only data, not per-user analytics (which this phase
+/// explicitly defers — see CHANGELOG.md's Phase 7 entry for why).
+model SearchQuery {
+  id        String   @id @default(uuid())
+  term      String
+  createdAt DateTime @default(now())
+
+  @@index([term])
+  @@index([createdAt])
+  @@map("search_queries")
+}
+
+// --- Phase 8: Recommendations + Analytics ---
+
+enum AnalyticsEventType {
+  PRODUCT_VIEW
+  SEARCH
+  CATEGORY_VIEW
+  ADD_TO_CART
+  WISHLIST_ADD
+  CHECKOUT_STARTED
+  ORDER_CREATED
+  ORDER_COMPLETED
+  ORDER_CANCELLED
+  RECOMMENDATION_CLICK
+}
+
+/// A generic, append-only event log — the single source both "trending
+/// products" (recommendations) and the analytics aggregation endpoints
+/// read from, rather than two separate tracking systems. userId is
+/// nullable (most events, like a guest's PRODUCT_VIEW, have no
+/// authenticated actor); productId/orderId are nullable and only
+/// populated for event types where they're meaningful. metadata is a
+/// bounded JSON bag for event-specific extras (e.g. SEARCH's query term,
+/// ORDER_CREATED's total) — kept generic rather than one column per
+/// event type per field, which would grow unboundedly as event types are
+/// added.
+///
+/// DELIBERATELY NO foreign keys to User/Product/Order, unlike every other
+/// table in this schema — an analytics/audit trail should stay valid and
+/// queryable ("this product was viewed 40 times last month") even after
+/// the product itself is later deleted, and a logging write should never
+/// be able to fail because of a transactional-entity constraint. This is
+/// a standard, deliberate pattern for append-only event logs, not an
+/// oversight.
+model AnalyticsEvent {
+  id        String             @id @default(uuid())
+  type      AnalyticsEventType
+  userId    String?
+  productId String?
+  orderId   String?
+  metadata  Json?
+  createdAt DateTime           @default(now())
+
+  @@index([type, createdAt])
+  @@index([productId])
+  @@index([userId])
+  @@map("analytics_events")
+}
+
+// --- Phase 9: Admin Operations ---
+
+/// Real audit trail for sensitive admin actions — actor/action/resource/
+/// resourceId/metadata/timestamp, matching the roadmap's exact required
+/// fields. No foreign keys, same deliberate reasoning as AnalyticsEvent
+/// (Phase 8): an audit trail must remain queryable even after the actor
+/// or resource it references is later deleted, and a logging write must
+/// never fail because of a transactional-entity constraint. ipAddress is
+/// nullable — not every action originates from an HTTP request with a
+/// meaningful client IP to capture (e.g. a future scheduled job).
+/// NEVER stores passwords, tokens, or payment secrets in metadata — that
+/// discipline is enforced in AuditService, not the schema, the same way
+/// Pino's log redaction (main.ts) is enforced at the logging call site.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
