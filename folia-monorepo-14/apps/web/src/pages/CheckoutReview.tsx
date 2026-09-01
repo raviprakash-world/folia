@@ -13,9 +13,11 @@ import { computeSubtotal, computeDiscount, computeTax, computeTotal } from '@/ut
 import { formatCurrency } from '@/utils/currency';
 import { generateOrderId } from '@/utils/orderId';
 import { assignCourier, generateTrackingNumber } from '@/utils/tracking';
+import { checkoutReal } from '@/services/ordersApiService';
 import type { Order, OrderItem } from '@/types/order';
 
 const PLACE_ORDER_DELAY_MS = 700;
+const useRealOrdersApi = import.meta.env.VITE_REAL_ORDERS_API === 'true';
 
 export default function CheckoutReview() {
   const navigate = useNavigate();
@@ -25,6 +27,11 @@ export default function CheckoutReview() {
   // assignment shown in the preview — both deterministically seeded by
   // order id — matches exactly what gets persisted on "Place order".
   const [orderId] = useState(() => generateOrderId());
+  // Real backend only — a stable key for the whole page lifetime, so a
+  // network retry of the same submit doesn't create a second order
+  // (Phase 11's real idempotency support). Regenerating per-click would
+  // defeat the purpose.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const cartItems = useCartStore((s) => s.items);
   const coupon = useCartStore((s) => s.coupon);
@@ -57,6 +64,15 @@ export default function CheckoutReview() {
       </Alert>
     );
   }
+
+  // Shadowed with explicitly non-null bindings — the guard above proves
+  // these at runtime, but TS doesn't propagate that narrowing into the
+  // nested handlePlaceOrder() closure below, so this makes the real
+  // guarantee explicit instead of fighting the closure with casts.
+  const deliveryMethodChecked = deliveryMethod;
+  const paymentChecked = payment;
+  const shippingAddressChecked = shippingAddress;
+  const billingAddressChecked = billingAddress;
 
   const subtotal = computeSubtotal(cartItems);
   const discount = computeDiscount(subtotal, coupon);
@@ -104,6 +120,30 @@ export default function CheckoutReview() {
     setPlacing(true);
     setError(null);
     try {
+      if (useRealOrdersApi) {
+        const realOrder = await checkoutReal(
+          {
+            shippingAddressId: shippingAddressChecked.id,
+            billingAddressId: billingAddressChecked.id,
+            deliveryMethod: deliveryMethodChecked,
+            paymentMethod: paymentChecked.method,
+            paymentDisplayLabel: paymentChecked.displayLabel,
+            couponCode: coupon?.code,
+          },
+          idempotencyKey
+        );
+        // No manual addNotification calls here on the real path — the
+        // real backend's own ORDER_CREATED event listener (Phase 15)
+        // already creates an "Order Placed" notification server-side;
+        // calling the old local store too would duplicate it. There's
+        // no real backend equivalent to the local "Payment Successful"
+        // notification — a stated, honest gap, not an oversight.
+        clearCart();
+        resetCheckout();
+        void navigate(`/checkout/confirmation/${realOrder.id}`);
+        return;
+      }
+
       await new Promise((resolve) => setTimeout(resolve, PLACE_ORDER_DELAY_MS));
       addOrder(previewOrder);
       addNotification({

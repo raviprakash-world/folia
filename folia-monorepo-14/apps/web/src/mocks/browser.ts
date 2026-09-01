@@ -4,6 +4,7 @@ import { authHandlers } from './authHandlers';
 import { catalogHandlers } from './catalogHandlers';
 import { reviewsHandlers } from './reviewsHandlers';
 import { addressHandlers } from './addressHandlers';
+import { trackingHandlers } from './trackingHandlers';
 
 /**
  * Phase 10/14 (backend integration), domain by domain — see
@@ -36,6 +37,7 @@ const domainFlags: { flag: string; handlers: typeof authHandlers }[] = [
   { flag: 'VITE_REAL_CATALOG_API', handlers: catalogHandlers },
   { flag: 'VITE_REAL_REVIEWS_API', handlers: reviewsHandlers },
   { flag: 'VITE_REAL_ADDRESSES_API', handlers: addressHandlers },
+  { flag: 'VITE_REAL_ORDERS_API', handlers: trackingHandlers },
 ];
 
 const excludedHandlers = domainFlags

@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { Pagination } from '@/components/common/Pagination';
 import { OrderRow } from '@/components/order/OrderRow';
 import { Button } from '@/components/ui/Button';
-import { useOrderStore } from '@/store/orderStore';
+import { useOrders } from '@/hooks/useOrders';
 import { getEffectiveOrderStatus } from '@/utils/refund';
 import { cn } from '@/utils/cn';
 import type { OrderStatus } from '@/types/order';
@@ -29,8 +29,7 @@ const ACTIVE_STATUSES: OrderStatus[] = ['processing', 'confirmed', 'shipped'];
 type SortKey = 'date-desc' | 'date-asc' | 'total-desc' | 'total-asc';
 
 export default function AccountOrders() {
-  const orders = useOrderStore((s) => s.orders);
-  const hasHydrated = useOrderStore((s) => s.hasHydrated);
+  const { orders, hasHydrated } = useOrders();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterBucket>('all');

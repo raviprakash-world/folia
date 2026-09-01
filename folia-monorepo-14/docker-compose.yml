@@ -34,7 +34,7 @@ services:
   api:
     build:
       context: ./apps/api
-      dockerfile: Dockerfile
+      dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     ports:
       - '3000:3000'

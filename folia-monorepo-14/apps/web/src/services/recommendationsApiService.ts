@@ -23,8 +23,21 @@ export async function fetchRealPersonalizedRecommendations(
   recentlyViewedIds: string[],
   recentSearches: string[]
 ): Promise<Product[]> {
-  const { data } = await apiClient.get<Product[]>('/recommendations/personalized', {
-    params: { recentlyViewedIds, recentSearches },
-  });
+  // A real bug, caught live: axios's default params serializer encodes
+  // arrays as recentlyViewedIds[]=p1&recentlyViewedIds[]=p8 (bracket
+  // notation), but the real backend's PersonalizedQueryDto
+  // (@IsArray() @IsString({ each: true }), no bracket-aware transform)
+  // rejects that literal property name with a real 400 — confirmed
+  // directly from a live request, not assumed. Building the query
+  // string manually with URLSearchParams instead, which repeats the
+  // plain key for each value with no brackets, matches what the DTO
+  // actually accepts.
+  const searchParams = new URLSearchParams();
+  for (const id of recentlyViewedIds) searchParams.append('recentlyViewedIds', id);
+  for (const term of recentSearches) searchParams.append('recentSearches', term);
+
+  const { data } = await apiClient.get<Product[]>(
+    `/recommendations/personalized?${searchParams.toString()}`
+  );
   return data;
 }

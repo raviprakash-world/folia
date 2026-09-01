@@ -367,6 +367,65 @@ export class OrdersService {
   }
 
   /** Real admin visibility across every customer's orders — genuinely new; every prior method in this service is scoped to a single user's own orders. */
+  /** Ownership-scoped via {id, userId} — same real 404-on-cross-user-access pattern established in notifications.service.ts (Phase 15), not the silent-no-op wishlist precedent, since a customer editing another customer's order notes is a real thing to reject loudly. */
+  async updateNotes(userId: string, orderId: string, notes: string) {
+    const { count } = await this.prisma.order.updateMany({
+      where: { id: orderId, userId },
+      data: { customerNotes: notes || null },
+    });
+    if (count === 0) throw new NotFoundException('Order not found.');
+    return this.findOneForUser(userId, orderId);
+  }
+
+  /**
+   * Mirrors apps/web/src/pages/AccountOrderDetail.tsx's own
+   * addAllItemsToCart() exactly — same {added, skipped} return shape,
+   * same per-item logic (skip if the product no longer exists or has
+   * zero real stock, otherwise add up to whatever's actually
+   * available). The real difference: this checks genuine current
+   * InventoryService availability, not a client-side product list that
+   * could be stale.
+   */
+  async reorder(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException('Order not found.');
+
+    const cart = await this.cartService.resolveCart(userId, null);
+    let added = 0;
+    let skipped = 0;
+
+    for (const item of (
+      order as unknown as {
+        items: {
+          productId: string;
+          variantId: string | null;
+          quantity: number;
+        }[];
+      }
+    ).items) {
+      const available = await this.inventoryService.getAvailability(
+        item.productId,
+        item.variantId ?? undefined,
+      );
+      if (available <= 0) {
+        skipped++;
+        continue;
+      }
+      await this.cartService.addItem(
+        cart.cart.id,
+        item.productId,
+        item.variantId,
+        Math.min(item.quantity, available),
+      );
+      added++;
+    }
+
+    return { added, skipped };
+  }
+
   async adminFindAll(filters: { status?: string } = {}) {
     const orders = await this.prisma.order.findMany({
       where: filters.status ? { status: filters.status as OrderStatus } : {},

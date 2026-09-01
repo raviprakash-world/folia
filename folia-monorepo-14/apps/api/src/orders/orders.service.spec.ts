@@ -82,6 +82,7 @@ function createDeps() {
       create: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
     },
@@ -95,6 +96,7 @@ function createDeps() {
       .fn()
       .mockResolvedValue({ cart: { id: 'cart-1', items: [makeCartItem()] } }),
     clearCart: jest.fn(),
+    addItem: jest.fn(),
   };
   const addressesService = {
     findOwnedOrThrow: jest.fn().mockResolvedValue(makeAddress()),
@@ -622,5 +624,107 @@ describe('OrdersService.checkout idempotency', () => {
       data: { idempotencyKey: string | null };
     };
     expect(createCall.data.idempotencyKey).toBe('store-me-123');
+  });
+});
+
+describe('OrdersService.updateNotes', () => {
+  it('scopes the update to {id, userId} and returns the updated order', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.updateNotes('user-1', 'FOL-1', 'Leave at the door');
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'FOL-1', userId: 'user-1' },
+      data: { customerNotes: 'Leave at the door' },
+    });
+  });
+
+  it('stores an empty string as null, matching the original local behavior exactly', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.updateNotes('user-1', 'FOL-1', '');
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'FOL-1', userId: 'user-1' },
+      data: { customerNotes: null },
+    });
+  });
+
+  it('throws NotFoundException — a real error, not a silent no-op — for an order that belongs to someone else', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.updateNotes('user-1', 'someone-elses-order', 'x'),
+    ).rejects.toThrow('Order not found.');
+  });
+});
+
+describe('OrdersService.reorder', () => {
+  function makeOrderWithItems(items: Record<string, unknown>[]) {
+    return { id: 'FOL-1', userId: 'user-1', items };
+  }
+
+  it('adds every item back to the cart when everything is still available', async () => {
+    const { prisma, cartService, inventoryService, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(
+      makeOrderWithItems([
+        { productId: 'prod-1', variantId: null, quantity: 2 },
+        { productId: 'prod-2', variantId: 'var-1', quantity: 1 },
+      ]),
+    );
+    inventoryService.getAvailability.mockResolvedValue(10);
+
+    const result = await service.reorder('user-1', 'FOL-1');
+
+    expect(result).toEqual({ added: 2, skipped: 0 });
+    expect(cartService.addItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips an item with zero real current availability, rather than adding it anyway', async () => {
+    const { prisma, cartService, inventoryService, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(
+      makeOrderWithItems([
+        { productId: 'prod-1', variantId: null, quantity: 2 },
+      ]),
+    );
+    inventoryService.getAvailability.mockResolvedValue(0);
+
+    const result = await service.reorder('user-1', 'FOL-1');
+
+    expect(result).toEqual({ added: 0, skipped: 1 });
+    expect(cartService.addItem).not.toHaveBeenCalled();
+  });
+
+  it('caps the added quantity at real current availability, never trusting the original order quantity blindly', async () => {
+    const { prisma, cartService, inventoryService, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(
+      makeOrderWithItems([
+        { productId: 'prod-1', variantId: null, quantity: 5 },
+      ]),
+    );
+    inventoryService.getAvailability.mockResolvedValue(2);
+
+    await service.reorder('user-1', 'FOL-1');
+
+    expect(cartService.addItem).toHaveBeenCalledWith(
+      'cart-1',
+      'prod-1',
+      null,
+      2,
+    );
+  });
+
+  it("throws NotFoundException for an order that doesn't belong to this user", async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.reorder('user-1', 'someone-elses-order'),
+    ).rejects.toThrow('Order not found.');
   });
 });

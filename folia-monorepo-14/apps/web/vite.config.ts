@@ -136,6 +136,20 @@ export default defineConfig(({ mode }) => {
             },
           }
         : {}),
+      ...(env.VITE_REAL_ORDERS_API === 'true'
+        ? {
+            '/api/checkout': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/checkout/, '/api/v1/checkout'),
+            },
+            '/api/orders': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/orders/, '/api/v1/orders'),
+            },
+          }
+        : {}),
     },
   },
   build: {

@@ -17,7 +17,7 @@ import { Alert } from '@/components/common/Alert';
 import { OrderSummary } from '@/components/order/OrderSummary';
 import { TrackingTimeline } from '@/components/order/TrackingTimeline';
 import { ShareButtons } from '@/components/product/ShareButtons';
-import { useOrderStore } from '@/store/orderStore';
+import { useOrder } from '@/hooks/useOrders';
 import { useCartStore } from '@/store/cartStore';
 import { useToastStore } from '@/store/toastStore';
 import { useNotificationStore } from '@/store/notificationStore';
@@ -45,14 +45,14 @@ const returnReasons: { value: ReturnReason; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+const useRealOrdersApi = import.meta.env.VITE_REAL_ORDERS_API === 'true';
+
 export default function AccountOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const order = useOrderStore((s) => (id ? s.getOrder(id) : undefined));
-  const cancelOrder = useOrderStore((s) => s.cancelOrder);
-  const requestReturn = useOrderStore((s) => s.requestReturn);
-  const updateCustomerNotes = useOrderStore((s) => s.updateCustomerNotes);
+  const { order, cancelOrder, requestReturn, updateCustomerNotes, reorder: reorderReal } = useOrder(id);
   const addCartItem = useCartStore((s) => s.addItem);
+  const loadCartFromServer = useCartStore((s) => s.loadFromServer);
   const showToast = useToastStore((s) => s.showToast);
   const addNotification = useNotificationStore((s) => s.addNotification);
 
@@ -89,7 +89,7 @@ export default function AccountOrderDetail() {
     }
   }
 
-  async function addAllItemsToCart(): Promise<{ added: number; skipped: number }> {
+  async function addAllItemsToCartLocal(): Promise<{ added: number; skipped: number }> {
     let added = 0;
     let skipped = 0;
     for (const item of order!.items) {
@@ -118,6 +118,28 @@ export default function AccountOrderDetail() {
     return { added, skipped };
   }
 
+  /**
+   * Real backend only calls reorderReal() (the real /orders/:id/reorder
+   * endpoint, Phase 15) — checks genuine current InventoryService
+   * availability per item server-side, rather than this page's own
+   * possibly-stale local product list. Same {added, skipped} shape
+   * either way, so the two callers below don't need to know which path
+   * ran. Explicitly syncs cartStore from the server afterward — the
+   * caller (handleReorder) navigates straight to /checkout/shipping
+   * without visiting /cart first, and that page's own loadFromServer()
+   * only fires on /cart's own mount, so without this the checkout flow
+   * would show the pre-reorder cart, not the real one that was just
+   * updated server-side.
+   */
+  async function addAllItemsToCart(): Promise<{ added: number; skipped: number }> {
+    if (useRealOrdersApi) {
+      const result = await reorderReal();
+      await loadCartFromServer();
+      return result;
+    }
+    return addAllItemsToCartLocal();
+  }
+
   async function handleBuyAgain() {
     const { added, skipped } = await addAllItemsToCart();
     if (added === 0) {
@@ -137,16 +159,21 @@ export default function AccountOrderDetail() {
     void navigate('/checkout/shipping');
   }
 
-  function handleConfirmCancel() {
-    cancelOrder(order!.id, cancelReason, cancelNote || null);
+  async function handleConfirmCancel() {
+    await cancelOrder(cancelReason, cancelNote || null);
     setCancelOpen(false);
     showToast('info', 'Order cancelled.');
-    addNotification({
-      type: 'order',
-      title: 'Order Cancelled',
-      message: `Order ${order!.id} was cancelled.`,
-      href: `/account/orders/${order!.id}`,
-    });
+    // Real backend only skips this — its own ORDER_CANCELLED event
+    // listener (Phase 15) already creates this notification server-side;
+    // calling the old local store too on the real path would duplicate it.
+    if (!useRealOrdersApi) {
+      addNotification({
+        type: 'order',
+        title: 'Order Cancelled',
+        message: `Order ${order!.id} was cancelled.`,
+        href: `/account/orders/${order!.id}`,
+      });
+    }
   }
 
   function toggleReturnItem(index: number) {
@@ -158,20 +185,22 @@ export default function AccountOrderDetail() {
     });
   }
 
-  function handleConfirmReturn() {
-    requestReturn(order!.id, returnReason, returnNote || null);
+  async function handleConfirmReturn() {
+    await requestReturn(returnReason, returnNote || null);
     setReturnOpen(false);
     showToast('info', 'Return requested — refund will show as processing.');
-    addNotification({
-      type: 'order',
-      title: 'Return Requested',
-      message: `A return was requested for order ${order!.id}.`,
-      href: `/account/orders/${order!.id}`,
-    });
+    if (!useRealOrdersApi) {
+      addNotification({
+        type: 'order',
+        title: 'Return Requested',
+        message: `A return was requested for order ${order!.id}.`,
+        href: `/account/orders/${order!.id}`,
+      });
+    }
   }
 
-  function handleSaveNotes() {
-    updateCustomerNotes(order!.id, notesDraft);
+  async function handleSaveNotes() {
+    await updateCustomerNotes(notesDraft);
     setNotesSaved(true);
     setTimeout(() => setNotesSaved(false), 2000);
   }
@@ -259,7 +288,7 @@ export default function AccountOrderDetail() {
           className="w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm focus:border-fern transition-colors"
         />
         <div className="flex items-center gap-3 mt-2">
-          <Button variant="outline" size="sm" onClick={handleSaveNotes}>
+          <Button variant="outline" size="sm" onClick={() => void handleSaveNotes()}>
             Save note
           </Button>
           {notesSaved && (
@@ -296,7 +325,7 @@ export default function AccountOrderDetail() {
           />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setCancelOpen(false)}>Keep order</Button>
-            <Button variant="primary" onClick={handleConfirmCancel}>Confirm cancellation</Button>
+            <Button variant="primary" onClick={() => void handleConfirmCancel()}>Confirm cancellation</Button>
           </div>
         </div>
       </Modal>
@@ -346,7 +375,7 @@ export default function AccountOrderDetail() {
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setReturnOpen(false)}>Cancel</Button>
-            <Button variant="primary" disabled={selectedReturnItems.size === 0} onClick={handleConfirmReturn}>
+            <Button variant="primary" disabled={selectedReturnItems.size === 0} onClick={() => void handleConfirmReturn()}>
               Request return
             </Button>
           </div>

@@ -1,10 +1,19 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrdersService } from './orders.service';
 import { CheckoutDto } from './dto/checkout.dto';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { ReturnOrderDto } from './dto/return-order.dto';
+import { UpdateNotesDto } from './dto/update-notes.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
@@ -108,5 +117,23 @@ export class OrdersController {
   })
   getTracking(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.ordersService.getTracking(user.id, id);
+  }
+
+  @Patch('orders/:id/notes')
+  updateNotes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateNotesDto,
+  ) {
+    return this.ordersService.updateNotes(user.id, id, dto.notes);
+  }
+
+  @Post('orders/:id/reorder')
+  @ApiOperation({
+    summary:
+      'Adds items from a past order back into the current cart, checking real current availability for each — skips anything now unavailable rather than failing the whole request.',
+  })
+  reorder(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.ordersService.reorder(user.id, id);
   }
 }
