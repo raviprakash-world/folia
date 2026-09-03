@@ -17,7 +17,6 @@ services:
     dockerContext: .
     plan: free
     healthCheckPath: /api/health/ready
-    preDeployCommand: npx --yes prisma migrate deploy --schema=apps/api/prisma/schema.prisma
     envVars:
       - key: NODE_ENV
         value: production
