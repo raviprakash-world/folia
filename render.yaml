@@ -1,0 +1,40 @@
+databases:
+  - name: folia-postgres
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: keyvalue
+    name: folia-redis
+    plan: free
+    ipAllowList: [] # only reachable over Render's private network
+    maxmemoryPolicy: noeviction # don't drop BullMQ job data under memory pressure
+
+  - type: web
+    name: folia-api
+    runtime: docker
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health/ready
+    preDeployCommand: npx --yes prisma migrate deploy --schema=apps/api/prisma/schema.prisma
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: folia-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: folia-redis
+          type: keyvalue
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://web-drab-mu-24.vercel.app
