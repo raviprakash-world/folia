@@ -5,7 +5,11 @@
 ###############################################################################
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
+# python3/make/g++ are needed to compile argon2's native binding via
+# node-gyp when no prebuilt binary matches this platform. Only the base
+# stage (deps/build/prod-deps) needs them — the runtime stage below
+# starts fresh from node:20-alpine, so these never reach the shipped image.
+RUN apk add --no-cache libc6-compat openssl python3 make g++
 
 ###############################################################################
 # Dependencies — root lockfile + every workspace's package.json, so npm can
@@ -65,4 +69,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:3000/api/health/ready || exit 1
 
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/src/main.js"]
