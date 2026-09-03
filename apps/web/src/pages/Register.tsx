@@ -30,7 +30,9 @@ export default function Register() {
   }, [user, navigate]);
 
   async function onSubmit(values: RegisterFormValues) {
-    await registerUser(values);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring-to-omit is the idiomatic way to drop one field; the unused binding is the point, not an oversight.
+    const { confirmPassword: _confirmPassword, ...input } = values;
+    await registerUser(input);
   }
 
   return (
