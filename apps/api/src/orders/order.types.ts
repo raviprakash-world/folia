@@ -40,6 +40,7 @@ export interface AddressSnapshot {
 }
 
 export type OrderStatus =
+  | 'PENDING_PAYMENT'
   | 'PROCESSING'
   | 'CONFIRMED'
   | 'SHIPPED'
@@ -51,6 +52,7 @@ export type CourierIdDb =
   'SWIFTPOST' | 'CASCADE_EXPRESS' | 'TRAILRUNNER' | 'NORTHLINE' | 'QUICKHATCH';
 
 const statusToPublic: Record<OrderStatus, string> = {
+  PENDING_PAYMENT: 'pending-payment',
   PROCESSING: 'processing',
   CONFIRMED: 'confirmed',
   SHIPPED: 'shipped',
@@ -116,8 +118,9 @@ export interface OrderRecord {
   deliveryMethod: DeliveryMethodType;
   estimatedDelivery: string;
   paymentMethod: PaymentMethodType;
-  paymentDisplayLabel: string;
-  paymentTransactionId: string;
+  /** Both null until PaymentsService confirms payment — see Order.paymentDisplayLabel's schema comment (Phase 1). */
+  paymentDisplayLabel: string | null;
+  paymentTransactionId: string | null;
   courierId: CourierIdDb;
   trackingNumber: string;
   customerNotes: string | null;

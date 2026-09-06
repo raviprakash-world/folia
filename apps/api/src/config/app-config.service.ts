@@ -55,4 +55,17 @@ export class AppConfigService {
       .split(',')
       .map((origin) => origin.trim());
   }
+
+  /** Undefined, not thrown, when unset — see env.validation.ts's comment on why these three are optional at boot. RazorpayProvider throws its own clear error at the point a real call is actually attempted. */
+  get razorpayKeyId(): string | undefined {
+    return this.configService.get<string>('RAZORPAY_KEY_ID');
+  }
+
+  get razorpayKeySecret(): string | undefined {
+    return this.configService.get<string>('RAZORPAY_KEY_SECRET');
+  }
+
+  get razorpayWebhookSecret(): string | undefined {
+    return this.configService.get<string>('RAZORPAY_WEBHOOK_SECRET');
+  }
 }

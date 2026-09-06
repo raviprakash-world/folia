@@ -4,7 +4,16 @@ export type DeliveryMethodType = 'standard' | 'express' | 'same-day' | 'pickup';
 
 export type PaymentMethodType = 'credit-card' | 'debit-card' | 'upi' | 'net-banking' | 'cod' | 'wallet';
 
-export type OrderStatus = 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled' | 'returned' | 'refunded';
+/** 'pending-payment' is Phase 1 (payments) — a real gateway order sits here from checkout until Razorpay confirms the charge (via the verify callback or, authoritatively, the webhook). COD skips it entirely and goes straight to 'processing'. */
+export type OrderStatus =
+  | 'pending-payment'
+  | 'processing'
+  | 'confirmed'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled'
+  | 'returned'
+  | 'refunded';
 
 /**
  * Granular delivery-tracking timeline, distinct from OrderStatus (the
@@ -63,9 +72,9 @@ export interface OrderItem {
 
 export interface PaymentSummary {
   method: PaymentMethodType;
-  /** Masked — last 4 digits for cards, masked UPI id, bank name, etc. Never a full card/account number. */
-  displayLabel: string;
-  transactionId: string;
+  /** Masked — last 4 digits for cards, masked UPI id, bank name, etc. Never a full card/account number. Null on a real gateway order that hasn't captured yet (Phase 1) — an order in 'pending-payment' genuinely doesn't have one yet. */
+  displayLabel: string | null;
+  transactionId: string | null;
 }
 
 export interface Order {

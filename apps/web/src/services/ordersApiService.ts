@@ -6,6 +6,10 @@ import type {
   CancellationReason,
   ReturnReason,
 } from '@/types/order';
+import type { CreatePaymentResult } from './paymentsApiService';
+
+/** Phase 1 (payments) — checkout() no longer returns a fully-paid order synchronously; it returns the order (in 'pending-payment' for a gateway method, 'processing' for COD) plus everything needed to actually resolve payment client-side. */
+export type CheckoutResponse = Order & { payment: CreatePaymentResult };
 
 export interface CheckoutRequest {
   shippingAddressId: string;
@@ -25,8 +29,8 @@ export interface CheckoutRequest {
  * against double-submission on a network retry, not just the disabled-
  * button UI guard this page already has.
  */
-export async function checkoutReal(request: CheckoutRequest, idempotencyKey: string): Promise<Order> {
-  const { data } = await apiClient.post<Order>('/checkout', request, {
+export async function checkoutReal(request: CheckoutRequest, idempotencyKey: string): Promise<CheckoutResponse> {
+  const { data } = await apiClient.post<CheckoutResponse>('/checkout', request, {
     headers: { 'Idempotency-Key': idempotencyKey },
   });
   return data;

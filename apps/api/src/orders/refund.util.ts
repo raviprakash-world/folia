@@ -14,7 +14,13 @@ export function deriveRefundStatus(requestedAt: Date): RefundStatus {
   return elapsed >= REFUND_PROCESSING_WINDOW_MS ? 'refunded' : 'processing';
 }
 
-const CANCELLABLE_STATUSES = ['PROCESSING', 'CONFIRMED', 'SHIPPED'];
+/** PENDING_PAYMENT (Phase 1) is cancellable — a customer should be able to back out before ever completing payment, not just after. */
+const CANCELLABLE_STATUSES = [
+  'PENDING_PAYMENT',
+  'PROCESSING',
+  'CONFIRMED',
+  'SHIPPED',
+];
 const RETURN_WINDOW_DAYS = 30;
 
 /** Matches apps/web/src/utils/refund.ts's canCancelOrder exactly. */

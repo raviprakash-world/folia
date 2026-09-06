@@ -131,11 +131,12 @@ export class InventoryService {
    * out of scope here — this project's warehouse model exists to prove
    * SKU/stock tracking works, not to implement fulfillment optimization.
    */
+  /** Returns the id of the inventory item actually decremented from, so a caller that might need to reverse this later (Phase 1 payments: an order whose payment fails or expires — see PaymentsService/the expire-stale-payments job) knows precisely which row to restore, rather than re-deriving "an" item for the product and risking restoring to a different warehouse row than the one actually decremented. */
   async decrementForProduct(
     productId: string,
     variantId: string | null,
     quantity: number,
-  ): Promise<void> {
+  ): Promise<string> {
     const items = (await this.prisma.inventoryItem.findMany({
       where: variantId
         ? { productId, variantId }
@@ -152,6 +153,12 @@ export class InventoryService {
     }
 
     await this.adjustStock(sufficient.id, -quantity);
+    return sufficient.id;
+  }
+
+  /** The precise inverse of decrementForProduct's effect on a single inventory item — gives stock back to the exact row it was taken from. Named separately from adjustStock (rather than calling adjustStock(id, +qty) directly at every call site) so a payment-expiry/failure code path reads as "restore this order line's stock," not an opaque signed-delta call. */
+  async restoreQuantity(inventoryItemId: string, quantity: number): Promise<void> {
+    await this.adjustStock(inventoryItemId, quantity);
   }
 
   /**

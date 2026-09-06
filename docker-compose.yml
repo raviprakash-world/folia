@@ -46,6 +46,12 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set — see apps/api/.env.example}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set — see apps/api/.env.example}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      # No :? guard, unlike the JWT secrets above — the app boots fine with
+      # these unset (see env.validation.ts's comment), it just can't take a
+      # real card/UPI/net-banking/wallet payment until they're real values.
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

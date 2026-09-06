@@ -12,6 +12,17 @@ import { cn } from '@/utils/cn';
 import { NewCardForm, SavedCardForm, SavedCardPicker, UpiForm, NetBankingForm } from '@/components/checkout/PaymentForms';
 import type { PaymentMethodType } from '@/types/order';
 
+const useRealOrdersApi = import.meta.env.VITE_REAL_ORDERS_API === 'true';
+
+/** Real gateway methods only — COD never touches a gateway either way, so it keeps using processPayment's generic "Cash on Delivery" summary regardless of this flag. */
+const GATEWAY_METHOD_LABELS: Partial<Record<PaymentMethodType, string>> = {
+  'credit-card': 'Card',
+  'debit-card': 'Card',
+  upi: 'UPI',
+  'net-banking': 'Net Banking',
+  wallet: 'Wallet',
+};
+
 export default function CheckoutPayment() {
   const navigate = useNavigate();
   const setPayment = useCheckoutStore((s) => s.setPayment);
@@ -36,6 +47,21 @@ export default function CheckoutPayment() {
   }
 
   async function handlePay(displayLabel: string) {
+    // Real gateway methods (Phase 1): nothing to "process" here at all —
+    // Razorpay's own hosted checkout collects the real card/UPI/bank
+    // details, and it can't open until a real gateway order exists,
+    // which only happens once /checkout is actually called on the
+    // Review step. This step's only job for these methods is picking
+    // which one, matching the label the eventual Razorpay modal will
+    // show. COD has no gateway either way, so it keeps the exact
+    // previous behavior (processPayment's generic, always-succeeds
+    // summary) regardless of this flag.
+    if (useRealOrdersApi && method !== 'cod') {
+      setPayment({ method, displayLabel: GATEWAY_METHOD_LABELS[method] ?? displayLabel, transactionId: null });
+      void navigate('/checkout/review');
+      return;
+    }
+
     setProcessing(true);
     setError(null);
     try {
@@ -85,40 +111,65 @@ export default function CheckoutPayment() {
         </Alert>
       )}
 
-      {(method === 'credit-card' || method === 'debit-card') && (
-        <>
-          <SavedCardPicker selectedId={savedCardId} onSelect={setSavedCardId} />
-          {savedCardId ? (
-            <SavedCardForm savedCardId={savedCardId} onSubmit={(label) => void handlePay(label)} processing={processing} />
-          ) : (
-            <NewCardForm onSubmit={(label) => void handlePay(label)} processing={processing} />
-          )}
-        </>
-      )}
-
-      {method === 'upi' && <UpiForm onSubmit={(label) => void handlePay(label)} processing={processing} />}
-
-      {method === 'net-banking' && <NetBankingForm onSubmit={(label) => void handlePay(label)} processing={processing} />}
-
-      {method === 'wallet' && (
+      {useRealOrdersApi && method !== 'cod' ? (
+        // Real gateway path (Phase 1): no card/UPI/net-banking form here at
+        // all — those collect fake, discarded data against the mock
+        // backend, and this app has never sent real card/account details
+        // to its own backend (see paymentService.ts's own doc comment on
+        // why: masked-label-only, matching a real tokenizing-SDK
+        // approach). The actual secure entry happens inside Razorpay's own
+        // hosted checkout, opened from the Review step once a real
+        // gateway order exists. "Wallet" here means a wallet routed
+        // through Razorpay (Paytm/PhonePe/etc.), not this mock's internal
+        // balance concept, so that check doesn't apply on this path either.
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-sm text-ink p-4 rounded-[var(--radius-control)] bg-stone-dark/30">
+          <div className="flex items-center gap-2 text-sm text-ink-soft p-4 rounded-[var(--radius-control)] bg-stone-dark/30">
             <Wallet size={16} className="text-fern" />
-            Wallet balance: <span className="font-mono">{formatCurrency(walletBalance)}</span>
+            You'll enter your {GATEWAY_METHOD_LABELS[method]?.toLowerCase() ?? 'payment'} details securely on the next
+            step.
           </div>
-          {!walletSufficient && (
-            <Alert tone="error">Your wallet balance isn't enough to cover this order. Choose another method.</Alert>
-          )}
-          <Button
-            variant="primary"
-            size="lg"
-            disabled={processing || !walletSufficient}
-            className="self-start"
-            onClick={() => void handlePay(`Wallet (${formatCurrency(walletBalance)} balance)`)}
-          >
-            {processing ? 'Processing…' : `Pay ${formatCurrency(total)} with wallet`}
+          <Button variant="primary" size="lg" className="self-start" onClick={() => void handlePay('')}>
+            Continue to review
           </Button>
         </div>
+      ) : (
+        <>
+          {(method === 'credit-card' || method === 'debit-card') && (
+            <>
+              <SavedCardPicker selectedId={savedCardId} onSelect={setSavedCardId} />
+              {savedCardId ? (
+                <SavedCardForm savedCardId={savedCardId} onSubmit={(label) => void handlePay(label)} processing={processing} />
+              ) : (
+                <NewCardForm onSubmit={(label) => void handlePay(label)} processing={processing} />
+              )}
+            </>
+          )}
+
+          {method === 'upi' && <UpiForm onSubmit={(label) => void handlePay(label)} processing={processing} />}
+
+          {method === 'net-banking' && <NetBankingForm onSubmit={(label) => void handlePay(label)} processing={processing} />}
+
+          {method === 'wallet' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 text-sm text-ink p-4 rounded-[var(--radius-control)] bg-stone-dark/30">
+                <Wallet size={16} className="text-fern" />
+                Wallet balance: <span className="font-mono">{formatCurrency(walletBalance)}</span>
+              </div>
+              {!walletSufficient && (
+                <Alert tone="error">Your wallet balance isn't enough to cover this order. Choose another method.</Alert>
+              )}
+              <Button
+                variant="primary"
+                size="lg"
+                disabled={processing || !walletSufficient}
+                className="self-start"
+                onClick={() => void handlePay(`Wallet (${formatCurrency(walletBalance)} balance)`)}
+              >
+                {processing ? 'Processing…' : `Pay ${formatCurrency(total)} with wallet`}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {method === 'cod' && (

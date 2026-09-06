@@ -37,3 +37,15 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: https://web-drab-mu-24.vercel.app
+      # sync: false — prompted for in the Render Dashboard on creation
+      # rather than committed here, same treatment as any other real
+      # secret. The app boots fine with these unset (see
+      # env.validation.ts); real card/UPI/net-banking/wallet payments
+      # just fail loudly until they're set to real Razorpay values (see
+      # docs/API_INTEGRATION_STATUS.md).
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false

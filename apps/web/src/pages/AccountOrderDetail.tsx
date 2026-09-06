@@ -225,7 +225,7 @@ export default function AccountOrderDetail() {
       <PageHeader
         eyebrow={formatDate(order.createdAt)}
         title={order.id}
-        action={<Tag tone={orderStatusTone[status]}>{status}</Tag>}
+        action={<Tag tone={orderStatusTone[status]}>{status.replace('-', ' ')}</Tag>}
       />
 
       {(order.cancellation ?? order.returnRequest) && refundStatus && (
