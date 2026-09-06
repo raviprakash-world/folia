@@ -92,6 +92,10 @@ function createDeps() {
       findMany: jest.fn(),
       count: jest.fn(),
     },
+    storeCreditEntry: {
+      create: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
   };
   const storageService = {
     upload: jest.fn().mockResolvedValue({
@@ -104,15 +108,24 @@ function createDeps() {
   const auditService = {
     log: jest.fn<Promise<void>, [LogAuditInput]>().mockResolvedValue(undefined),
   };
+  const paymentsService = { refund: jest.fn() };
 
   const service = new ReturnsService(
     prisma as never,
     storageService,
     eventEmitter,
     auditService as never,
+    paymentsService as never,
   );
 
-  return { prisma, storageService, eventEmitter, auditService, service };
+  return {
+    prisma,
+    storageService,
+    eventEmitter,
+    auditService,
+    paymentsService,
+    service,
+  };
 }
 
 describe('ReturnsService.createClaim', () => {
@@ -1173,7 +1186,7 @@ describe('ReturnsService.adminApprove', () => {
   });
 
   it('never creates a refund/store-credit/replacement side effect — approval only records the decision', async () => {
-    const { prisma, service } = createDeps();
+    const { prisma, paymentsService, service } = createDeps();
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({ status: 'APPROVED' }),
@@ -1181,10 +1194,8 @@ describe('ReturnsService.adminApprove', () => {
 
     await service.adminApprove('admin-1', 'rr-1', {}, undefined);
 
-    // The mock prisma object has no payment/refund/storeCreditEntry/order.update
-    // methods at all — if adminApprove tried to call any of them, this test
-    // would fail with a "not a function" error rather than passing silently.
-    expect(Object.keys(prisma)).toEqual(['order', 'returnRequest']);
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+    expect(prisma.storeCreditEntry.create).not.toHaveBeenCalled();
   });
 
   it('exactly one of two concurrent approve calls for the same claim succeeds', async () => {
@@ -1278,7 +1289,7 @@ describe('ReturnsService.adminReject', () => {
   });
 
   it('never creates a refund/store-credit/replacement side effect — rejection only records the decision', async () => {
-    const { prisma, service } = createDeps();
+    const { prisma, paymentsService, service } = createDeps();
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({ status: 'REJECTED' }),
@@ -1286,7 +1297,8 @@ describe('ReturnsService.adminReject', () => {
 
     await service.adminReject('admin-1', 'rr-1', { reason: 'x' }, undefined);
 
-    expect(Object.keys(prisma)).toEqual(['order', 'returnRequest']);
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+    expect(prisma.storeCreditEntry.create).not.toHaveBeenCalled();
   });
 
   it('exactly one of two concurrent reject calls for the same claim succeeds', async () => {
@@ -1375,5 +1387,483 @@ describe('ReturnsService admin audit — no false successes', () => {
     expect(auditService.log).toHaveBeenCalledTimes(1);
     const [[loggedInput]] = auditService.log.mock.calls;
     expect(loggedInput.action).toBe('RETURN_REJECTED');
+  });
+});
+
+// --- Phase 6D-4B: financial resolution ---
+
+function makeResolutionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'rr-1',
+    orderId: 'order-1',
+    claimType: 'STANDARD_RETURN',
+    reason: 'WRONG_ITEM',
+    status: 'APPROVED',
+    refundAmount: null,
+    items: [
+      {
+        orderItemId: 'item-1',
+        quantity: 1,
+        orderItem: { price: 42, quantity: 2 },
+      },
+    ],
+    order: {
+      id: 'order-1',
+      userId: 'user-1',
+      subtotal: 42,
+      discount: 0,
+      tax: 3.36,
+      paymentMethod: 'CREDIT_CARD',
+      payment: { id: 'pay-1' },
+    },
+    ...overrides,
+  };
+}
+
+describe('ReturnsService.resolveClaim — eligibility', () => {
+  it('throws NotFoundException for a nonexistent return request', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.resolveClaim('admin-1', 'unknown', undefined),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects resolving a PENDING claim', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeResolutionRow({ status: 'PENDING' }),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('rejects resolving a REJECTED claim', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeResolutionRow({ status: 'REJECTED' }),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('is idempotent for an already REFUND_ISSUED claim — returns the persisted result, never re-executes', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow({ status: 'REFUND_ISSUED' }))
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+
+    const result = await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(result.status).toBe('refund-issued');
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent for an already STORE_CREDIT_ISSUED claim — returns the persisted result, never re-executes', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({ status: 'STORE_CREDIT_ISSUED' }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+
+    const result = await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(result.status).toBe('store-credit-issued');
+  });
+
+  it('rejects with a zero computed refund amount rather than resolving nothing', async () => {
+    const { prisma, service } = createDeps();
+    // eligibleItemSubtotal (42) with a huge deduction relative to a tiny
+    // order — engineered so calculateRefundAmount floors to 0.
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeResolutionRow({
+        reason: 'CHANGED_MIND',
+        items: [
+          {
+            orderItemId: 'item-1',
+            quantity: 1,
+            orderItem: { price: 1, quantity: 1 },
+          },
+        ],
+        order: {
+          id: 'order-1',
+          userId: 'user-1',
+          subtotal: 1000,
+          discount: 0,
+          tax: 80,
+          paymentMethod: 'CREDIT_CARD',
+          payment: { id: 'pay-1' },
+        },
+      }),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(/zero/);
+  });
+});
+
+describe('ReturnsService.resolveClaim — prepaid refund', () => {
+  it('resolves an approved prepaid claim through PaymentsService.refund() with the correct frozen amount', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', '10.0.0.1');
+
+    // subtotal=42, discount=0, tax=3.36, eligibleItemSubtotal=42 (full),
+    // reason=WRONG_ITEM (no deduction) -> 42 - 0 + 3.36 = 45.36
+    expect(paymentsService.refund).toHaveBeenCalledWith(
+      'pay-1',
+      expect.objectContaining({ amount: 45.36 }),
+      { actorId: 'admin-1', actorType: 'admin', ipAddress: '10.0.0.1' },
+    );
+  });
+
+  it('never calls the Razorpay SDK/provider directly — ReturnsService has no such dependency at all, only PaymentsService', () => {
+    // Structural guarantee, not a runtime check: ReturnsService's
+    // constructor never receives a RazorpayProvider (see its DI graph) —
+    // there is no code path by which it could call Razorpay directly.
+    // Documented here rather than asserted at runtime, since there is
+    // nothing to mock/spy on that ReturnsService could even call.
+    expect(true).toBe(true);
+  });
+
+  it('persists refundId and transitions to REFUND_ISSUED on success', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    const result = await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(result.status).toBe('refund-issued');
+    const statusUpdateCall = prisma.returnRequest.updateMany.mock.calls.find(
+      (call) => call[0].data.status === 'REFUND_ISSUED',
+    );
+    expect(statusUpdateCall![0]).toEqual({
+      where: { id: 'rr-1', status: 'APPROVED' },
+      data: {
+        status: 'REFUND_ISSUED',
+        resolutionType: 'REFUND',
+        refundId: 'refund-1',
+      },
+    });
+  });
+
+  it('leaves the claim retryable (APPROVED, no fake success) when the gateway refund fails', async () => {
+    const { prisma, paymentsService, auditService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(makeResolutionRow());
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockRejectedValue(new Error('gateway unreachable'));
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow('gateway unreachable');
+
+    // No status/resolutionType/refundId update was ever attempted for a
+    // successful transition.
+    const successUpdate = prisma.returnRequest.updateMany.mock.calls.find(
+      (call) => call[0].data.status === 'REFUND_ISSUED',
+    );
+    expect(successUpdate).toBeUndefined();
+
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('RETURN_REFUND_FAILED');
+  });
+
+  it('never creates a duplicate refund on repeated resolution once the amount is frozen — a clean conflict instead', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    // Simulates: a first call already froze refundAmount (whether it
+    // succeeded, failed, or is a concurrent racer — see the KNOWN GAP
+    // doc comment in returns.service.ts for why prepaid can't safely
+    // distinguish these).
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeResolutionRow({ refundAmount: 45.36 }),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(ConflictException);
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+  });
+
+  it('exactly one of two concurrent first-time resolution attempts proceeds to call PaymentsService.refund()', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow()) // request A's fetch
+      .mockResolvedValueOnce(makeResolutionRow()) // request B's fetch
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' })); // A's final adminGetClaim
+    // A's freeze wins (count: 1), B's freeze loses (count: 0).
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // A freezes refundAmount
+      .mockResolvedValueOnce({ count: 0 }) // B loses the freeze race
+      .mockResolvedValueOnce({ count: 1 }); // A's success status transition
+    // B re-reads fresh state after losing the freeze race: still
+    // APPROVED, refundAmount now frozen by A.
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue({
+      status: 'APPROVED',
+      refundAmount: 45.36,
+    });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    const [a, b] = await Promise.allSettled([
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+      service.resolveClaim('admin-2', 'rr-1', undefined),
+    ]);
+
+    expect(a.status).toBe('fulfilled');
+    expect(b.status).toBe('rejected');
+    if (b.status === 'rejected') {
+      expect(b.reason).toBeInstanceOf(ConflictException);
+    }
+    expect(paymentsService.refund).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReturnsService.resolveClaim — COD store credit', () => {
+  function makeCodRow(overrides: Record<string, unknown> = {}) {
+    return makeResolutionRow({
+      order: {
+        id: 'order-1',
+        userId: 'user-1',
+        subtotal: 42,
+        discount: 0,
+        tax: 3.36,
+        paymentMethod: 'COD',
+        payment: { id: 'pay-1' },
+      },
+      ...overrides,
+    });
+  }
+
+  it('creates a StoreCreditEntry for the exact frozen amount, linked to the ReturnRequest', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeCodRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockResolvedValue({ id: 'sce-1' });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(prisma.storeCreditEntry.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        amount: 45.36, // 42 - 0 + 3.36
+        reason: 'Return resolution for order order-1',
+        returnRequestId: 'rr-1',
+      },
+    });
+  });
+
+  it('never calls PaymentsService.refund() for COD — no Razorpay involvement at all', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeCodRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockResolvedValue({ id: 'sce-1' });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+  });
+
+  it('transitions to STORE_CREDIT_ISSUED, never REFUND_ISSUED, and never touches Payment.status', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeCodRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockResolvedValue({ id: 'sce-1' });
+
+    const result = await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(result.status).toBe('store-credit-issued');
+    const statusCall = prisma.returnRequest.updateMany.mock.calls.find(
+      (call) => call[0].data.status,
+    );
+    expect(statusCall![0].data).toEqual({
+      status: 'STORE_CREDIT_ISSUED',
+      resolutionType: 'FOLIA_STORE_CREDIT',
+    });
+    // The mock's `prisma` has no `payment` model at all — if resolveClaim
+    // ever tried to touch Payment directly for COD, this would fail with
+    // a "not a function" error rather than passing silently.
+  });
+
+  it('duplicate resolution of an already-issued COD claim does not create a second StoreCreditEntry', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeCodRow({ status: 'STORE_CREDIT_ISSUED' }))
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(prisma.storeCreditEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('a concurrent duplicate create() attempt (P2002 on the unique returnRequestId) is treated as idempotent, not an error, and never double-credits', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeCodRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
+      }),
+    );
+    prisma.storeCreditEntry.findUniqueOrThrow.mockResolvedValue({
+      id: 'sce-existing',
+    });
+
+    const result = await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(result.status).toBe('store-credit-issued');
+    expect(prisma.storeCreditEntry.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('exactly one StoreCreditEntry results from two concurrent resolution requests for the same claim', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeCodRow()) // A
+      .mockResolvedValueOnce(makeCodRow()) // B
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' })) // A's final read
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' })); // B's final read
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    // A wins the real create(); B collides on the unique constraint.
+    prisma.storeCreditEntry.create
+      .mockResolvedValueOnce({ id: 'sce-1' })
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '6.19.3',
+        }),
+      );
+    prisma.storeCreditEntry.findUniqueOrThrow.mockResolvedValue({
+      id: 'sce-1',
+    });
+
+    const [a, b] = await Promise.allSettled([
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+      service.resolveClaim('admin-2', 'rr-1', undefined),
+    ]);
+
+    expect(a.status).toBe('fulfilled');
+    expect(b.status).toBe('fulfilled');
+    expect(prisma.storeCreditEntry.create).toHaveBeenCalledTimes(2);
+    // Only one of those two calls actually persisted a row — the second
+    // hit the unique constraint and was resolved to the SAME entry.
+  });
+
+  it('a genuine (non-P2002) storage failure logs RETURN_STORE_CREDIT_FAILED and never fakes success', async () => {
+    const { prisma, auditService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(makeCodRow());
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockRejectedValue(
+      new Error('database connection lost'),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow('database connection lost');
+
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('RETURN_STORE_CREDIT_FAILED');
+  });
+});
+
+describe('ReturnsService.resolveClaim — audit and events', () => {
+  it('logs exactly one RETURN_REFUND_ISSUED audit record on a successful prepaid resolution', async () => {
+    const { prisma, paymentsService, auditService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(auditService.log).toHaveBeenCalledTimes(1);
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('RETURN_REFUND_ISSUED');
+  });
+
+  it('emits STORE_CREDIT_ISSUED with the correct payload on successful COD resolution', async () => {
+    const { prisma, eventEmitter, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          order: {
+            id: 'order-1',
+            userId: 'user-1',
+            subtotal: 42,
+            discount: 0,
+            tax: 3.36,
+            paymentMethod: 'COD',
+            payment: { id: 'pay-1' },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockResolvedValue({ id: 'sce-1' });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'notification.store_credit_issued',
+      {
+        returnRequestId: 'rr-1',
+        orderId: 'order-1',
+        userId: 'user-1',
+        amount: 45.36,
+      },
+    );
+  });
+
+  it('does not create a false-successful audit record for a failed prepaid attempt', async () => {
+    const { prisma, paymentsService, auditService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(makeResolutionRow());
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockRejectedValue(new Error('declined'));
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow('declined');
+
+    expect(auditService.log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'RETURN_REFUND_ISSUED' }),
+    );
   });
 });

@@ -10,6 +10,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { PaymentsService } from '../payments/payments.service';
 import { STORAGE_SERVICE } from '../storage/storage.interface';
 import type { StorageService } from '../storage/storage.interface';
 import {
@@ -21,6 +22,7 @@ import {
   isReasonEligibleForClaimType,
   isWithinReturnWindow,
   requiresEvidence,
+  calculateRefundAmount,
   type ReturnClaimType,
 } from './return-policy.util';
 import { RETURN_REASON_TO_DB, returnReasonToPublic } from './order.types';
@@ -32,6 +34,7 @@ import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type {
   ReturnApprovedPayload,
   ReturnRejectedPayload,
+  StoreCreditIssuedPayload,
 } from '../notifications/notification.events';
 
 /** DB enum -> public API string, both directions — covers every ReturnRequestStatus value, even the ones no code can reach yet (REFUND_ISSUED/STORE_CREDIT_ISSUED/REPLACEMENT_ISSUED are Phase 6D-4B+'s job), so the admin list/detail responses stay honest if a caller ever filters on one. */
@@ -74,6 +77,36 @@ type AdminReturnRequestRow = Prisma.ReturnRequestGetPayload<{
 }>;
 
 /**
+ * Phase 6D-4B — a separate, narrower include for the resolution methods'
+ * own internal calculation/branching needs (order pricing snapshot,
+ * payment method, the real Payment row to refund). Kept distinct from
+ * ADMIN_RETURN_INCLUDE deliberately: the admin list/detail response has
+ * no reason to expose raw subtotal/discount/tax or the linked Payment's
+ * internals, and this include has no reason to fetch the customer's
+ * name/email.
+ */
+const RESOLUTION_INCLUDE = {
+  items: {
+    include: { orderItem: { select: { price: true, quantity: true } } },
+  },
+  order: {
+    select: {
+      id: true,
+      userId: true,
+      subtotal: true,
+      discount: true,
+      tax: true,
+      paymentMethod: true,
+      payment: { select: { id: true } },
+    },
+  },
+} satisfies Prisma.ReturnRequestInclude;
+
+type ResolutionRow = Prisma.ReturnRequestGetPayload<{
+  include: typeof RESOLUTION_INCLUDE;
+}>;
+
+/**
  * Phase 6D-3 — customer-facing claim CREATION only. Everything downstream
  * of a claim actually existing (admin approval/rejection, refund
  * execution, store-credit issuance, replacement-order creation, reverse
@@ -92,6 +125,7 @@ export class ReturnsService {
     @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   async createClaim(
@@ -548,10 +582,10 @@ export class ReturnsService {
         decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
         decisionNote: row.decisionNote,
       },
-      // Always empty/null in Phase 6D-4A (nothing here ever sets them) —
-      // surfaced anyway so the admin UI can see at a glance that no
-      // resolution has been executed yet, and so this shape doesn't need
-      // to change once a later phase starts populating them.
+      // Null until Phase 6D-4B's resolveClaim() actually populates them —
+      // surfaced from the start (Phase 6D-4A) so the admin UI can see at
+      // a glance whether a resolution has executed yet, with no response
+      // shape change needed once it does.
       resolution: {
         resolutionType: row.resolutionType,
         requiresReverseLogistics: row.requiresReverseLogistics,
@@ -561,5 +595,278 @@ export class ReturnsService {
         storeCreditEntryId: row.storeCreditEntry?.id ?? null,
       },
     };
+  }
+
+  // --- Phase 6D-4B: financial resolution for an already-APPROVED claim ---
+  //
+  // Resolution type is never accepted from the client — it is derived
+  // entirely from the order's real, persisted paymentMethod: COD ->
+  // FOLIA_STORE_CREDIT, anything else -> REFUND via the existing
+  // PaymentsService.refund(). Replacement is out of scope until a later
+  // phase. Nothing here calls the Razorpay SDK directly — the only
+  // gateway path is PaymentsService.refund() itself.
+  //
+  // KNOWN GAP (see docs/PHASE_6D_MIGRATION_DESIGN.md): the existing
+  // ReturnRequestStatus enum cannot distinguish "a prepaid refund attempt
+  // is currently in flight" from "a previous attempt failed and this is
+  // a safe retry" — both look identical (status still APPROVED,
+  // refundAmount already frozen). PaymentsService.refund()'s own
+  // aggregate guard protects the PAYMENT's total from being over-
+  // refunded, but does NOT protect this ONE LOGICAL CLAIM from being
+  // refunded twice if the payment has enough remaining headroom to
+  // absorb a second, independently-valid-looking refund() call — a real
+  // double-refund risk if a second prepaid resolve() attempt were allowed
+  // to proceed under that ambiguity. Given that, this implementation
+  // deliberately ERRS TOWARD FINANCIAL SAFETY: once a prepaid claim's
+  // refundAmount is frozen, any further resolveClaim() call is refused
+  // with a clean conflict rather than risking a second gateway attempt —
+  // by design, this means an admin cannot self-service-retry a failed
+  // prepaid resolution through this same action; closing that safely
+  // requires a small additive schema change (a distinct transient
+  // status, e.g. a "financial resolution in progress/failed" value) that
+  // has NOT been made without approval, per this phase's explicit
+  // instruction to report rather than invent an unsafe workaround.
+  // COD has no such gap: StoreCreditEntry.returnRequestId's own unique
+  // constraint is a single, instantaneous, airtight guard (no external
+  // gateway call sits between "decide to create" and "actually create"),
+  // so COD resolution is always safe to retry.
+
+  async resolveClaim(adminId: string, id: string, ipAddress?: string) {
+    const row = await this.prisma.returnRequest.findUnique({
+      where: { id },
+      include: RESOLUTION_INCLUDE,
+    });
+    if (!row) throw new NotFoundException('Return request not found.');
+
+    if (row.status === 'PENDING' || row.status === 'REJECTED') {
+      throw new ConflictException(
+        `This claim is ${RETURN_STATUS_TO_PUBLIC[row.status] ?? row.status.toLowerCase()} and must be approved before it can be financially resolved.`,
+      );
+    }
+    if (row.status !== 'APPROVED') {
+      // Already resolved (REFUND_ISSUED / STORE_CREDIT_ISSUED /
+      // REPLACEMENT_ISSUED) — idempotent: return the persisted result,
+      // never re-execute a financial operation.
+      return this.adminGetClaim(id);
+    }
+
+    const isCod = row.order.paymentMethod === 'COD';
+
+    let frozenAmount: number;
+    if (row.refundAmount != null) {
+      // A previous attempt (this claim's first, or a concurrent racer)
+      // already froze the amount. See the KNOWN GAP note above.
+      if (!isCod) {
+        throw new ConflictException(
+          'A financial resolution attempt for this claim has already been initiated and cannot be automatically retried — manual review is required.',
+        );
+      }
+      frozenAmount = Number(row.refundAmount);
+    } else {
+      const eligibleItemSubtotal = row.items.reduce(
+        (sum, item) => sum + Number(item.orderItem.price) * item.quantity,
+        0,
+      );
+      const computed = calculateRefundAmount({
+        claimType: row.claimType,
+        reason: row.reason,
+        orderSubtotal: Number(row.order.subtotal),
+        orderDiscount: Number(row.order.discount),
+        orderTax: Number(row.order.tax),
+        eligibleItemSubtotal,
+      });
+      if (computed <= 0) {
+        throw new BadRequestException(
+          'The computed refund amount for this claim is zero — there is nothing to resolve.',
+        );
+      }
+
+      // Deterministic given immutable order/item data — freezing it is
+      // the real, atomic gate: exactly one of two concurrent first-time
+      // callers wins this conditional update (Postgres serializes
+      // concurrent UPDATEs to the same row), the same idiom this
+      // codebase already uses for PaymentsService.confirmCapture and
+      // Phase 6D-4A's own approve/reject transitions.
+      const { count } = await this.prisma.returnRequest.updateMany({
+        where: { id, status: 'APPROVED', refundAmount: null },
+        data: { refundAmount: computed },
+      });
+
+      if (count === 1) {
+        frozenAmount = computed;
+      } else {
+        // Lost the freeze race — re-read fresh state rather than assume
+        // why. Someone else may have already finished (idempotent
+        // return) or may have just frozen the amount a moment ago (the
+        // KNOWN GAP case for prepaid; safe to proceed for COD).
+        const fresh = await this.prisma.returnRequest.findUniqueOrThrow({
+          where: { id },
+          select: { status: true, refundAmount: true },
+        });
+        if (fresh.status !== 'APPROVED') return this.adminGetClaim(id);
+        if (!isCod) {
+          throw new ConflictException(
+            'A financial resolution attempt for this claim is already in progress.',
+          );
+        }
+        frozenAmount = Number(fresh.refundAmount);
+      }
+    }
+
+    if (isCod) {
+      return this.resolveCodStoreCredit(adminId, row, frozenAmount, ipAddress);
+    }
+    return this.resolvePrepaidRefund(adminId, row, frozenAmount, ipAddress);
+  }
+
+  private async resolveCodStoreCredit(
+    adminId: string,
+    row: ResolutionRow,
+    amount: number,
+    ipAddress?: string,
+  ) {
+    let entry: { id: string };
+    try {
+      entry = await this.prisma.storeCreditEntry.create({
+        data: {
+          userId: row.order.userId,
+          amount,
+          reason: `Return resolution for order ${row.orderId}`,
+          returnRequestId: row.id,
+        },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        // A concurrent resolveClaim() call already issued the credit —
+        // the real, race-proof guarantee (this codebase's established
+        // "unique constraint as the atomic gate" idiom, same as
+        // ReturnRequest.orderId in Phase 6D-3). Idempotent, not an error.
+        entry = await this.prisma.storeCreditEntry.findUniqueOrThrow({
+          where: { returnRequestId: row.id },
+        });
+      } else {
+        await this.auditService.log({
+          actorId: adminId,
+          action: 'RETURN_STORE_CREDIT_FAILED',
+          resource: 'return_request',
+          resourceId: row.id,
+          metadata: {
+            orderId: row.orderId,
+            amount,
+            error: err instanceof Error ? err.message : 'unknown error',
+          },
+          ipAddress,
+        });
+        throw err;
+      }
+    }
+
+    // Safe even if this call lost the create() race above: the entry (the
+    // real financial fact) is confirmed to exist either way by this
+    // point, so marking ISSUED here is never a lie — and if a concurrent
+    // call already flipped status, this update is a harmless no-op
+    // (count: 0), not an error.
+    await this.prisma.returnRequest.updateMany({
+      where: { id: row.id, status: 'APPROVED' },
+      data: {
+        status: 'STORE_CREDIT_ISSUED',
+        resolutionType: 'FOLIA_STORE_CREDIT',
+      },
+    });
+
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'RETURN_STORE_CREDIT_ISSUED',
+      resource: 'return_request',
+      resourceId: row.id,
+      metadata: {
+        orderId: row.orderId,
+        amount,
+        storeCreditEntryId: entry.id,
+      },
+      ipAddress,
+    });
+
+    const payload: StoreCreditIssuedPayload = {
+      returnRequestId: row.id,
+      orderId: row.orderId,
+      userId: row.order.userId,
+      amount,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.STORE_CREDIT_ISSUED, payload);
+
+    return this.adminGetClaim(row.id);
+  }
+
+  private async resolvePrepaidRefund(
+    adminId: string,
+    row: ResolutionRow,
+    amount: number,
+    ipAddress?: string,
+  ) {
+    if (!row.order.payment) {
+      throw new BadRequestException(
+        'This order has no payment record to refund.',
+      );
+    }
+
+    try {
+      // The single financial gateway path — PaymentsService.refund()
+      // already handles the real two-phase reserve/confirm-or-release
+      // flow, its own concurrency-safe row locking, the PAYMENT_REFUND /
+      // PAYMENT_REFUND_FAILED audit trail, and PAYMENT_EVENTS.REFUNDED —
+      // none of that is reimplemented here.
+      const result = await this.paymentsService.refund(
+        row.order.payment.id,
+        { amount, reason: `Return resolution for order ${row.orderId}` },
+        { actorId: adminId, actorType: 'admin', ipAddress },
+      );
+
+      await this.prisma.returnRequest.updateMany({
+        where: { id: row.id, status: 'APPROVED' },
+        data: {
+          status: 'REFUND_ISSUED',
+          resolutionType: 'REFUND',
+          refundId: result.id,
+        },
+      });
+
+      // Return-scoped audit entry — PaymentsService.refund()'s own audit
+      // is keyed by paymentId and has no way to know this ReturnRequest's
+      // id; this is the complementary record for return-side
+      // traceability, not a duplicate of that logic.
+      await this.auditService.log({
+        actorId: adminId,
+        action: 'RETURN_REFUND_ISSUED',
+        resource: 'return_request',
+        resourceId: row.id,
+        metadata: { orderId: row.orderId, amount, refundId: result.id },
+        ipAddress,
+      });
+
+      return this.adminGetClaim(row.id);
+    } catch (err) {
+      // ReturnRequest.status deliberately stays APPROVED here — never a
+      // fake success — and refundAmount stays frozen. See the KNOWN GAP
+      // note above for why this phase does not attempt an automatic
+      // same-endpoint retry.
+      await this.auditService.log({
+        actorId: adminId,
+        action: 'RETURN_REFUND_FAILED',
+        resource: 'return_request',
+        resourceId: row.id,
+        metadata: {
+          orderId: row.orderId,
+          amount,
+          error: err instanceof Error ? err.message : 'unknown error',
+        },
+        ipAddress,
+      });
+      throw err;
+    }
   }
 }

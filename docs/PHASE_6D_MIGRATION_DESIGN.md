@@ -182,3 +182,97 @@ editable without a redeploy, that would be new infrastructure (e.g. a
 `SystemConfig` key-value table) this codebase has for no other business
 constant today — a real option, not built now since nothing locked asks
 for runtime editability.
+
+# Phase 6D-4B — Return Financial Resolution: design notes and a reported gap
+
+No schema or migration change was made in this phase. `npx prisma migrate
+status` confirms the database is up to date against the same 7 migrations
+that existed after 6D-1 — `schema.prisma` itself was not touched. Every
+column this phase's calculations read (`ReturnRequest.refundAmount`,
+`.status`, `Order.subtotal/discount/tax`, `StoreCreditEntry.amount`)
+already existed from the 6D-1 migration; this phase only adds application
+code that populates and reads them.
+
+## Where the proration formula lives
+
+`calculateRefundAmount()` in `apps/api/src/orders/return-policy.util.ts` is
+the single, canonical implementation of the locked partial-refund formula
+(eligible item subtotal, proportion of order subtotal, prorated discount
+and tax, item-level refund, the Rs.99 return-shipping deduction where the
+locked rule applies, floor at zero). It reuses the existing
+`calculateShippingDeduction()` from the same file rather than duplicating
+the Rs.99 rule a second time. Nothing else in the codebase computed this
+formula before 6D-4B, so no prior implementation had to be reconciled or
+replaced.
+
+## Reported gap: prepaid refund retry/concurrency cannot be safely disambiguated with the existing enum
+
+`PaymentsService.refund()` already guards a payment's total against being
+over-refunded, by summing existing `Refund` rows with
+`status IN ('PENDING', 'PROCESSED')` — deliberately excluding `'FAILED'`
+rows, so a failed attempt never permanently consumes headroom a legitimate
+retry needs.
+
+That is the correct design for `PaymentsService.refund()` taken in
+isolation. But it means a return claim's own resolution state cannot be
+safely derived from `ReturnRequestStatus` alone: once
+`ReturnRequest.refundAmount` is frozen on an `APPROVED` claim, that same
+observable state (`status = APPROVED`, `refundAmount` non-null) is reached
+by three different real situations the schema cannot tell apart:
+
+1. A first resolution attempt is currently in flight (the call to
+   `PaymentsService.refund()` has not yet returned).
+2. A previous attempt failed at the gateway and this is a legitimate,
+   safe-to-allow retry.
+3. A previous attempt already succeeded, and a second call (concurrent
+   request, accidental double-click, or a retried request) is racing or
+   duplicating it.
+
+Because case 2 must be allowed and case 3 must never be allowed, and both
+present identically in the current schema, safely allowing (2) without a
+schema change risks also allowing (3) — a naive
+`if (!returnRequest.refundId) { refund() }` check is racy across
+concurrent requests, and "allow another resolve call whenever the last one
+didn't reach a terminal success" cannot distinguish a slow in-flight call
+(1) from a genuinely finished one whose write hasn't yet been observed by
+the racing request.
+
+**Decision made in code, per instruction to report rather than invent an
+unsafe workaround**: `resolveClaim()` uses an atomic
+`updateMany({ where: { id, status: 'APPROVED', refundAmount: null } })`
+conditional update as the one-time freeze gate for a claim's first
+resolution attempt (exactly one of two concurrent first-time callers wins
+the race; the loser gets a clean `ConflictException`, not a second
+financial effect). For any subsequent call on a prepaid claim whose
+`refundAmount` is already frozen — whether a genuine concurrent racer or a
+later manual retry after a real gateway failure — the code deliberately
+throws `ConflictException` rather than calling `PaymentsService.refund()`
+again. This is intentionally conservative: it forfeits self-service retry
+convenience after a failed prepaid gateway call, in exchange for a
+guarantee that this codebase will never issue two Razorpay refund attempts
+for the same claim.
+
+**What a safe retry-enabling fix would need** (not built in this phase,
+since it requires a real, reviewed schema change): a resolution-attempt
+state distinct from `ReturnRequestStatus`, capable of representing
+"resolution in progress" as its own persisted, lockable state — e.g. a
+`ReturnResolutionState` enum (`NONE` / `IN_PROGRESS` / `SUCCEEDED` /
+`FAILED_RETRYABLE`) with its own conditional-update transitions
+(`IN_PROGRESS -> SUCCEEDED` / `IN_PROGRESS -> FAILED_RETRYABLE`), so a
+retry attempt could safely transition only out of `FAILED_RETRYABLE`,
+never out of `IN_PROGRESS` or `SUCCEEDED`. This is a genuine,
+currently-missing schema capability, not a workaround to build silently,
+and it was not built in 6D-4B.
+
+## Why COD store credit has no equivalent gap
+
+`StoreCreditEntry.returnRequestId` is `@unique`. Issuing store credit is a
+single, atomic `create()` against that constraint — there is no external
+gateway call and therefore no window in which two racing requests can both
+observe "not yet issued" and both proceed. The loser of the race gets a
+Postgres `P2002` violation, caught and turned into an idempotent fetch-
+and-return of the entry the winner created. This is the same idiom this
+schema already uses for `CancellationRequest`'s and `ReturnRequest.orderId`'s
+own concurrent-creation races (see 6D-1 notes above) — reused here, not
+reinvented, and airtight without any new resolution-state column because
+the entire operation is one atomic write.

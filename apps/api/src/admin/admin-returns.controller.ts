@@ -53,4 +53,20 @@ export class AdminReturnsController {
   ) {
     return this.returnsService.adminReject(admin.id, id, dto, req.ip);
   }
+
+  /**
+   * Phase 6D-4B — executes the financial resolution for an already-
+   * APPROVED claim. Deliberately takes no body at all: resolution type
+   * (prepaid refund vs. COD store credit) and the amount are both
+   * derived entirely from persisted server-side state
+   * (ReturnsService.resolveClaim), never from client input.
+   */
+  @Post(':id/resolve')
+  resolve(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    return this.returnsService.resolveClaim(admin.id, id, req.ip);
+  }
 }

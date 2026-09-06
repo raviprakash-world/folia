@@ -1,4 +1,5 @@
 import {
+  calculateRefundAmount,
   calculateShippingDeduction,
   deriveClaimType,
   DOA_CLAIM_WINDOW_MS,
@@ -191,5 +192,164 @@ describe('calculateShippingDeduction', () => {
       0,
     );
     expect(calculateShippingDeduction('DOA_CLAIM', 'WRONG_ITEM')).toBe(0);
+  });
+});
+
+describe('calculateRefundAmount', () => {
+  it('refunds the full prorated amount when the entire order is claimed as one item', () => {
+    // subtotal=200, discount=20, tax=(200-20)*0.08=14.4; claiming the
+    // whole order (proportion=1) — a non-deduction reason.
+    const result = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'WRONG_ITEM',
+      orderSubtotal: 200,
+      orderDiscount: 20,
+      orderTax: 14.4,
+      eligibleItemSubtotal: 200,
+    });
+    expect(result).toBe(194.4); // 200 - 20 + 14.4
+  });
+
+  it('prorates discount and tax proportionally for a partial claim (multiple eligible items combined)', () => {
+    // subtotal=1000, discount=0, tax=80; eligible items sum to 500 (half).
+    const result = calculateRefundAmount({
+      claimType: 'DOA_CLAIM',
+      reason: 'DOA',
+      orderSubtotal: 1000,
+      orderDiscount: 0,
+      orderTax: 80,
+      eligibleItemSubtotal: 500,
+    });
+    // proportion=0.5 -> proratedDiscount=0, proratedTax=40 -> 500 - 0 + 40 = 540, no deduction for DOA
+    expect(result).toBe(540);
+  });
+
+  it('prorates a real discount proportionally, not just tax', () => {
+    // subtotal=1000, discount=100, tax=(1000-100)*0.08=72; eligible items = 500 (half).
+    const result = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'NOT_AS_DESCRIBED',
+      orderSubtotal: 1000,
+      orderDiscount: 100,
+      orderTax: 72,
+      eligibleItemSubtotal: 500,
+    });
+    // proportion=0.5 -> proratedDiscount=50, proratedTax=36 -> 500 - 50 + 36 = 486
+    expect(result).toBe(486);
+  });
+
+  it('applies the configured ₹99 deduction for an eligible STANDARD_RETURN change-of-mind reason', () => {
+    const result = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'CHANGED_MIND',
+      orderSubtotal: 1000,
+      orderDiscount: 0,
+      orderTax: 80,
+      eligibleItemSubtotal: 500,
+    });
+    // itemLevelRefund = 540 (as above), minus RETURN_SHIPPING_DEDUCTION_INR (99)
+    expect(result).toBe(540 - RETURN_SHIPPING_DEDUCTION_INR);
+  });
+
+  it('never deducts for a DOA claim, regardless of reason', () => {
+    const result = calculateRefundAmount({
+      claimType: 'DOA_CLAIM',
+      reason: 'DOA',
+      orderSubtotal: 1000,
+      orderDiscount: 0,
+      orderTax: 80,
+      eligibleItemSubtotal: 500,
+    });
+    expect(result).toBe(540);
+  });
+
+  it("never deducts for a wrong-item or damaged-in-transit STANDARD_RETURN reason (not the customer's fault)", () => {
+    const wrongItem = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'WRONG_ITEM',
+      orderSubtotal: 1000,
+      orderDiscount: 0,
+      orderTax: 80,
+      eligibleItemSubtotal: 500,
+    });
+    const damaged = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'DAMAGED_IN_TRANSIT',
+      orderSubtotal: 1000,
+      orderDiscount: 0,
+      orderTax: 80,
+      eligibleItemSubtotal: 500,
+    });
+    expect(wrongItem).toBe(540);
+    expect(damaged).toBe(540);
+  });
+
+  it('never includes original shipping — shippingRefund is always 0, not a parameter at all', () => {
+    // There is no way to pass a shipping cost into this function — its
+    // absence from RefundCalculationInput IS the enforcement. This test
+    // documents that guarantee explicitly rather than leaving it implicit.
+    const result = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'WRONG_ITEM',
+      orderSubtotal: 100,
+      orderDiscount: 0,
+      orderTax: 8,
+      eligibleItemSubtotal: 100,
+    });
+    expect(result).toBe(108); // 100 - 0 + 8, no shipping component anywhere
+  });
+
+  it('floors at zero rather than going negative when the deduction exceeds the item-level refund', () => {
+    // A tiny claimed line (eligibleItemSubtotal=50 of a 1000 subtotal)
+    // with the ₹99 deduction applied.
+    const result = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'OTHER',
+      orderSubtotal: 1000,
+      orderDiscount: 0,
+      orderTax: 80,
+      eligibleItemSubtotal: 50,
+    });
+    // proportion=0.05 -> proratedTax=4 -> itemLevelRefund=54 -> 54-99 = -45 -> floored to 0
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 for a zero or negative order subtotal rather than dividing by zero', () => {
+    expect(
+      calculateRefundAmount({
+        claimType: 'STANDARD_RETURN',
+        reason: 'WRONG_ITEM',
+        orderSubtotal: 0,
+        orderDiscount: 0,
+        orderTax: 0,
+        eligibleItemSubtotal: 0,
+      }),
+    ).toBe(0);
+  });
+
+  it('returns 0 for a zero eligible item subtotal', () => {
+    expect(
+      calculateRefundAmount({
+        claimType: 'STANDARD_RETURN',
+        reason: 'WRONG_ITEM',
+        orderSubtotal: 1000,
+        orderDiscount: 0,
+        orderTax: 80,
+        eligibleItemSubtotal: 0,
+      }),
+    ).toBe(0);
+  });
+
+  it("rounds to 2 decimal places, matching this schema's Decimal(10,2) money precision", () => {
+    const result = calculateRefundAmount({
+      claimType: 'STANDARD_RETURN',
+      reason: 'WRONG_ITEM',
+      orderSubtotal: 3,
+      orderDiscount: 0,
+      orderTax: 1,
+      eligibleItemSubtotal: 1, // proportion = 1/3
+    });
+    // proratedTax = 1 * (1/3) = 0.3333... -> itemLevelRefund = 1.3333... -> rounds to 1.33
+    expect(result).toBe(1.33);
   });
 });

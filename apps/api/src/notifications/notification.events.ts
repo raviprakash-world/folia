@@ -35,6 +35,19 @@ export const NOTIFICATION_EVENTS = {
    */
   RETURN_APPROVED: 'notification.return_approved',
   RETURN_REJECTED: 'notification.return_rejected',
+  /**
+   * Phase 6D-4B — a COD return/DOA claim's financial resolution. The
+   * prepaid equivalent reuses the EXISTING PAYMENT_EVENTS.REFUNDED
+   * (already fires from PaymentsService.refund() itself, with everything
+   * a future notification needs — orderId/userId/paymentId/amount) rather
+   * than adding a second, redundant event for the same real occurrence,
+   * matching ORDER_STATUS_CHANGED/ORDER_CREATED's own precedent above.
+   * COD store credit has no equivalent existing event at all — this is
+   * the one genuinely new event this phase adds. No listener exists yet:
+   * same "add the event, don't implement delivery" scope as
+   * RETURN_APPROVED/REJECTED.
+   */
+  STORE_CREDIT_ISSUED: 'notification.store_credit_issued',
   PROFILE_UPDATED: 'notification.profile_updated',
   PASSWORD_CHANGED: 'notification.password_changed',
 } as const;
@@ -67,6 +80,13 @@ export interface ReturnRejectedPayload {
   userId: string;
   /** The admin's required rejection reason (ReturnRequest.decisionNote). */
   reason: string;
+}
+
+export interface StoreCreditIssuedPayload {
+  returnRequestId: string;
+  orderId: string;
+  userId: string;
+  amount: number;
 }
 
 export interface ProfileUpdatedPayload {

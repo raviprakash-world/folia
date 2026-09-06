@@ -159,3 +159,50 @@ export function calculateShippingDeduction(
     ? RETURN_SHIPPING_DEDUCTION_INR
     : 0;
 }
+
+export interface RefundCalculationInput {
+  claimType: ReturnClaimType;
+  reason: ReturnReasonDb;
+  /** Order.subtotal — the whole order's pre-discount/tax item total. */
+  orderSubtotal: number;
+  /** Order.discount — the whole order's coupon/discount amount. */
+  orderDiscount: number;
+  /** Order.tax — the whole order's tax amount, computed uniformly as a flat rate of (subtotal - discount) at checkout time. */
+  orderTax: number;
+  /** sum(orderItem.price * claimedQuantity) across only the items/quantities THIS claim covers — never the whole order. */
+  eligibleItemSubtotal: number;
+}
+
+/**
+ * The canonical, Phase-6C-approved partial-return refund/store-credit
+ * calculation — the ONE place this formula is implemented (Phase 6D-4B
+ * is its first real caller; nothing before this phase needed it). Pure
+ * and side-effect-free like every other function in this file: no DB, no
+ * rounding-mode surprises hidden inside a service. Reuses
+ * calculateShippingDeduction above rather than re-deriving the ₹99 rule.
+ *
+ * proportion = eligibleItemSubtotal / orderSubtotal — valid because
+ * Order.tax was itself computed as a flat rate of (subtotal - discount)
+ * uniformly across every line at checkout time (see order.types.ts's
+ * TAX_RATE / OrdersService.checkout), so the same proportion applies
+ * exactly to both discount and tax for a subset of lines. Original
+ * outbound shippingCost is never refunded (a sunk fulfillment cost
+ * regardless of what's returned) — shippingRefund is always 0, not a
+ * parameter, so there is no way to accidentally include it.
+ */
+export function calculateRefundAmount(input: RefundCalculationInput): number {
+  if (input.orderSubtotal <= 0 || input.eligibleItemSubtotal <= 0) return 0;
+
+  const proportion = input.eligibleItemSubtotal / input.orderSubtotal;
+  const proratedDiscount = input.orderDiscount * proportion;
+  const proratedTax = input.orderTax * proportion;
+  const itemLevelRefund =
+    input.eligibleItemSubtotal - proratedDiscount + proratedTax;
+  const deduction = calculateShippingDeduction(input.claimType, input.reason);
+  const final = Math.max(0, itemLevelRefund - deduction);
+
+  // Rounded to 2 decimal places — matches this schema's Decimal(10, 2)
+  // storage precision for every money field (Order.total, Payment.amount,
+  // Refund.amount, ReturnRequest.refundAmount, StoreCreditEntry.amount).
+  return Math.round(final * 100) / 100;
+}
