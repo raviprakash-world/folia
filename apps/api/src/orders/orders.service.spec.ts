@@ -993,6 +993,43 @@ describe('OrdersService.adminUpdateStatus', () => {
     ).rejects.toThrow(BadRequestException);
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
+
+  it('sets deliveredAt exactly once, the moment an order transitions to DELIVERED (Phase 6D-2 — the authoritative eligibility-window timestamp for return/DOA claims)', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: 'SHIPPED',
+      userId: 'user-1',
+    });
+    prisma.order.update.mockResolvedValue({});
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.adminUpdateStatus('order-1', 'DELIVERED');
+
+    const call = prisma.order.update.mock.calls[0][0] as {
+      data: { status: string; deliveredAt?: Date };
+    };
+    expect(call.data.status).toBe('DELIVERED');
+    expect(call.data.deliveredAt).toBeInstanceOf(Date);
+  });
+
+  it('never sets deliveredAt for a transition to any status other than DELIVERED — preserves existing behavior', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: 'PROCESSING',
+      userId: 'user-1',
+    });
+    prisma.order.update.mockResolvedValue({});
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.adminUpdateStatus('order-1', 'CONFIRMED');
+
+    expect(prisma.order.update).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: { status: 'CONFIRMED' },
+    });
+  });
 });
 
 describe('OrdersService.shipOrder', () => {

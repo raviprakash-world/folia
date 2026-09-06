@@ -422,16 +422,6 @@ export class OrdersService {
     return this.findOneForUser(userId, orderId);
   }
 
-  /**
-   * Phase 6D-1 note: this whole-order, always-auto-approved endpoint is
-   * being replaced by a proper per-item, admin-reviewed ReturnsService in
-   * Phase 6D-3 (see docs/PHASE_6D_MIGRATION_DESIGN.md) — it is
-   * deliberately NOT extended with new behavior here. The only change in
-   * this subphase is supplying the newly-required `claimType`, derived
-   * honestly (the same "does this order contain a plants-category item"
-   * signal the migration's own backfill used for existing rows) rather
-   * than a placeholder, since this endpoint still runs until 6D-3 lands.
-   */
   async requestReturn(userId: string, orderId: string, dto: ReturnOrderDto) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
@@ -745,7 +735,18 @@ export class OrdersService {
 
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: newStatus as OrderStatus },
+      data: {
+        status: newStatus as OrderStatus,
+        // Set exactly once, the moment an order actually reaches
+        // DELIVERED — the authoritative eligibility-window timestamp for
+        // Phase 6D's return/DOA claims (see return-policy.util.ts).
+        // Never overwritten on a later call: DELIVERED has no outgoing
+        // transitions (order-status.util.ts's ALLOWED_TRANSITIONS), so
+        // canTransitionStatus already makes this branch unreachable a
+        // second time for the same order — no extra guard needed here to
+        // get "set once" for free from the existing state machine.
+        ...(newStatus === 'DELIVERED' ? { deliveredAt: new Date() } : {}),
+      },
     });
 
     const userId = (order as { userId: string }).userId;

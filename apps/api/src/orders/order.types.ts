@@ -171,7 +171,9 @@ export type ReturnReasonDb =
   | 'DAMAGED_IN_TRANSIT'
   | 'NOT_AS_DESCRIBED'
   | 'CHANGED_MIND'
-  | 'OTHER';
+  | 'OTHER'
+  /** Phase 6D — "arrived dead/dying," plant-claim-only. Not in RETURN_REASON_TO_DB below: no customer-facing input path accepts it yet (that's Phase 6D-3's new claim-creation endpoint) — return-policy.util.ts (Phase 6D-2) is the only consumer of this value today. */
+  | 'DOA';
 
 export const CANCELLATION_REASON_TO_DB: Record<string, CancellationReasonDb> = {
   'changed-mind': 'CHANGED_MIND',
@@ -205,6 +207,7 @@ const returnReasonToPublic: Record<ReturnReasonDb, string> = {
   NOT_AS_DESCRIBED: 'not-as-described',
   CHANGED_MIND: 'changed-mind',
   OTHER: 'other',
+  DOA: 'doa',
 };
 
 export interface CancellationRequestRecord {
