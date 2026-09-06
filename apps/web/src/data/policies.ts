@@ -26,7 +26,7 @@ export const policies: Policy[] = [
       },
       {
         heading: 'Free shipping threshold',
-        body: 'Orders over $75 ship free. Orders under that threshold are charged a flat rate based on your region, shown before you check out.',
+        body: 'Orders over ₹75 ship free. Orders under that threshold are charged a flat rate based on your region, shown before you check out.',
       },
       {
         heading: 'Plant-specific packaging',

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, Truck } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
+import { formatCurrency } from '@/utils/currency';
 
 export function ShippingEstimator() {
   const [zip, setZip] = useState('');
@@ -49,7 +50,7 @@ export function ShippingEstimator() {
       {shippingCost !== null && status !== 'error' && (
         <p className="flex items-center gap-1.5 text-xs text-fern-dark mt-1.5">
           <Truck size={13} />
-          {shippingCost === 0 ? 'Free shipping' : `$${shippingCost.toFixed(2)} shipping`} to {shippingZip} — {shippingEta}
+          {shippingCost === 0 ? 'Free shipping' : `${formatCurrency(shippingCost)} shipping`} to {shippingZip} — {shippingEta}
         </p>
       )}
     </div>

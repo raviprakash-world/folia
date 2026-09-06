@@ -19,7 +19,7 @@ async function validateCouponLocal(code: string, subtotal: number): Promise<Coup
   }
   if (coupon.minSubtotal && subtotal < coupon.minSubtotal) {
     const remainder = (coupon.minSubtotal - subtotal).toFixed(2);
-    throw new CouponError(`This code needs a $${coupon.minSubtotal} subtotal — add $${remainder} more.`);
+    throw new CouponError(`This code needs a ₹${coupon.minSubtotal} subtotal — add ₹${remainder} more.`);
   }
 
   return coupon;

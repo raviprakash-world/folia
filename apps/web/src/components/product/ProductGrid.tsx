@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { ProductCard } from './ProductCard';
 import { Tag } from '@/components/ui/Tag';
+import { formatCurrency } from '@/utils/currency';
 import type { Product } from '@/types/product';
 
 interface ProductGridProps {
@@ -28,8 +29,8 @@ function ProductListRow({ product }: { product: Product }) {
       </div>
       <div className="text-right shrink-0">
         <div className="flex items-baseline gap-2 font-mono text-sm justify-end">
-          <span className={onSale ? 'text-rust' : 'text-ink'}>${product.price}</span>
-          {onSale && <span className="text-ink-soft/50 line-through text-xs">${product.compareAtPrice}</span>}
+          <span className={onSale ? 'text-rust' : 'text-ink'}>{formatCurrency(product.price)}</span>
+          {onSale && <span className="text-ink-soft/50 line-through text-xs">{formatCurrency(product.compareAtPrice!)}</span>}
         </div>
         {product.rating && (
           <div className="flex items-center justify-end gap-1 text-xs text-ink-soft mt-1">

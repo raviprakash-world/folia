@@ -1,7 +1,7 @@
 import { Truck, ShieldCheck, RotateCcw } from 'lucide-react';
 
 const rows = [
-  { Icon: Truck, label: 'Ships in 1–2 business days', detail: 'Free shipping on orders over $75.' },
+  { Icon: Truck, label: 'Ships in 1–2 business days', detail: 'Free shipping on orders over ₹75.' },
   { Icon: ShieldCheck, label: '30-day health guarantee', detail: 'Arrives unwell? We replace it.' },
   { Icon: RotateCcw, label: '14-day returns on vessels & tools', detail: 'Plants are final sale once delivered.' },
 ];

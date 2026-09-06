@@ -23,6 +23,7 @@ import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useUIStore } from '@/store/uiStore';
 import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
 import { cn } from '@/utils/cn';
+import { formatCurrency } from '@/utils/currency';
 
 const badgeTone = { New: 'ochre', Sale: 'rust', Bestseller: 'pine', 'Low stock': 'stone' } as const;
 
@@ -143,8 +144,8 @@ export default function ProductDetail() {
           )}
 
           <div className="flex items-baseline gap-3 mt-4 font-mono text-2xl">
-            <span className={onSale ? 'text-rust' : 'text-ink'}>${product.price}</span>
-            {onSale && <span className="text-ink-soft/50 line-through text-lg">${product.compareAtPrice}</span>}
+            <span className={onSale ? 'text-rust' : 'text-ink'}>{formatCurrency(product.price)}</span>
+            {onSale && <span className="text-ink-soft/50 line-through text-lg">{formatCurrency(product.compareAtPrice!)}</span>}
           </div>
 
           {product.careLevel && (

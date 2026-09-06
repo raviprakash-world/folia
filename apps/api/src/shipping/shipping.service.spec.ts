@@ -9,7 +9,7 @@ describe('ShippingService.estimate', () => {
     expect(() => service.estimate('abcde', 20)).toThrow(BadRequestException);
   });
 
-  it('is free once subtotal clears the $75 threshold, regardless of region', () => {
+  it('is free once subtotal clears the ₹75 threshold, regardless of region', () => {
     expect(service.estimate('90210', 75)).toEqual({
       cost: 0,
       etaDays: '3–5 business days',

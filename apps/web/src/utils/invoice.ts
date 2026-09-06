@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate } from '@/utils/currency';
+import { formatCurrencyForPdf as formatCurrency, formatDate } from '@/utils/currency';
 import { generateInvoiceNumber } from '@/utils/orderId';
 import type { Order } from '@/types/order';
 

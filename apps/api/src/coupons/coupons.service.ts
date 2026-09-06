@@ -38,7 +38,7 @@ export class CouponsService {
     if (minSubtotal && subtotal < minSubtotal) {
       const remainder = (minSubtotal - subtotal).toFixed(2);
       throw new BadRequestException(
-        `This code needs a $${minSubtotal} subtotal — add $${remainder} more.`,
+        `This code needs a ₹${minSubtotal} subtotal — add ₹${remainder} more.`,
       );
     }
 
