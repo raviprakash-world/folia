@@ -648,6 +648,7 @@ describe('OrdersService.requestCancellation', () => {
       expect.objectContaining({
         reason: expect.stringContaining('changed-mind'),
       }),
+      { actorId: 'user-1', actorType: 'system' },
     );
   });
 

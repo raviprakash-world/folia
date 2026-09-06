@@ -19,16 +19,12 @@ import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../users/user.types';
 
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
-  constructor(
-    private readonly paymentsService: PaymentsService,
-    private readonly auditService: AuditService,
-  ) {}
+  constructor(private readonly paymentsService: PaymentsService) {}
 
   @ApiBearerAuth()
   @Post(':id/verify')
@@ -83,20 +79,18 @@ export class PaymentsController {
     @Body() dto: RefundPaymentDto,
     @Req() req: Request,
   ) {
-    const result = await this.paymentsService.refund(id, dto);
     // Real money movement, triggered directly by an admin request — every
     // other consequential admin action in this codebase is audited
-    // (AdminOrdersController's status/ship endpoints); this was the one
-    // exception until Phase 6 closed it.
-    await this.auditService.log({
+    // (AdminOrdersController's status/ship endpoints), and so is this one:
+    // PaymentsService.refund() itself writes the audit record (the same
+    // choke point OrdersService.requestCancellation's refund goes through),
+    // so every refund is audited regardless of entry point rather than
+    // each controller/service duplicating that logic.
+    return this.paymentsService.refund(id, dto, {
       actorId: admin.id,
-      action: 'PAYMENT_REFUND',
-      resource: 'payment',
-      resourceId: id,
-      metadata: { amount: dto.amount, reason: dto.reason, refundId: result.id },
+      actorType: 'admin',
       ipAddress: req.ip,
     });
-    return result;
   }
 
   /**

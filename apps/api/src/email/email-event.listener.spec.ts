@@ -75,6 +75,45 @@ describe('EmailEventListener', () => {
     },
   );
 
+  it('handlePaymentRefunded sends a real refund email with the amount and a working order link', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handlePaymentRefunded({
+      orderId: 'FOL-7',
+      userId: 'user-1',
+      paymentId: 'pay-1',
+      amount: 71.3,
+    });
+    const email = sentEmail(emailService);
+    expect(email.to).toBe('sam@example.com');
+    expect(email.html).toContain('/account/orders/FOL-7');
+    expect(email.text).toContain('71.30');
+  });
+
+  it('handlePaymentRefunded skips sending (does not throw) when the payload has no orderId to link to', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handlePaymentRefunded({
+      orderId: null,
+      userId: 'user-1',
+      paymentId: 'pay-1',
+      amount: 20,
+    });
+    expect(emailService.send).not.toHaveBeenCalled();
+  });
+
+  it('never throws when the email provider fails for a refund email — same non-fatal-side-effect contract as every other handler', async () => {
+    const { listener, emailService } = createDeps();
+    emailService.send.mockRejectedValue(new Error('Resend is down'));
+
+    await expect(
+      listener.handlePaymentRefunded({
+        orderId: 'FOL-8',
+        userId: 'user-1',
+        paymentId: 'pay-1',
+        amount: 15,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('handlePaymentFailed links to the cart, not a nonexistent order (Phase 2: a failed attempt never produced an order)', async () => {
     const { listener, emailService } = createDeps();
     await listener.handlePaymentFailed({

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PaymentsService, PAYMENT_EXPIRY_MINUTES } from './payments.service';
 import type { CheckoutSnapshot } from '../orders/order.types';
+import type { LogAuditInput } from '../audit/audit.types';
 
 function decimal(value: number) {
   return value; // Prisma Decimal in these mocks is just a plain number — Number(payment.amount) works either way, matching this codebase's existing decimal() test-helper convention elsewhere.
@@ -143,6 +144,9 @@ function createDeps() {
     releaseReservation: jest.fn(),
   };
   const eventEmitter = { emit: jest.fn() };
+  const auditService = {
+    log: jest.fn<Promise<void>, [LogAuditInput]>().mockResolvedValue(undefined),
+  };
 
   const service = new PaymentsService(
     prisma as never,
@@ -151,6 +155,7 @@ function createDeps() {
     razorpay as never,
     inventoryService as never,
     eventEmitter,
+    auditService as never,
   );
 
   return {
@@ -161,9 +166,12 @@ function createDeps() {
     razorpay,
     inventoryService,
     eventEmitter,
+    auditService,
     service,
   };
 }
+
+const ADMIN_ACTOR = { actorId: 'admin-1', actorType: 'admin' as const };
 
 describe('PaymentsService.createForOrder — COD', () => {
   it('creates a COD_PENDING payment with no gateway round-trip and no requiresGatewayCheckout', async () => {
@@ -697,7 +705,7 @@ describe('PaymentsService.refund', () => {
     });
     razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
 
-    const result = await service.refund('pay-1', {});
+    const result = await service.refund('pay-1', {}, ADMIN_ACTOR);
 
     expect(razorpay.refund).toHaveBeenCalledWith(
       expect.objectContaining({ providerPaymentId: 'pay_abc' }),
@@ -731,7 +739,7 @@ describe('PaymentsService.refund', () => {
     });
     razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
 
-    await service.refund('pay-1', { amount: 40 });
+    await service.refund('pay-1', { amount: 40 }, ADMIN_ACTOR);
 
     expect(orderTx.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'PARTIALLY_REFUNDED' } }),
@@ -762,7 +770,7 @@ describe('PaymentsService.refund', () => {
     });
     razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_2' });
 
-    await service.refund('pay-1', { amount: 40 });
+    await service.refund('pay-1', { amount: 40 }, ADMIN_ACTOR);
 
     expect(orderTx.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'REFUNDED' } }),
@@ -781,9 +789,9 @@ describe('PaymentsService.refund', () => {
     // 60 already claimed (PENDING or PROCESSED — e.g. a concurrent refund's own reservation) — only 40 remains.
     orderTx.refund.aggregate.mockResolvedValueOnce({ _sum: { amount: 60 } });
 
-    await expect(service.refund('pay-1', { amount: 50 })).rejects.toThrow(
-      /only ₹40\.00 of this payment remains refundable/,
-    );
+    await expect(
+      service.refund('pay-1', { amount: 50 }, ADMIN_ACTOR),
+    ).rejects.toThrow(/only ₹40\.00 of this payment remains refundable/);
     expect(razorpay.refund).not.toHaveBeenCalled();
     expect(orderTx.refund.create).not.toHaveBeenCalled();
   });
@@ -800,7 +808,7 @@ describe('PaymentsService.refund', () => {
     });
     razorpay.refund.mockRejectedValue(new Error('gateway unreachable'));
 
-    await expect(service.refund('pay-1', {})).rejects.toThrow(
+    await expect(service.refund('pay-1', {}, ADMIN_ACTOR)).rejects.toThrow(
       'gateway unreachable',
     );
 
@@ -817,7 +825,7 @@ describe('PaymentsService.refund', () => {
       makePayment({ status: 'CREATED' }),
     );
 
-    await expect(service.refund('pay-1', {})).rejects.toThrow(
+    await expect(service.refund('pay-1', {}, ADMIN_ACTOR)).rejects.toThrow(
       'Only a captured payment can be refunded.',
     );
   });
@@ -828,9 +836,201 @@ describe('PaymentsService.refund', () => {
       makePayment({ status: 'REFUNDED' }),
     );
 
-    await expect(service.refund('pay-1', {})).rejects.toThrow(
+    await expect(service.refund('pay-1', {}, ADMIN_ACTOR)).rejects.toThrow(
       'Only a captured payment can be refunded.',
     );
+  });
+
+  it('emits PAYMENT_EVENTS.REFUNDED with the correct payment/refund/order info on a successful refund', async () => {
+    const { orderTx, razorpay, eventEmitter, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
+      makePayment({
+        status: 'CAPTURED',
+        providerPaymentId: 'pay_abc',
+        orderId: 'FOL-1',
+        userId: 'user-1',
+      }),
+    );
+    orderTx.refund.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: null } })
+      .mockResolvedValueOnce({ _sum: { amount: 71.3 } });
+    orderTx.refund.create.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PENDING',
+    });
+    orderTx.refund.update.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+    razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
+
+    await service.refund('pay-1', {}, ADMIN_ACTOR);
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith('payment.refunded', {
+      orderId: 'FOL-1',
+      userId: 'user-1',
+      paymentId: 'pay-1',
+      amount: 71.3,
+    });
+  });
+
+  it('does NOT emit PAYMENT_EVENTS.REFUNDED when the gateway refund call fails', async () => {
+    const { orderTx, razorpay, eventEmitter, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
+      makePayment({ status: 'CAPTURED', providerPaymentId: 'pay_abc' }),
+    );
+    orderTx.refund.aggregate.mockResolvedValueOnce({ _sum: { amount: null } });
+    orderTx.refund.create.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PENDING',
+    });
+    razorpay.refund.mockRejectedValue(new Error('gateway unreachable'));
+
+    await expect(service.refund('pay-1', {}, ADMIN_ACTOR)).rejects.toThrow(
+      'gateway unreachable',
+    );
+
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      'payment.refunded',
+      expect.anything(),
+    );
+  });
+
+  describe('audit trail — every entry point must audit a real refund, regardless of who/what triggered it', () => {
+    function setUpSuccessfulRefund(
+      orderTx: ReturnType<typeof createDeps>['orderTx'],
+      razorpay: ReturnType<typeof createDeps>['razorpay'],
+    ) {
+      orderTx.payment.findUnique.mockResolvedValue(
+        makePayment({ status: 'CAPTURED', providerPaymentId: 'pay_abc' }),
+      );
+      orderTx.refund.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: null } })
+        .mockResolvedValueOnce({ _sum: { amount: 71.3 } });
+      orderTx.refund.create.mockResolvedValue({
+        id: 'refund-1',
+        status: 'PENDING',
+      });
+      orderTx.refund.update.mockResolvedValue({
+        id: 'refund-1',
+        status: 'PROCESSED',
+        providerRefundId: 'rfnd_1',
+      });
+      razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
+    }
+
+    it('audits a successful admin-triggered refund with actorType "admin" and the admin ipAddress — preserving the pre-existing admin refund audit behavior', async () => {
+      const { orderTx, razorpay, auditService, service } = createDeps();
+      setUpSuccessfulRefund(orderTx, razorpay);
+
+      await service.refund(
+        'pay-1',
+        { reason: 'Customer requested' },
+        { actorId: 'admin-1', actorType: 'admin', ipAddress: '10.0.0.1' },
+      );
+
+      expect(auditService.log).toHaveBeenCalledWith({
+        actorId: 'admin-1',
+        action: 'PAYMENT_REFUND',
+        resource: 'payment',
+        resourceId: 'pay-1',
+        metadata: {
+          amount: 71.3,
+          reason: 'Customer requested',
+          refundId: 'refund-1',
+          actorType: 'admin',
+        },
+        ipAddress: '10.0.0.1',
+      });
+    });
+
+    it('audits a successful cancellation-triggered (system) refund with actorType "system" — the fix for the previously-unaudited cancellation path', async () => {
+      const { orderTx, razorpay, auditService, service } = createDeps();
+      setUpSuccessfulRefund(orderTx, razorpay);
+
+      await service.refund(
+        'pay-1',
+        { reason: 'Order cancelled: changed-mind' },
+        { actorId: 'user-1', actorType: 'system' },
+      );
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorId: 'user-1',
+          action: 'PAYMENT_REFUND',
+          resource: 'payment',
+          resourceId: 'pay-1',
+        }),
+      );
+      const [[loggedInput]] = auditService.log.mock.calls;
+      expect(loggedInput.metadata?.actorType).toBe('system');
+    });
+
+    it('never puts the provider refund/gateway payload into audit metadata — only amount/reason/refundId/actorType', async () => {
+      const { orderTx, razorpay, auditService, service } = createDeps();
+      setUpSuccessfulRefund(orderTx, razorpay);
+
+      await service.refund('pay-1', {}, ADMIN_ACTOR);
+
+      const [[loggedInput]] = auditService.log.mock.calls;
+      expect(Object.keys(loggedInput.metadata ?? {})).toEqual(
+        expect.arrayContaining(['amount', 'reason', 'refundId', 'actorType']),
+      );
+      expect(loggedInput.metadata).not.toHaveProperty('providerRefundId');
+      expect(loggedInput.metadata).not.toHaveProperty('providerPaymentId');
+    });
+
+    it('audits a failed refund attempt under a distinct action (PAYMENT_REFUND_FAILED), explicitly distinguishing attempt/failure from success', async () => {
+      const { orderTx, razorpay, auditService, service } = createDeps();
+      orderTx.payment.findUnique.mockResolvedValue(
+        makePayment({ status: 'CAPTURED', providerPaymentId: 'pay_abc' }),
+      );
+      orderTx.refund.aggregate.mockResolvedValueOnce({
+        _sum: { amount: null },
+      });
+      orderTx.refund.create.mockResolvedValue({
+        id: 'refund-1',
+        status: 'PENDING',
+      });
+      razorpay.refund.mockRejectedValue(new Error('gateway unreachable'));
+
+      await expect(
+        service.refund(
+          'pay-1',
+          { reason: 'Order cancelled: changed-mind' },
+          { actorId: 'user-1', actorType: 'system' },
+        ),
+      ).rejects.toThrow('gateway unreachable');
+
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorId: 'user-1',
+          action: 'PAYMENT_REFUND_FAILED',
+          resource: 'payment',
+          resourceId: 'pay-1',
+        }),
+      );
+      const [[loggedInput]] = auditService.log.mock.calls;
+      expect(loggedInput.metadata?.actorType).toBe('system');
+      expect(loggedInput.metadata?.error).toBe('gateway unreachable');
+      expect(auditService.log).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'PAYMENT_REFUND' }),
+      );
+    });
+
+    it('does not audit a pre-flight rejection (never reached the gateway, no claim was ever created) — only genuine attempts are audited', async () => {
+      const { orderTx, auditService, service } = createDeps();
+      orderTx.payment.findUnique.mockResolvedValue(
+        makePayment({ status: 'CREATED' }),
+      );
+
+      await expect(service.refund('pay-1', {}, ADMIN_ACTOR)).rejects.toThrow(
+        'Only a captured payment can be refunded.',
+      );
+
+      expect(auditService.log).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -22,6 +22,26 @@ import type { PaymentRefundedPayload } from './payments.events';
 import { toPublicOrder } from '../orders/order.types';
 import type { CheckoutSnapshot } from '../orders/order.types';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
+import { AuditService } from '../audit/audit.service';
+
+/**
+ * Who/what triggered a refund — every refund path (admin-initiated via
+ * PaymentsController, cancellation-triggered via OrdersService) must
+ * supply one, so `refund()` itself can audit consistently regardless of
+ * entry point instead of leaving it to each caller to remember. 'system'
+ * covers a customer-facing action (e.g. cancellation) that this backend
+ * decided to act on automatically, with no admin in the loop — distinct
+ * from 'admin' so an audit reviewer can tell a discretionary admin refund
+ * apart from one this system triggered on its own.
+ */
+export type RefundActorType = 'admin' | 'system';
+
+export interface RefundActor {
+  actorId: string;
+  actorType: RefundActorType;
+  /** Only ever available from an authenticated admin HTTP request — a system-triggered refund has no request context to take this from. */
+  ipAddress?: string;
+}
 
 /**
  * How long a gateway payment stays retryable, and how long its stock
@@ -106,6 +126,7 @@ export class PaymentsService {
     private readonly razorpay: RazorpayProvider,
     private readonly inventoryService: InventoryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditService: AuditService,
   ) {}
 
   async createForOrder(
@@ -541,10 +562,11 @@ export class PaymentsService {
   }
 
   /**
-   * Not wired to any automatic trigger yet — Phase 6 (returns/refunds)
-   * connects cancellation/return approval to this. Built and independently
-   * callable now (admin-invoked) so the gateway-facing half of a refund
-   * is real and tested before anything upstream depends on it.
+   * Callable both directly (PaymentsController's admin-triggered refund)
+   * and automatically (OrdersService.requestCancellation, on a cancelled
+   * order that was actually charged) — see the audit-trail doc comment
+   * below for why both converge on this one method rather than each
+   * having its own refund logic.
    *
    * Two-phase (reserve, then confirm-or-release) rather than a single
    * read-then-write, and deliberately does NOT hold a transaction open
@@ -561,10 +583,26 @@ export class PaymentsService {
    * this one call's amount, which is what let sequential partial refunds
    * silently over-refund past 100% before this fix). On failure the claim
    * is marked FAILED so it stops occupying refundable headroom.
+   *
+   * Audits itself, right here, regardless of which caller reached it —
+   * PaymentsController's admin-triggered refund and
+   * OrdersService.requestCancellation's cancellation-triggered refund
+   * both funnel through this single method, so this is the one place a
+   * real refund can audit-log itself rather than each caller duplicating
+   * that logic (and each caller risking forgetting to). `actor` is what
+   * lets the resulting audit record distinguish a discretionary admin
+   * action from a system-triggered one. A genuine gateway attempt that
+   * fails (i.e. one that got as far as creating a PENDING Refund claim
+   * below) is audited too, under a distinct action, so success and
+   * failure are never ambiguous in the audit trail — a pre-flight
+   * rejection (payment not found/not captured/amount exceeds remaining)
+   * never creates a claim and is just a normal thrown exception, not a
+   * "refund attempt" worth its own audit record.
    */
   async refund(
     paymentId: string,
     input: { amount?: number; reason?: string },
+    actor: RefundActor,
   ): Promise<{ id: string; status: string; providerRefundId: string }> {
     const { payment, requestedAmount, pendingRefundId } =
       await this.prisma.$transaction(async (tx) => {
@@ -659,6 +697,20 @@ export class PaymentsService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
       this.eventEmitter.emit(PAYMENT_EVENTS.REFUNDED, payload);
 
+      await this.auditService.log({
+        actorId: actor.actorId,
+        action: 'PAYMENT_REFUND',
+        resource: 'payment',
+        resourceId: paymentId,
+        metadata: {
+          amount: requestedAmount,
+          reason: input.reason,
+          refundId: outcome.id,
+          actorType: actor.actorType,
+        },
+        ipAddress: actor.ipAddress,
+      });
+
       return outcome;
     } catch (err) {
       // The claim didn't pan out (gateway rejected it, network failure,
@@ -672,6 +724,26 @@ export class PaymentsService {
         where: { id: pendingRefundId },
         data: { status: 'FAILED' },
       });
+
+      // A distinct action (not PAYMENT_REFUND) so a reviewer scanning the
+      // audit trail never mistakes an attempt for a success — this only
+      // fires once a real gateway attempt was made (a PENDING claim
+      // already exists by this point), never for the pre-flight
+      // validation errors thrown above this try block.
+      await this.auditService.log({
+        actorId: actor.actorId,
+        action: 'PAYMENT_REFUND_FAILED',
+        resource: 'payment',
+        resourceId: paymentId,
+        metadata: {
+          amount: requestedAmount,
+          reason: input.reason,
+          actorType: actor.actorType,
+          error: err instanceof Error ? err.message : 'unknown error',
+        },
+        ipAddress: actor.ipAddress,
+      });
+
       throw err;
     }
   }

@@ -407,9 +407,11 @@ export class OrdersService {
     // for email sends never breaking their triggering request.
     if (hasRefund && typedOrder.payment) {
       try {
-        await this.paymentsService.refund(typedOrder.payment.id, {
-          reason: `Order cancelled: ${dto.reason}`,
-        });
+        await this.paymentsService.refund(
+          typedOrder.payment.id,
+          { reason: `Order cancelled: ${dto.reason}` },
+          { actorId: userId, actorType: 'system' },
+        );
       } catch (err) {
         this.logger.warn(
           `Refund attempt failed for cancelled order ${orderId} (payment ${typedOrder.payment.id}): ${err instanceof Error ? err.message : 'unknown error'} — needs manual follow-up.`,
