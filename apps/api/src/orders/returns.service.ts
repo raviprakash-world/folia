@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { STORAGE_SERVICE } from '../storage/storage.interface';
 import type { StorageService } from '../storage/storage.interface';
 import {
@@ -26,6 +27,7 @@ import {
   type ReturnClaimType,
 } from './return-policy.util';
 import { RETURN_REASON_TO_DB, returnReasonToPublic } from './order.types';
+import { generateOrderId } from './order-id.util';
 import type { CreateReturnClaimDto } from './dto/create-return-claim.dto';
 import type { ApproveReturnDto } from './dto/approve-return.dto';
 import type { RejectReturnDto } from './dto/reject-return.dto';
@@ -35,6 +37,7 @@ import type {
   ReturnApprovedPayload,
   ReturnRejectedPayload,
   StoreCreditIssuedPayload,
+  ReplacementIssuedPayload,
 } from '../notifications/notification.events';
 
 /** DB enum -> public API string, both directions — covers every ReturnRequestStatus value, even the ones no code can reach yet (REFUND_ISSUED/STORE_CREDIT_ISSUED/REPLACEMENT_ISSUED are Phase 6D-4B+'s job), so the admin list/detail responses stay honest if a caller ever filters on one. */
@@ -87,7 +90,23 @@ type AdminReturnRequestRow = Prisma.ReturnRequestGetPayload<{
  */
 const RESOLUTION_INCLUDE = {
   items: {
-    include: { orderItem: { select: { price: true, quantity: true } } },
+    include: {
+      orderItem: {
+        select: {
+          price: true,
+          quantity: true,
+          // Phase 6D-4C additions — a replacement order's own OrderItem
+          // rows need this product snapshot; the refund/credit paths never
+          // read these fields, so their presence is harmless there.
+          productId: true,
+          slug: true,
+          name: true,
+          categorySlug: true,
+          variantId: true,
+          variantLabel: true,
+        },
+      },
+    },
   },
   order: {
     select: {
@@ -98,6 +117,13 @@ const RESOLUTION_INCLUDE = {
       tax: true,
       paymentMethod: true,
       payment: { select: { id: true } },
+      // Phase 6D-4C additions — a replacement order ships to the same
+      // place on the same terms as the original; refund/credit never read
+      // these.
+      shippingAddressSnapshot: true,
+      billingAddressSnapshot: true,
+      deliveryMethod: true,
+      estimatedDelivery: true,
     },
   },
 } satisfies Prisma.ReturnRequestInclude;
@@ -105,6 +131,14 @@ const RESOLUTION_INCLUDE = {
 type ResolutionRow = Prisma.ReturnRequestGetPayload<{
   include: typeof RESOLUTION_INCLUDE;
 }>;
+
+/**
+ * Phase 6D-4C — thrown (and caught) purely internally by
+ * resolveReplacement() to force its transaction to roll back when the
+ * final conditional ReturnRequest update loses the replacement-creation
+ * race, distinguishing that from a genuine failure worth an audit log.
+ */
+class LostReplacementRaceError extends Error {}
 
 /**
  * Phase 6D-3 — customer-facing claim CREATION only. Everything downstream
@@ -126,6 +160,7 @@ export class ReturnsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
     private readonly paymentsService: PaymentsService,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   async createClaim(
@@ -434,6 +469,25 @@ export class ReturnsService {
     dto: ApproveReturnDto,
     ipAddress?: string,
   ) {
+    // Phase 6D-4C — REPLACEMENT is the one resolution type an admin picks
+    // explicitly, and only for a DOA/damage claim (a "changed my mind"
+    // standard return has nothing wrong with the item to replace).
+    // claimType is immutable once a claim is created, so reading it here
+    // ahead of the atomic transition below is safe — it cannot change
+    // concurrently underneath this check.
+    if (dto.resolutionType === 'REPLACEMENT') {
+      const existing = await this.prisma.returnRequest.findUnique({
+        where: { id },
+        select: { claimType: true },
+      });
+      if (!existing) throw new NotFoundException('Return request not found.');
+      if (existing.claimType !== 'DOA_CLAIM') {
+        throw new BadRequestException(
+          'Replacement resolution is only available for DOA/damage claims.',
+        );
+      }
+    }
+
     const { count } = await this.prisma.returnRequest.updateMany({
       where: { id, status: 'PENDING' },
       data: {
@@ -441,6 +495,7 @@ export class ReturnsService {
         decidedBy: adminId,
         decidedAt: new Date(),
         decisionNote: dto.note,
+        resolutionType: dto.resolutionType ?? null,
       },
     });
     if (count === 0) await this.rejectStaleDecision(id);
@@ -648,6 +703,15 @@ export class ReturnsService {
       // REPLACEMENT_ISSUED) — idempotent: return the persisted result,
       // never re-execute a financial operation.
       return this.adminGetClaim(id);
+    }
+
+    // Phase 6D-4C — REPLACEMENT was chosen explicitly at approval time
+    // (ReturnsService.adminApprove, DOA_CLAIM only) and takes a completely
+    // separate path: no refundAmount, no PaymentsService, no
+    // StoreCreditEntry. Dispatched before the refund/credit freeze-gate
+    // below, which has no meaning for a replacement.
+    if (row.resolutionType === 'REPLACEMENT') {
+      return this.resolveReplacement(adminId, row, ipAddress);
     }
 
     const isCod = row.order.paymentMethod === 'COD';
@@ -868,5 +932,196 @@ export class ReturnsService {
       });
       throw err;
     }
+  }
+
+  /**
+   * Phase 6D-4C — a DOA/damage claim resolved by shipping a free
+   * replacement instead of a refund/store-credit. Reuses the same
+   * reserve -> commit-inside-order-creation-transaction pipeline
+   * PaymentsService.confirmAndCreateOrder already established for real
+   * checkouts (InventoryService.reserveForProduct, then
+   * InventoryService.commitReservation with the order-creation
+   * transaction's own `tx`) — no new inventory primitive was written for
+   * this.
+   *
+   * Idempotency/concurrency: ReturnRequest.replacementOrderId is @unique,
+   * but it can't be the atomic pre-claim gate 6D-4B used for refundAmount
+   * (an Order id can't be written there before that Order row exists —
+   * the column has a real FK to orders(id)). Instead, the Order/OrderItem/
+   * Payment rows are created SPECULATIVELY inside one transaction whose
+   * FINAL write is the conditional
+   * `updateMany({ status: 'APPROVED', replacementOrderId: null })`; if that
+   * matches zero rows (a concurrent racer already won), this method throws
+   * to roll the ENTIRE transaction back — the speculative order/payment
+   * rows and the just-committed inventory decrement all revert together,
+   * so a losing racer never leaves an orphaned $0 order or double-decremented
+   * stock behind. The reservation itself (made before the transaction, so
+   * it can be released on any failure path) is explicitly released after a
+   * lost race, since its COMMITTED write was rolled back with everything
+   * else and it would otherwise sit ACTIVE forever.
+   */
+  private async resolveReplacement(
+    adminId: string,
+    row: ResolutionRow,
+    ipAddress?: string,
+  ) {
+    if (row.claimType !== 'DOA_CLAIM') {
+      // Defense in depth — adminApprove already enforces this, but this is
+      // the method that actually creates a real order, so it re-verifies
+      // rather than trusting that upstream check alone.
+      throw new BadRequestException(
+        'Replacement resolution is only available for DOA/damage claims.',
+      );
+    }
+    if (row.items.length === 0) {
+      throw new BadRequestException('This claim has no items to replace.');
+    }
+
+    const newOrderId = generateOrderId();
+    const reservations: string[] = [];
+    try {
+      for (const claimItem of row.items) {
+        const reservation = await this.inventoryService.reserveForProduct(
+          claimItem.orderItem.productId,
+          claimItem.orderItem.variantId,
+          claimItem.quantity,
+          'ORDER',
+          newOrderId,
+        );
+        reservations.push(reservation.id);
+      }
+    } catch (err) {
+      for (const reservationId of reservations) {
+        await this.inventoryService.releaseReservation(reservationId);
+      }
+      await this.auditService.log({
+        actorId: adminId,
+        action: 'RETURN_REPLACEMENT_FAILED',
+        resource: 'return_request',
+        resourceId: row.id,
+        metadata: {
+          orderId: row.orderId,
+          error: err instanceof Error ? err.message : 'unknown error',
+        },
+        ipAddress,
+      });
+      throw err;
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        for (const reservationId of reservations) {
+          await this.inventoryService.commitReservation(reservationId, tx);
+        }
+
+        await tx.order.create({
+          data: {
+            id: newOrderId,
+            userId: row.order.userId,
+            subtotal: 0,
+            discount: 0,
+            shippingCost: 0,
+            tax: 0,
+            total: 0,
+            shippingAddressSnapshot: row.order
+              .shippingAddressSnapshot as unknown as Prisma.InputJsonValue,
+            billingAddressSnapshot: row.order
+              .billingAddressSnapshot as unknown as Prisma.InputJsonValue,
+            deliveryMethod: row.order.deliveryMethod,
+            estimatedDelivery: row.order.estimatedDelivery,
+            status: 'PROCESSING',
+            paymentMethod: 'REPLACEMENT',
+            paymentDisplayLabel: 'Free replacement',
+            paymentTransactionId: `replacement-${row.id}`,
+            customerNotes: `Free replacement for order ${row.orderId} (return/DOA claim ${row.id}).`,
+            items: {
+              create: row.items.map((claimItem) => ({
+                productId: claimItem.orderItem.productId,
+                slug: claimItem.orderItem.slug,
+                name: claimItem.orderItem.name,
+                categorySlug: claimItem.orderItem.categorySlug,
+                variantId: claimItem.orderItem.variantId,
+                variantLabel: claimItem.orderItem.variantLabel,
+                // Zero, not the original line's price — see
+                // docs/PHASE_6D_MIGRATION_DESIGN.md's replacement-order
+                // notes: a future return claim against THIS order must
+                // never compute a non-zero refund over money never
+                // charged.
+                price: 0,
+                quantity: claimItem.quantity,
+              })),
+            },
+            payment: {
+              create: {
+                userId: row.order.userId,
+                provider: 'COD',
+                method: 'REPLACEMENT',
+                status: 'NO_CHARGE',
+                amount: 0,
+                currency: 'INR',
+                displayLabel: 'Free replacement',
+              },
+            },
+          },
+        });
+
+        const { count } = await tx.returnRequest.updateMany({
+          where: { id: row.id, status: 'APPROVED', replacementOrderId: null },
+          data: {
+            status: 'REPLACEMENT_ISSUED',
+            replacementOrderId: newOrderId,
+          },
+        });
+        if (count === 0) throw new LostReplacementRaceError();
+      });
+    } catch (err) {
+      // Whatever this transaction wrote (the order/items/payment, the
+      // committed reservations) has already been rolled back by Postgres
+      // at this point — the reservations are back to ACTIVE, not
+      // COMMITTED, so they must be explicitly released rather than left
+      // to sit forever.
+      for (const reservationId of reservations) {
+        await this.inventoryService.releaseReservation(reservationId);
+      }
+
+      if (err instanceof LostReplacementRaceError) {
+        // A concurrent resolveClaim() call already created the
+        // replacement — idempotent, not an error.
+        return this.adminGetClaim(row.id);
+      }
+
+      await this.auditService.log({
+        actorId: adminId,
+        action: 'RETURN_REPLACEMENT_FAILED',
+        resource: 'return_request',
+        resourceId: row.id,
+        metadata: {
+          orderId: row.orderId,
+          error: err instanceof Error ? err.message : 'unknown error',
+        },
+        ipAddress,
+      });
+      throw err;
+    }
+
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'RETURN_REPLACEMENT_ISSUED',
+      resource: 'return_request',
+      resourceId: row.id,
+      metadata: { orderId: row.orderId, replacementOrderId: newOrderId },
+      ipAddress,
+    });
+
+    const payload: ReplacementIssuedPayload = {
+      returnRequestId: row.id,
+      orderId: row.orderId,
+      replacementOrderId: newOrderId,
+      userId: row.order.userId,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.REPLACEMENT_ISSUED, payload);
+
+    return this.adminGetClaim(row.id);
   }
 }

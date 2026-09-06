@@ -78,9 +78,21 @@ interface UpdateManyReturnRequestArgs {
   data: Record<string, unknown>;
 }
 
+/** Loosely typed shape of a prisma.order.create() call's argument (Phase 6D-4C's replacement-order creation) — just enough for `.mock.calls` to type-check cleanly below. */
+interface CreateOrderArgs {
+  data: Record<string, unknown> & {
+    id: string;
+    items: { create: Record<string, unknown>[] };
+    payment: { create: Record<string, unknown> };
+  };
+}
+
 function createDeps() {
   const prisma = {
-    order: { findFirst: jest.fn() },
+    order: {
+      findFirst: jest.fn(),
+      create: jest.fn<Promise<unknown>, [CreateOrderArgs]>(),
+    },
     returnRequest: {
       create: jest.fn<Promise<unknown>, [CreateReturnRequestArgs]>(),
       updateMany: jest.fn<
@@ -96,7 +108,19 @@ function createDeps() {
       create: jest.fn(),
       findUniqueOrThrow: jest.fn(),
     },
+    // Every real transactional write this service performs
+    // (resolveReplacement, Phase 6D-4C) targets the SAME mock objects
+    // above — a real Prisma `tx` is just a scoped client, and nothing here
+    // simulates actual rollback semantics, so reusing `prisma` itself as
+    // `tx` is sufficient: tests assert JS-level control flow (which
+    // branch ran, what got released), not genuine Postgres atomicity.
+    $transaction: jest
+      .fn()
+      .mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+        cb(prisma),
+      ),
   };
+
   const storageService = {
     upload: jest.fn().mockResolvedValue({
       url: '/uploads/return-evidence/fake.jpg',
@@ -109,6 +133,11 @@ function createDeps() {
     log: jest.fn<Promise<void>, [LogAuditInput]>().mockResolvedValue(undefined),
   };
   const paymentsService = { refund: jest.fn() };
+  const inventoryService = {
+    reserveForProduct: jest.fn(),
+    commitReservation: jest.fn(),
+    releaseReservation: jest.fn(),
+  };
 
   const service = new ReturnsService(
     prisma as never,
@@ -116,6 +145,7 @@ function createDeps() {
     eventEmitter,
     auditService as never,
     paymentsService as never,
+    inventoryService as never,
   );
 
   return {
@@ -123,6 +153,7 @@ function createDeps() {
     storageService,
     eventEmitter,
     auditService,
+    inventoryService,
     paymentsService,
     service,
   };
@@ -1185,6 +1216,58 @@ describe('ReturnsService.adminApprove', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('persists resolutionType REPLACEMENT when the admin chooses it for a DOA_CLAIM', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'DOA_CLAIM',
+    });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED', resolutionType: 'REPLACEMENT' }),
+    );
+
+    await service.adminApprove(
+      'admin-1',
+      'rr-1',
+      { resolutionType: 'REPLACEMENT' },
+      undefined,
+    );
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.data).toMatchObject({ resolutionType: 'REPLACEMENT' });
+  });
+
+  it('rejects choosing REPLACEMENT for a STANDARD_RETURN claim with BadRequestException', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'STANDARD_RETURN',
+    });
+
+    await expect(
+      service.adminApprove(
+        'admin-1',
+        'rr-1',
+        { resolutionType: 'REPLACEMENT' },
+        undefined,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.returnRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundException when choosing REPLACEMENT for a claim that does not exist', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.adminApprove(
+        'admin-1',
+        'unknown',
+        { resolutionType: 'REPLACEMENT' },
+        undefined,
+      ),
+    ).rejects.toThrow(NotFoundException);
+  });
+
   it('never creates a refund/store-credit/replacement side effect — approval only records the decision', async () => {
     const { prisma, paymentsService, service } = createDeps();
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
@@ -1400,11 +1483,21 @@ function makeResolutionRow(overrides: Record<string, unknown> = {}) {
     reason: 'WRONG_ITEM',
     status: 'APPROVED',
     refundAmount: null,
+    resolutionType: null,
     items: [
       {
         orderItemId: 'item-1',
         quantity: 1,
-        orderItem: { price: 42, quantity: 2 },
+        orderItem: {
+          price: 42,
+          quantity: 2,
+          productId: 'prod-1',
+          slug: 'monstera',
+          name: 'Monstera',
+          categorySlug: 'plants',
+          variantId: null,
+          variantLabel: null,
+        },
       },
     ],
     order: {
@@ -1415,6 +1508,10 @@ function makeResolutionRow(overrides: Record<string, unknown> = {}) {
       tax: 3.36,
       paymentMethod: 'CREDIT_CARD',
       payment: { id: 'pay-1' },
+      shippingAddressSnapshot: { city: 'patna' },
+      billingAddressSnapshot: { city: 'patna' },
+      deliveryMethod: 'STANDARD',
+      estimatedDelivery: '3-5 business days',
     },
     ...overrides,
   };
@@ -1864,6 +1961,237 @@ describe('ReturnsService.resolveClaim — audit and events', () => {
 
     expect(auditService.log).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'RETURN_REFUND_ISSUED' }),
+    );
+  });
+});
+
+function makeReplacementRow(overrides: Record<string, unknown> = {}) {
+  return makeResolutionRow({
+    claimType: 'DOA_CLAIM',
+    resolutionType: 'REPLACEMENT',
+    ...overrides,
+  });
+}
+
+describe('ReturnsService.resolveClaim — replacement', () => {
+  it('dispatches to the replacement path and never touches refund/store-credit primitives', async () => {
+    const { prisma, paymentsService, inventoryService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeReplacementRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REPLACEMENT_ISSUED' }));
+    inventoryService.reserveForProduct.mockResolvedValue({ id: 'res-1' });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+    expect(prisma.storeCreditEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('reserves and commits stock for each claimed item, then creates a $0 replacement order snapshotting the original order and items', async () => {
+    const { prisma, inventoryService, service } = createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue({ id: 'res-1' });
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeReplacementRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REPLACEMENT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(inventoryService.reserveForProduct).toHaveBeenCalledWith(
+      'prod-1',
+      null,
+      1,
+      'ORDER',
+      expect.stringMatching(/^FOL-/),
+    );
+    expect(inventoryService.commitReservation).toHaveBeenCalledWith(
+      'res-1',
+      prisma,
+    );
+
+    const [[createCall]] = prisma.order.create.mock.calls;
+    expect(createCall.data).toMatchObject({
+      userId: 'user-1',
+      subtotal: 0,
+      discount: 0,
+      shippingCost: 0,
+      tax: 0,
+      total: 0,
+      paymentMethod: 'REPLACEMENT',
+      deliveryMethod: 'STANDARD',
+      estimatedDelivery: '3-5 business days',
+    });
+    expect(createCall.data.items.create).toEqual([
+      expect.objectContaining({
+        productId: 'prod-1',
+        slug: 'monstera',
+        name: 'Monstera',
+        categorySlug: 'plants',
+        price: 0,
+        quantity: 1,
+      }),
+    ]);
+    expect(createCall.data.payment.create).toMatchObject({
+      userId: 'user-1',
+      provider: 'COD',
+      method: 'REPLACEMENT',
+      status: 'NO_CHARGE',
+      amount: 0,
+    });
+  });
+
+  it('transitions the claim to REPLACEMENT_ISSUED and links replacementOrderId to the new order', async () => {
+    const { prisma, inventoryService, service } = createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue({ id: 'res-1' });
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeReplacementRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REPLACEMENT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    const [[createCall]] = prisma.order.create.mock.calls;
+    const newOrderId = createCall.data.id;
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.where).toEqual({
+      id: 'rr-1',
+      status: 'APPROVED',
+      replacementOrderId: null,
+    });
+    expect(updateCall.data).toEqual({
+      status: 'REPLACEMENT_ISSUED',
+      replacementOrderId: newOrderId,
+    });
+  });
+
+  it('logs RETURN_REPLACEMENT_ISSUED and emits REPLACEMENT_ISSUED with the correct payload', async () => {
+    const { prisma, inventoryService, auditService, eventEmitter, service } =
+      createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue({ id: 'res-1' });
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeReplacementRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REPLACEMENT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.resolveClaim('admin-1', 'rr-1', '10.0.0.1');
+
+    const [[createCall]] = prisma.order.create.mock.calls;
+    const newOrderId = createCall.data.id;
+
+    expect(auditService.log).toHaveBeenCalledWith({
+      actorId: 'admin-1',
+      action: 'RETURN_REPLACEMENT_ISSUED',
+      resource: 'return_request',
+      resourceId: 'rr-1',
+      metadata: { orderId: 'order-1', replacementOrderId: newOrderId },
+      ipAddress: '10.0.0.1',
+    });
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'notification.replacement_issued',
+      {
+        returnRequestId: 'rr-1',
+        orderId: 'order-1',
+        replacementOrderId: newOrderId,
+        userId: 'user-1',
+      },
+    );
+  });
+
+  it('rejects with BadRequestException when claimType is not DOA_CLAIM, without reserving any stock (defense in depth)', async () => {
+    const { prisma, inventoryService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeReplacementRow({ claimType: 'STANDARD_RETURN' }),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(BadRequestException);
+    expect(inventoryService.reserveForProduct).not.toHaveBeenCalled();
+  });
+
+  it('insufficient stock: releases any already-reserved items, logs RETURN_REPLACEMENT_FAILED, creates no order, and leaves the claim APPROVED', async () => {
+    const { prisma, inventoryService, auditService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeReplacementRow({
+        items: [
+          {
+            orderItemId: 'item-1',
+            quantity: 1,
+            orderItem: {
+              price: 42,
+              quantity: 2,
+              productId: 'prod-1',
+              slug: 'monstera',
+              name: 'Monstera',
+              categorySlug: 'plants',
+              variantId: null,
+              variantLabel: null,
+            },
+          },
+          {
+            orderItemId: 'item-2',
+            quantity: 1,
+            orderItem: {
+              price: 20,
+              quantity: 1,
+              productId: 'prod-2',
+              slug: 'fern',
+              name: 'Fern',
+              categorySlug: 'plants',
+              variantId: null,
+              variantLabel: null,
+            },
+          },
+        ],
+      }),
+    );
+    inventoryService.reserveForProduct
+      .mockResolvedValueOnce({ id: 'res-1' })
+      .mockRejectedValueOnce(new BadRequestException('Not enough stock.'));
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow('Not enough stock.');
+
+    expect(inventoryService.releaseReservation).toHaveBeenCalledWith('res-1');
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(prisma.returnRequest.updateMany).not.toHaveBeenCalled();
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'RETURN_REPLACEMENT_FAILED',
+        resourceId: 'rr-1',
+      }),
+    );
+  });
+
+  it('a lost replacement-creation race releases the reservation and returns the idempotent existing result instead of a duplicate order', async () => {
+    const { prisma, inventoryService, auditService, eventEmitter, service } =
+      createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue({ id: 'res-1' });
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeReplacementRow())
+      .mockResolvedValueOnce(
+        makeAdminRow({
+          status: 'REPLACEMENT_ISSUED',
+          replacementOrderId: 'FOL-winner',
+        }),
+      );
+    // The final conditional update loses the race — a concurrent call
+    // already won and created the real replacement order.
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(inventoryService.releaseReservation).toHaveBeenCalledWith('res-1');
+    expect(result.resolution.replacementOrderId).toBe('FOL-winner');
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      'notification.replacement_issued',
+      expect.anything(),
+    );
+    expect(auditService.log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'RETURN_REPLACEMENT_FAILED' }),
     );
   });
 });

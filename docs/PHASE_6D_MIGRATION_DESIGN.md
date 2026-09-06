@@ -276,3 +276,103 @@ schema already uses for `CancellationRequest`'s and `ReturnRequest.orderId`'s
 own concurrent-creation races (see 6D-1 notes above) — reused here, not
 reinvented, and airtight without any new resolution-state column because
 the entire operation is one atomic write.
+
+# Phase 6D-4C — Replacement Order Creation: design notes
+
+No schema or migration change was made in this phase either — `npx prisma
+migrate status` still reports the same 7 migrations, up to date. Every
+column this phase writes (`ReturnRequest.resolutionType`,
+`.replacementOrderId`, `Order.paymentMethod = REPLACEMENT`,
+`Payment.status = NO_CHARGE`) was already anticipated by the 6D-1
+migration's own design notes above (see "Zero-charge replacement order —
+why the existing model can't safely represent it").
+
+## How REPLACEMENT is chosen (a real, confirmed gap this phase closes)
+
+Before this phase, `ReturnRequest.resolutionType` and
+`.requiresReverseLogistics` were never actually set by any code path —
+`ReturnsService.adminApprove` (Phase 6D-4A) only ever recorded a decision
+note, and `resolveClaim` (Phase 6D-4B) derived the refund-vs-store-credit
+split purely from `Order.paymentMethod`. There was no mechanism at all by
+which a claim could be routed to REPLACEMENT.
+
+This phase adds one optional field, `ApproveReturnDto.resolutionType`,
+accepting only the literal `'REPLACEMENT'` — REFUND and FOLIA_STORE_CREDIT
+stay exactly as 6D-4B left them: never client-settable, always derived
+automatically from server-side payment state, since those are real money
+amounts. REPLACEMENT is a physical-fulfillment decision, not a money
+amount, so an admin choosing it explicitly at approval time is safe.
+`adminApprove` rejects the combination unless the claim's `claimType` is
+`DOA_CLAIM` — a "changed my mind" standard return has nothing wrong with
+the item to replace. `resolveClaim` checks `resolutionType === 'REPLACEMENT'`
+before its refund/credit branch and dispatches to a fully separate method,
+`resolveReplacement`, which never touches `refundAmount`,
+`PaymentsService`, or `StoreCreditEntry`.
+
+Reverse logistics (waiting for the original DOA item to be physically
+received back before shipping a replacement) was deliberately left out of
+this phase's scope, consistent with 6D-4B's own precedent of treating
+`requiresReverseLogistics`/`itemReceivedAt` as separate, not-yet-built
+work — `resolveReplacement` creates the replacement order immediately upon
+resolution, the same timing model 6D-4B already used for refund/store-
+credit.
+
+## Reusing the existing order-creation and inventory primitives
+
+`resolveReplacement` does not reimplement checkout. It reuses the exact
+reserve -> commit-inside-the-order-creation-transaction pipeline
+`PaymentsService.confirmAndCreateOrder` already established for every real
+order (`InventoryService.reserveForProduct`, called per claimed line
+before the transaction opens, then `InventoryService.commitReservation`
+called with the transaction's own `tx` inside it) — no new inventory
+primitive was written for this phase. The replacement order reuses the
+original order's own `shippingAddressSnapshot`, `billingAddressSnapshot`,
+`deliveryMethod`, and `estimatedDelivery` rather than re-querying
+`AddressesService` by id, since a replacement ships to wherever the
+original order shipped, even if the customer's saved address has since
+been edited or deleted.
+
+Every monetary field on the replacement `Order` and its `OrderItem` rows
+is zero (`subtotal`/`discount`/`shippingCost`/`tax`/`total`, and each
+line's `price`) — not the original claimed line's real price — exactly per
+the 6D-1 design notes' own invariant: a future return claim filed against
+*this* replacement order must never compute a non-zero refund over money
+that was never charged. `Payment.provider` stays `COD` (no real gateway
+was involved) with `method = REPLACEMENT` and `status = NO_CHARGE`,
+matching the 6D-1 notes' reasoning for why `COD_COLLECTED` and `CAPTURED`
+were both rejected as unsafe reuse for this case.
+
+## Idempotency/concurrency: why this can't use 6D-4B's freeze-gate idiom directly
+
+6D-4B's prepaid path used an atomic `updateMany` conditional on
+`refundAmount IS NULL` as a pre-claim gate, executed *before* any external
+side effect. `ReturnRequest.replacementOrderId` cannot be used the same
+way: it has a real foreign key to `orders(id)`, so it cannot be set to an
+order id before that `Order` row exists — there is no nullable scalar
+value to freeze upfront the way `refundAmount` could be.
+
+Instead, `resolveReplacement` creates the `Order`/`OrderItem`/`Payment`
+rows *speculatively* inside one `prisma.$transaction`, whose **final**
+write is the same conditional-`updateMany` idiom used throughout this
+project
+(`{ where: { id, status: 'APPROVED', replacementOrderId: null } }`). If
+that update matches zero rows (a concurrent call already won), the method
+throws inside the transaction callback, and Postgres rolls back
+*everything* written in that transaction — the speculative order, its
+items, its payment, and the just-committed inventory decrement all revert
+together. A losing racer therefore never leaves an orphaned $0 order or a
+double-decremented stock level behind. Stock reservations themselves are
+made *before* the transaction (so they can be released on any failure
+path, including a stock-unavailability error that never reaches the
+transaction at all); a reservation whose `commitReservation` write was
+rolled back reverts to `ACTIVE`, not `COMMITTED`, so the loser's reservation
+is explicitly released back to available stock after the transaction
+throws — it does not sit ACTIVE forever.
+
+This is a different mechanism from 6D-4B's freeze-gate, but the same
+underlying principle: exactly one of two concurrent resolution attempts
+for a given claim produces exactly one financial/physical effect, and the
+loser gets an idempotent result, never a duplicate. Unlike 6D-4B's prepaid
+retry gap, this path has no equivalent "can't safely tell in-flight from
+failed" ambiguity — a failed reservation attempt writes nothing to the
+database at all, so a subsequent retry from scratch is always safe.

@@ -48,6 +48,16 @@ export const NOTIFICATION_EVENTS = {
    * RETURN_APPROVED/REJECTED.
    */
   STORE_CREDIT_ISSUED: 'notification.store_credit_issued',
+  /**
+   * Phase 6D-4C — a DOA/damage claim resolved by shipping a free
+   * replacement order instead of a refund/store-credit. No existing event
+   * covers order creation for a $0, no-charge order (ANALYTICS_EVENTS.
+   * ORDER_CREATED is deliberately NOT reused here — a replacement isn't a
+   * new sale, and firing it would misrepresent the replacement as revenue-
+   * bearing order-count activity). No listener exists yet: same "add the
+   * event, don't implement delivery" scope as STORE_CREDIT_ISSUED.
+   */
+  REPLACEMENT_ISSUED: 'notification.replacement_issued',
   PROFILE_UPDATED: 'notification.profile_updated',
   PASSWORD_CHANGED: 'notification.password_changed',
 } as const;
@@ -87,6 +97,15 @@ export interface StoreCreditIssuedPayload {
   orderId: string;
   userId: string;
   amount: number;
+}
+
+export interface ReplacementIssuedPayload {
+  returnRequestId: string;
+  /** The original order the claim was filed against. */
+  orderId: string;
+  /** The new $0 order created to fulfill the replacement. */
+  replacementOrderId: string;
+  userId: string;
 }
 
 export interface ProfileUpdatedPayload {
