@@ -526,59 +526,142 @@ export class PaymentsService {
   }
 
   /**
+   * Locks a single Payment row for the rest of the enclosing transaction —
+   * same Postgres `SELECT ... FOR UPDATE` technique, same reasoning, as
+   * InventoryService.lockItemForUpdate: two concurrent refund() calls for
+   * the same payment must not both read the same "amount already
+   * refunded" total before either has recorded its own claim.
+   */
+  private async lockPaymentForUpdate(
+    tx: Prisma.TransactionClient,
+    paymentId: string,
+  ): Promise<void> {
+    await tx.$queryRaw`SELECT "id" FROM "payments" WHERE "id" = ${paymentId} FOR UPDATE`;
+  }
+
+  /**
    * Not wired to any automatic trigger yet — Phase 6 (returns/refunds)
    * connects cancellation/return approval to this. Built and independently
    * callable now (admin-invoked) so the gateway-facing half of a refund
    * is real and tested before anything upstream depends on it.
+   *
+   * Two-phase (reserve, then confirm-or-release) rather than a single
+   * read-then-write, and deliberately does NOT hold a transaction open
+   * across the real Razorpay call below — matching this codebase's
+   * existing convention (see confirmCapture: the gateway call always
+   * happens outside any $transaction). Phase 1, under a row lock, sums
+   * every PENDING + PROCESSED refund already claimed against this payment
+   * and creates a new PENDING Refund row for the requested amount — a
+   * concurrent second call sees that PENDING claim in its own sum and is
+   * correctly rejected or reduced, closing the double-refund/over-refund
+   * race without ever holding a lock across the network call. Phase 2
+   * calls Razorpay; on success the claim is marked PROCESSED and
+   * Payment.status is derived from the real PROCESSED total (not just
+   * this one call's amount, which is what let sequential partial refunds
+   * silently over-refund past 100% before this fix). On failure the claim
+   * is marked FAILED so it stops occupying refundable headroom.
    */
   async refund(
     paymentId: string,
     input: { amount?: number; reason?: string },
   ): Promise<{ id: string; status: string; providerRefundId: string }> {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
-    if (!payment) throw new NotFoundException('Payment not found.');
-    if (
-      payment.status !== 'CAPTURED' &&
-      payment.status !== 'PARTIALLY_REFUNDED'
-    ) {
-      throw new BadRequestException('Only a captured payment can be refunded.');
-    }
-    if (!payment.providerPaymentId) {
-      throw new BadRequestException(
-        'This payment has no gateway transaction to refund.',
-      );
-    }
+    const { payment, requestedAmount, pendingRefundId } =
+      await this.prisma.$transaction(async (tx) => {
+        await this.lockPaymentForUpdate(tx, paymentId);
 
-    const result = await this.razorpay.refund({
-      providerPaymentId: payment.providerPaymentId,
-      amount: input.amount,
-      reason: input.reason,
-    });
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+        });
+        if (!payment) throw new NotFoundException('Payment not found.');
+        if (
+          payment.status !== 'CAPTURED' &&
+          payment.status !== 'PARTIALLY_REFUNDED'
+        ) {
+          throw new BadRequestException(
+            'Only a captured payment can be refunded.',
+          );
+        }
+        if (!payment.providerPaymentId) {
+          throw new BadRequestException(
+            'This payment has no gateway transaction to refund.',
+          );
+        }
 
-    const refund = await this.prisma.refund.create({
-      data: {
-        paymentId: payment.id,
-        amount: input.amount ?? payment.amount,
-        status: 'PROCESSED',
-        providerRefundId: result.providerRefundId,
+        const claimed = await tx.refund.aggregate({
+          where: { paymentId, status: { in: ['PENDING', 'PROCESSED'] } },
+          _sum: { amount: true },
+        });
+        const alreadyClaimed = Number(claimed._sum.amount ?? 0);
+        const remaining = Number(payment.amount) - alreadyClaimed;
+        const requestedAmount = input.amount ?? remaining;
+
+        if (requestedAmount <= 0 || requestedAmount > remaining) {
+          throw new BadRequestException(
+            `Cannot refund ₹${requestedAmount.toFixed(2)} — only ₹${remaining.toFixed(2)} of this payment remains refundable.`,
+          );
+        }
+
+        const pending = await tx.refund.create({
+          data: {
+            paymentId: payment.id,
+            amount: requestedAmount,
+            status: 'PENDING',
+            reason: input.reason,
+          },
+        });
+
+        return { payment, requestedAmount, pendingRefundId: pending.id };
+      });
+
+    try {
+      const result = await this.razorpay.refund({
+        providerPaymentId: payment.providerPaymentId!,
+        amount: requestedAmount,
         reason: input.reason,
-      },
-    });
+      });
 
-    const isFullRefund =
-      input.amount === undefined || input.amount >= Number(payment.amount);
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
-    });
+      return await this.prisma.$transaction(async (tx) => {
+        await this.lockPaymentForUpdate(tx, paymentId);
 
-    return {
-      id: refund.id,
-      status: refund.status,
-      providerRefundId: result.providerRefundId,
-    };
+        const refund = await tx.refund.update({
+          where: { id: pendingRefundId },
+          data: {
+            status: 'PROCESSED',
+            providerRefundId: result.providerRefundId,
+          },
+        });
+
+        const processed = await tx.refund.aggregate({
+          where: { paymentId, status: 'PROCESSED' },
+          _sum: { amount: true },
+        });
+        const isFullRefund =
+          Number(processed._sum.amount ?? 0) >= Number(payment.amount);
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: { status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
+        });
+
+        return {
+          id: refund.id,
+          status: refund.status,
+          providerRefundId: result.providerRefundId,
+        };
+      });
+    } catch (err) {
+      // The claim didn't pan out (gateway rejected it, network failure,
+      // etc.) — release it so it stops occupying refundable headroom on
+      // this payment. A crash between the gateway call succeeding and
+      // this catch running would leave a real Razorpay refund with no
+      // PROCESSED row here; that reconciliation gap is a real, stated
+      // Phase 6 follow-up (webhook-driven reconciliation), not silently
+      // claimed as solved by this fix.
+      await this.prisma.refund.update({
+        where: { id: pendingRefundId },
+        data: { status: 'FAILED' },
+      });
+      throw err;
+    }
   }
 
   /**
