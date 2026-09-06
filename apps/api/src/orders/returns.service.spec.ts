@@ -1,8 +1,13 @@
 // Same reasoning as auth.service.spec.ts's top-of-file comment.
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ReturnsService } from './returns.service';
 import type { EvidenceFileLike } from './evidence-file.util';
+import type { LogAuditInput } from '../audit/audit.types';
 
 function jpegBuffer(): Buffer {
   return Buffer.concat([
@@ -67,11 +72,25 @@ interface CreateReturnRequestArgs {
   data: Record<string, unknown>;
 }
 
+/** Loosely typed shape of a prisma.returnRequest.updateMany() call's argument — just enough for assertions below to type-check cleanly. */
+interface UpdateManyReturnRequestArgs {
+  where: Record<string, unknown>;
+  data: Record<string, unknown>;
+}
+
 function createDeps() {
   const prisma = {
     order: { findFirst: jest.fn() },
     returnRequest: {
       create: jest.fn<Promise<unknown>, [CreateReturnRequestArgs]>(),
+      updateMany: jest.fn<
+        Promise<{ count: number }>,
+        [UpdateManyReturnRequestArgs]
+      >(),
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
     },
   };
   const storageService = {
@@ -81,10 +100,19 @@ function createDeps() {
     }),
     delete: jest.fn(),
   };
+  const eventEmitter = { emit: jest.fn() };
+  const auditService = {
+    log: jest.fn<Promise<void>, [LogAuditInput]>().mockResolvedValue(undefined),
+  };
 
-  const service = new ReturnsService(prisma as never, storageService);
+  const service = new ReturnsService(
+    prisma as never,
+    storageService,
+    eventEmitter,
+    auditService as never,
+  );
 
-  return { prisma, storageService, service };
+  return { prisma, storageService, eventEmitter, auditService, service };
 }
 
 describe('ReturnsService.createClaim', () => {
@@ -872,5 +900,480 @@ describe('ReturnsService.createClaim', () => {
     );
 
     expect(result.status).toBe('pending');
+  });
+});
+
+// --- Phase 6D-4A: admin queue, detail, approve/reject ---
+
+function makeAdminRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'rr-1',
+    orderId: 'order-1',
+    claimType: 'STANDARD_RETURN',
+    reason: 'WRONG_ITEM',
+    note: 'Arrived with a chip',
+    requestedAt: new Date('2026-09-10T10:00:00.000Z'),
+    status: 'PENDING',
+    decidedBy: null,
+    decidedAt: null,
+    decisionNote: null,
+    resolutionType: null,
+    requiresReverseLogistics: null,
+    refundAmount: null,
+    refundId: null,
+    replacementOrderId: null,
+    storeCreditEntry: null,
+    items: [
+      {
+        orderItemId: 'item-1',
+        quantity: 1,
+        orderItem: { name: 'Ceramic Vessel — Ash', price: 42, quantity: 2 },
+      },
+    ],
+    evidence: [],
+    order: {
+      id: 'order-1',
+      total: 47.54,
+      deliveredAt: new Date('2026-09-09T10:00:00.000Z'),
+      user: {
+        id: 'user-1',
+        firstName: 'Sam',
+        lastName: 'Rivera',
+        email: 'sam@example.com',
+      },
+    },
+    ...overrides,
+  };
+}
+
+describe('ReturnsService.adminListClaims', () => {
+  it('defaults to the PENDING queue, ordered oldest-first, and maps every required field', async () => {
+    const { prisma, service } = createDeps();
+    const row = makeAdminRow();
+    prisma.returnRequest.findMany.mockResolvedValue([row]);
+    prisma.returnRequest.count.mockResolvedValue(1);
+
+    const result = await service.adminListClaims({
+      status: 'pending',
+      page: 1,
+      pageSize: 20,
+    });
+
+    expect(prisma.returnRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: 'PENDING' },
+        orderBy: { requestedAt: 'asc' },
+        skip: 0,
+        take: 20,
+      }),
+    );
+    expect(result.total).toBe(1);
+    const [item] = result.items as Array<Record<string, unknown>>;
+    expect(item).toMatchObject({
+      id: 'rr-1',
+      orderId: 'order-1',
+      status: 'pending',
+      claimType: 'standard-return',
+      reason: 'wrong-item',
+      note: 'Arrived with a chip',
+    });
+    expect(item.customer).toEqual({
+      id: 'user-1',
+      firstName: 'Sam',
+      lastName: 'Rivera',
+      email: 'sam@example.com',
+    });
+    expect(item.items).toEqual([
+      {
+        orderItemId: 'item-1',
+        quantity: 1,
+        productName: 'Ceramic Vessel — Ash',
+        unitPrice: 42,
+        purchasedQuantity: 2,
+        claimedLineValue: 42,
+      },
+    ]);
+    expect(item.policy).toEqual({
+      evidenceRequired: false,
+      evidenceProvided: false,
+      reasonEligible: true,
+    });
+    expect(item.resolution).toEqual({
+      resolutionType: null,
+      requiresReverseLogistics: null,
+      refundAmount: null,
+      refundId: null,
+      replacementOrderId: null,
+      storeCreditEntryId: null,
+    });
+  });
+
+  it('paginates using page/pageSize, clamped at 50', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findMany.mockResolvedValue([]);
+    prisma.returnRequest.count.mockResolvedValue(0);
+
+    await service.adminListClaims({
+      status: 'pending',
+      page: 3,
+      pageSize: 999,
+    });
+
+    expect(prisma.returnRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 100, take: 50 }),
+    );
+  });
+
+  it('filters by a different status when asked (e.g. reviewing already-approved claims)', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findMany.mockResolvedValue([]);
+    prisma.returnRequest.count.mockResolvedValue(0);
+
+    await service.adminListClaims({
+      status: 'approved',
+      page: 1,
+      pageSize: 20,
+    });
+
+    expect(prisma.returnRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'APPROVED' } }),
+    );
+  });
+
+  it('marks a DOA claim as evidence-required and reflects whether evidence was actually provided', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findMany.mockResolvedValue([
+      makeAdminRow({
+        claimType: 'DOA_CLAIM',
+        reason: 'DOA',
+        evidence: [
+          { url: '/uploads/return-evidence/a.jpg', createdAt: new Date() },
+        ],
+      }),
+    ]);
+    prisma.returnRequest.count.mockResolvedValue(1);
+
+    const result = await service.adminListClaims({
+      status: 'pending',
+      page: 1,
+      pageSize: 20,
+    });
+
+    const [item] = result.items as Array<Record<string, unknown>>;
+    expect(item.policy).toMatchObject({
+      evidenceRequired: true,
+      evidenceProvided: true,
+      reasonEligible: true,
+    });
+  });
+});
+
+describe('ReturnsService.adminGetClaim', () => {
+  it('returns the full mapped detail for an existing claim', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(makeAdminRow());
+
+    const result = await service.adminGetClaim('rr-1');
+
+    expect(result.id).toBe('rr-1');
+    expect(result.order).toEqual({
+      id: 'order-1',
+      total: 47.54,
+      deliveredAt: '2026-09-09T10:00:00.000Z',
+    });
+  });
+
+  it('throws NotFoundException for a nonexistent return request', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(null);
+
+    await expect(service.adminGetClaim('unknown')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+
+describe('ReturnsService.adminApprove', () => {
+  it('transitions PENDING -> APPROVED, records who/when, and returns the updated claim', async () => {
+    const { prisma, service, auditService, eventEmitter } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({
+        status: 'APPROVED',
+        decidedBy: 'admin-1',
+        decidedAt: new Date('2026-09-10T12:00:00.000Z'),
+        decisionNote: 'Looks legitimate',
+      }),
+    );
+
+    const result = await service.adminApprove(
+      'admin-1',
+      'rr-1',
+      { note: 'Looks legitimate' },
+      '10.0.0.1',
+    );
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.where).toEqual({ id: 'rr-1', status: 'PENDING' });
+    expect(updateCall.data).toMatchObject({
+      status: 'APPROVED',
+      decidedBy: 'admin-1',
+      decisionNote: 'Looks legitimate',
+    });
+    expect(result.status).toBe('approved');
+
+    expect(auditService.log).toHaveBeenCalledWith({
+      actorId: 'admin-1',
+      action: 'RETURN_APPROVED',
+      resource: 'return_request',
+      resourceId: 'rr-1',
+      metadata: { orderId: 'order-1', note: 'Looks legitimate' },
+      ipAddress: '10.0.0.1',
+    });
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'notification.return_approved',
+      {
+        returnRequestId: 'rr-1',
+        orderId: 'order-1',
+        userId: 'user-1',
+      },
+    );
+  });
+
+  it('rejects approving an already-APPROVED claim with a clean ConflictException', async () => {
+    const { prisma, service, auditService, eventEmitter } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+
+    await expect(
+      service.adminApprove('admin-1', 'rr-1', {}, undefined),
+    ).rejects.toThrow(ConflictException);
+    expect(auditService.log).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it('rejects approving an already-REJECTED claim with a clean ConflictException, naming the actual current state', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'REJECTED' });
+
+    await expect(
+      service.adminApprove('admin-1', 'rr-1', {}, undefined),
+    ).rejects.toThrow(/already rejected/);
+  });
+
+  it('throws NotFoundException when approving a return request that does not exist at all', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.adminApprove('admin-1', 'unknown', {}, undefined),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('never creates a refund/store-credit/replacement side effect — approval only records the decision', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+
+    await service.adminApprove('admin-1', 'rr-1', {}, undefined);
+
+    // The mock prisma object has no payment/refund/storeCreditEntry/order.update
+    // methods at all — if adminApprove tried to call any of them, this test
+    // would fail with a "not a function" error rather than passing silently.
+    expect(Object.keys(prisma)).toEqual(['order', 'returnRequest']);
+  });
+
+  it('exactly one of two concurrent approve calls for the same claim succeeds', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+
+    const [first, second] = await Promise.allSettled([
+      service.adminApprove('admin-1', 'rr-1', {}, undefined),
+      service.adminApprove('admin-2', 'rr-1', {}, undefined),
+    ]);
+
+    const outcomes = [first.status, second.status].sort();
+    expect(outcomes).toEqual(['fulfilled', 'rejected']);
+    const rejected = [first, second].find(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    )!;
+    expect(rejected.reason).toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('ReturnsService.adminReject', () => {
+  it('transitions PENDING -> REJECTED, storing the required reason as decisionNote', async () => {
+    const { prisma, service, auditService, eventEmitter } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({
+        status: 'REJECTED',
+        decidedBy: 'admin-1',
+        decisionNote: 'Outside the return window',
+      }),
+    );
+
+    const result = await service.adminReject(
+      'admin-1',
+      'rr-1',
+      { reason: 'Outside the return window' },
+      '10.0.0.1',
+    );
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.where).toEqual({ id: 'rr-1', status: 'PENDING' });
+    expect(updateCall.data).toMatchObject({
+      status: 'REJECTED',
+      decisionNote: 'Outside the return window',
+    });
+    expect(result.status).toBe('rejected');
+    expect(auditService.log).toHaveBeenCalledWith({
+      actorId: 'admin-1',
+      action: 'RETURN_REJECTED',
+      resource: 'return_request',
+      resourceId: 'rr-1',
+      metadata: { orderId: 'order-1', reason: 'Outside the return window' },
+      ipAddress: '10.0.0.1',
+    });
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'notification.return_rejected',
+      {
+        returnRequestId: 'rr-1',
+        orderId: 'order-1',
+        userId: 'user-1',
+        reason: 'Outside the return window',
+      },
+    );
+  });
+
+  it('rejects rejecting an already-REJECTED claim with a clean ConflictException', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'REJECTED' });
+
+    await expect(
+      service.adminReject('admin-1', 'rr-1', { reason: 'x' }, undefined),
+    ).rejects.toThrow(ConflictException);
+    expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  it('rejects rejecting an already-APPROVED claim with a clean ConflictException', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+
+    await expect(
+      service.adminReject('admin-1', 'rr-1', { reason: 'x' }, undefined),
+    ).rejects.toThrow(/already approved/);
+  });
+
+  it('never creates a refund/store-credit/replacement side effect — rejection only records the decision', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'REJECTED' }),
+    );
+
+    await service.adminReject('admin-1', 'rr-1', { reason: 'x' }, undefined);
+
+    expect(Object.keys(prisma)).toEqual(['order', 'returnRequest']);
+  });
+
+  it('exactly one of two concurrent reject calls for the same claim succeeds', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'REJECTED' }),
+    );
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'REJECTED' });
+
+    const [first, second] = await Promise.allSettled([
+      service.adminReject('admin-1', 'rr-1', { reason: 'a' }, undefined),
+      service.adminReject('admin-2', 'rr-1', { reason: 'b' }, undefined),
+    ]);
+
+    const outcomes = [first.status, second.status].sort();
+    expect(outcomes).toEqual(['fulfilled', 'rejected']);
+  });
+});
+
+describe('ReturnsService approve vs reject cross-race', () => {
+  it('a concurrent APPROVE and REJECT for the same claim produce exactly one winner', async () => {
+    const { prisma, service } = createDeps();
+    // Whichever call's UPDATE statement reaches Postgres first wins in
+    // reality; both orderings are equally valid, so this simulates one
+    // arbitrary but internally consistent outcome (approve wins).
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // approve's own conditional update
+      .mockResolvedValueOnce({ count: 0 }); // reject's own conditional update, now stale
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+
+    const [approveResult, rejectResult] = await Promise.allSettled([
+      service.adminApprove('admin-1', 'rr-1', {}, undefined),
+      service.adminReject('admin-2', 'rr-1', { reason: 'too late' }, undefined),
+    ]);
+
+    expect(approveResult.status).toBe('fulfilled');
+    expect(rejectResult.status).toBe('rejected');
+    if (rejectResult.status === 'rejected') {
+      expect(rejectResult.reason).toBeInstanceOf(ConflictException);
+    }
+  });
+});
+
+describe('ReturnsService admin audit — no false successes', () => {
+  it('a stale/conflicting approve attempt never calls AuditService.log at all', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+
+    await expect(
+      service.adminApprove('admin-1', 'rr-1', {}, undefined),
+    ).rejects.toThrow(ConflictException);
+
+    expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  it('a successful approval logs exactly one RETURN_APPROVED audit record', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+
+    await service.adminApprove('admin-1', 'rr-1', {}, undefined);
+
+    expect(auditService.log).toHaveBeenCalledTimes(1);
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('RETURN_APPROVED');
+  });
+
+  it('a successful rejection logs exactly one RETURN_REJECTED audit record', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'REJECTED' }),
+    );
+
+    await service.adminReject('admin-1', 'rr-1', { reason: 'x' }, undefined);
+
+    expect(auditService.log).toHaveBeenCalledTimes(1);
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('RETURN_REJECTED');
   });
 });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminProductsController } from './admin-products.controller';
 import { AdminOrdersController } from './admin-orders.controller';
+import { AdminReturnsController } from './admin-returns.controller';
 import { AdminInventoryController } from './admin-inventory.controller';
 import { AdminUsersController } from './admin-users.controller';
 import { ProductsModule } from '../products/products.module';
@@ -20,6 +21,7 @@ import { AuditModule } from '../audit/audit.module';
   controllers: [
     AdminProductsController,
     AdminOrdersController,
+    AdminReturnsController,
     AdminInventoryController,
     AdminUsersController,
   ],

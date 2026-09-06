@@ -11,6 +11,7 @@ import { TrackingModule } from '../tracking/tracking.module';
 import { AppConfigModule } from '../config/config.module';
 import { ShippingModule } from '../shipping/shipping.module';
 import { StorageModule } from '../storage/storage.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -23,9 +24,10 @@ import { StorageModule } from '../storage/storage.module';
     AppConfigModule,
     ShippingModule,
     StorageModule,
+    AuditModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, ReturnsService],
-  exports: [OrdersService],
+  exports: [OrdersService, ReturnsService],
 })
 export class OrdersModule {}

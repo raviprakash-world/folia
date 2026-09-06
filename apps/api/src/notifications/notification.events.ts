@@ -22,6 +22,19 @@ export const NOTIFICATION_EVENTS = {
    * order's userId in scope without an extra query.
    */
   ORDER_STATUS_CHANGED: 'notification.order_status_changed',
+  /**
+   * Phase 6D-4A — the admin decision on a return/DOA claim. Emitted from
+   * ReturnsService itself (the one place that already has the claim's
+   * orderId and the order's customer userId in scope right after the
+   * atomic PENDING -> APPROVED/REJECTED transition, without an extra
+   * query — same reasoning as ORDER_STATUS_CHANGED above). No listener
+   * exists for either yet: this phase only adds the event names/payloads
+   * and emits them, matching the "add the minimal domain events, don't
+   * implement delivery" scope — a future phase wires the actual
+   * notification/email.
+   */
+  RETURN_APPROVED: 'notification.return_approved',
+  RETURN_REJECTED: 'notification.return_rejected',
   PROFILE_UPDATED: 'notification.profile_updated',
   PASSWORD_CHANGED: 'notification.password_changed',
 } as const;
@@ -40,6 +53,20 @@ export interface OrderStatusChangedPayload {
   orderId: string;
   userId: string;
   status: 'CONFIRMED' | 'SHIPPED' | 'DELIVERED';
+}
+
+export interface ReturnApprovedPayload {
+  returnRequestId: string;
+  orderId: string;
+  userId: string;
+}
+
+export interface ReturnRejectedPayload {
+  returnRequestId: string;
+  orderId: string;
+  userId: string;
+  /** The admin's required rejection reason (ReturnRequest.decisionNote). */
+  reason: string;
 }
 
 export interface ProfileUpdatedPayload {

@@ -202,7 +202,8 @@ const cancellationReasonToPublic: Record<CancellationReasonDb, string> = {
   OTHER: 'other',
 };
 
-const returnReasonToPublic: Record<ReturnReasonDb, string> = {
+/** Exported for ReturnsService's admin-facing responses (Phase 6D-4A) — the same DB-enum-to-public-string mapping toPublicReturn already uses below, not duplicated. */
+export const returnReasonToPublic: Record<ReturnReasonDb, string> = {
   NO_LONGER_NEEDED: 'no-longer-needed',
   WRONG_ITEM: 'wrong-item',
   DAMAGED_IN_TRANSIT: 'damaged-in-transit',
