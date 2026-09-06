@@ -14,13 +14,15 @@ export function deriveRefundStatus(requestedAt: Date): RefundStatus {
   return elapsed >= REFUND_PROCESSING_WINDOW_MS ? 'refunded' : 'processing';
 }
 
-/** PENDING_PAYMENT (Phase 1) is cancellable — a customer should be able to back out before ever completing payment, not just after. */
-const CANCELLABLE_STATUSES = [
-  'PENDING_PAYMENT',
-  'PROCESSING',
-  'CONFIRMED',
-  'SHIPPED',
-];
+/**
+ * No PENDING_PAYMENT here (Phase 1 briefly added it, Phase 2 removed it
+ * along with the status itself — see schema.prisma's OrderStatus comment):
+ * an Order row only ever exists once payment is already confirmed, so
+ * "cancel before paying" is now "let the reservation expire/release
+ * un-confirmed" (InventoryService.releaseExpiredReservations,
+ * PaymentsService.expireStalePayments), not an Order-level cancellation.
+ */
+const CANCELLABLE_STATUSES = ['PROCESSING', 'CONFIRMED', 'SHIPPED'];
 const RETURN_WINDOW_DAYS = 30;
 
 /** Matches apps/web/src/utils/refund.ts's canCancelOrder exactly. */

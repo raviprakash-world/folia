@@ -40,7 +40,6 @@ export interface AddressSnapshot {
 }
 
 export type OrderStatus =
-  | 'PENDING_PAYMENT'
   | 'PROCESSING'
   | 'CONFIRMED'
   | 'SHIPPED'
@@ -52,7 +51,6 @@ export type CourierIdDb =
   'SWIFTPOST' | 'CASCADE_EXPRESS' | 'TRAILRUNNER' | 'NORTHLINE' | 'QUICKHATCH';
 
 const statusToPublic: Record<OrderStatus, string> = {
-  PENDING_PAYMENT: 'pending-payment',
   PROCESSING: 'processing',
   CONFIRMED: 'confirmed',
   SHIPPED: 'shipped',
@@ -118,9 +116,9 @@ export interface OrderRecord {
   deliveryMethod: DeliveryMethodType;
   estimatedDelivery: string;
   paymentMethod: PaymentMethodType;
-  /** Both null until PaymentsService confirms payment — see Order.paymentDisplayLabel's schema comment (Phase 1). */
-  paymentDisplayLabel: string | null;
-  paymentTransactionId: string | null;
+  /** Always known at creation time (Phase 2): an Order row is only ever created once PaymentsService.confirmAndCreateOrder runs, by which point payment has already resolved — see Order.paymentDisplayLabel's schema comment. */
+  paymentDisplayLabel: string;
+  paymentTransactionId: string;
   courierId: CourierIdDb;
   trackingNumber: string;
   customerNotes: string | null;
@@ -248,4 +246,48 @@ export function toPublicReturn(r: ReturnRequestRecord) {
     note: r.note,
     refundStatus: deriveRefundStatus(r.requestedAt),
   };
+}
+
+/** One cart line as reserved at checkout time — carries the exact InventoryItem/StockReservation each line resolved to, so confirmAndCreateOrder commits precisely the same rows checkout reserved, never re-deriving "an" item for the product. */
+export interface CheckoutSnapshotItem {
+  productId: string;
+  slug: string;
+  name: string;
+  categorySlug: string;
+  variantId: string | null;
+  variantLabel: string | null;
+  price: number;
+  quantity: number;
+  inventoryItemId: string;
+  reservationId: string;
+}
+
+/**
+ * Everything PaymentsService.confirmAndCreateOrder needs to create the real
+ * Order row once a Payment is confirmed — computed once at checkout time
+ * (prices, coupon, shipping, the pre-generated order id/courier/tracking
+ * number, address snapshots) and persisted verbatim on
+ * Payment.checkoutSnapshot until confirmation reads it back. See that
+ * field's own schema.prisma comment for why this exists at all: Phase 2
+ * moves Order creation to AFTER payment confirms, so nothing about the
+ * order can be computed fresh at confirmation time — cart contents, prices,
+ * and address selections a customer made at checkout could all have
+ * changed by then.
+ */
+export interface CheckoutSnapshot {
+  orderId: string;
+  courierId: CourierIdDb;
+  trackingNumber: string;
+  subtotal: number;
+  discount: number;
+  couponCode: string | null;
+  shippingCost: number;
+  tax: number;
+  total: number;
+  estimatedDelivery: string;
+  deliveryMethod: DeliveryMethodType;
+  customerNotes: string | null;
+  shippingAddressSnapshot: AddressSnapshot;
+  billingAddressSnapshot: AddressSnapshot;
+  items: CheckoutSnapshotItem[];
 }

@@ -6,33 +6,53 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { Payment, PaymentMethodType, PaymentStatus } from '@prisma/client';
+import type {
+  Payment,
+  PaymentMethodType,
+  PaymentStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { RazorpayProvider } from './providers/razorpay.provider';
 import { PAYMENT_EVENTS } from './payments.events';
+import { toPublicOrder } from '../orders/order.types';
+import type { CheckoutSnapshot } from '../orders/order.types';
+import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
 
 /**
- * How long a gateway payment stays retryable before this system gives up
- * on it. Deliberately shorter than Razorpay's own ~15-minute order
- * expiry (checkout.js itself won't let a customer pay against a
- * sufficiently stale order) so our own cleanup runs first and is the one
- * that actually cancels the order and restores stock — see
- * expireStalePayments below and jobs/expire-stale-payments.processor.ts,
- * which schedules it.
+ * How long a gateway payment stays retryable, and how long its stock
+ * reservation stays held, before this system gives up on it. The SAME
+ * value is deliberately used as the StockReservation TTL for every
+ * PAYMENT-referenced reservation (see OrdersService.checkout) — if the two
+ * timers ran independently, InventoryService.releaseExpiredReservations
+ * (which knows nothing about Payment state) could release a reservation
+ * out from under a payment that's still legitimately CREATED, or this
+ * sweep and that one could race each other for no reason. With one shared
+ * window, releaseExpiredReservations becomes a pure backstop (it still
+ * fires independently, e.g. for a payment that went FAILED and was never
+ * retried, since that sweep doesn't filter by Payment status at all) and
+ * expireStalePayments below is the primary, faster-reacting path for the
+ * common "customer abandoned a CREATED payment" case. Deliberately shorter
+ * than Razorpay's own ~15-minute order expiry (checkout.js itself won't
+ * let a customer pay against a sufficiently stale order) — wait, actually
+ * longer: 20 minutes gives real customers room to complete a UPI/net-
+ * banking flow without racing their own reservation.
  */
 export const PAYMENT_EXPIRY_MINUTES = 20;
 
 const COD_METHOD: PaymentMethodType = 'COD';
 
 export interface CreatePaymentInput {
-  orderId: string;
+  paymentId: string;
   userId: string;
   method: PaymentMethodType;
   amount: number;
   displayLabel: string;
+  idempotencyKey?: string;
+  checkoutSnapshot: CheckoutSnapshot;
 }
 
 export interface CreatePaymentResult {
@@ -45,6 +65,8 @@ export interface CreatePaymentResult {
     amount: number;
     currency: string;
   };
+  /** Only ever set for a payment that resolved synchronously at creation time (COD) — a gateway payment has no order yet, and verify()/the webhook is what eventually produces one. */
+  order?: ReturnType<typeof toPublicOrder> | null;
 }
 
 export interface VerifyPaymentInput {
@@ -57,17 +79,20 @@ export interface VerifyPaymentInput {
  * Replaces the old Math.random()-decline simulation entirely — every
  * method below either talks to Razorpay for real (via RazorpayProvider)
  * or, for COD, models a real payment lifecycle with no gateway round-trip
- * at all (see the class-level doc comment on why COD is still a genuine
- * Payment row, never silently marked paid — this project's own Phase-1
- * brief is explicit that COD orders must not be marked "paid").
+ * at all (COD is still a genuine Payment row, never silently marked paid
+ * — this project's Phase-1 brief was explicit that COD orders must not be
+ * marked "paid").
  *
- * Ownership of Order.status transitions caused by payment outcomes lives
- * here, not in OrdersService — checkout() creates the Order (in
- * PENDING_PAYMENT or PROCESSING, depending on method) and hands off to
- * this service for everything payment-shaped from that point on, the
- * same separation of concerns this codebase already uses elsewhere
- * (OrdersService orchestrates the order lifecycle, InventoryService owns
- * stock, CouponsService owns discount validation).
+ * Phase 2 moved Order creation itself into this service
+ * (confirmAndCreateOrder), out of OrdersService.checkout: an Order row
+ * only ever exists once payment has already resolved (captured, or COD's
+ * immediate confirmation), driven by Payment.checkoutSnapshot — the frozen
+ * record of everything OrdersService.checkout computed at cart time. See
+ * that field's schema.prisma comment and order.types.ts's CheckoutSnapshot
+ * for the full reasoning. This is what closes the "order created but
+ * payment never resolved" and "inventory decremented but no order exists"
+ * gaps Phase 1's decrement-then-create-order-then-pay ordering had no way
+ * to fully close.
  */
 @Injectable()
 export class PaymentsService {
@@ -96,7 +121,7 @@ export class PaymentsService {
   ): Promise<CreatePaymentResult> {
     const payment = await this.prisma.payment.create({
       data: {
-        orderId: input.orderId,
+        id: input.paymentId,
         userId: input.userId,
         provider: 'COD',
         method: input.method,
@@ -104,6 +129,9 @@ export class PaymentsService {
         amount: input.amount,
         currency: 'INR',
         displayLabel: input.displayLabel,
+        idempotencyKey: input.idempotencyKey ?? null,
+        checkoutSnapshot:
+          input.checkoutSnapshot as unknown as Prisma.InputJsonValue,
         attempts: {
           create: { status: 'COD_PENDING' },
         },
@@ -111,23 +139,16 @@ export class PaymentsService {
     });
 
     // COD has no async confirmation to wait for — the order is
-    // fulfillment-ready immediately. paymentTransactionId here is our own
-    // Payment.id (never a fabricated txn_ string like the old mock),
-    // since there is no gateway transaction id for COD to record.
-    await this.prisma.order.update({
-      where: { id: input.orderId },
-      data: {
-        status: 'PROCESSING',
-        paymentTransactionId: payment.id,
-        paymentDisplayLabel: input.displayLabel,
-      },
-    });
-    await this.clearCartFor(input.userId);
+    // fulfillment-ready immediately, so this is the one path where
+    // Payment creation and Order creation happen back-to-back in the
+    // same request rather than confirmation being a separate later call.
+    const order = await this.confirmAndCreateOrder(payment);
 
     return {
       paymentId: payment.id,
-      status: payment.status,
+      status: 'COD_PENDING',
       requiresGatewayCheckout: false,
+      order,
     };
   }
 
@@ -147,12 +168,12 @@ export class PaymentsService {
     const gatewayOrder = await this.razorpay.createOrder({
       amount: input.amount,
       currency: 'INR',
-      receipt: input.orderId,
+      receipt: input.paymentId,
     });
 
     const payment = await this.prisma.payment.create({
       data: {
-        orderId: input.orderId,
+        id: input.paymentId,
         userId: input.userId,
         provider: 'RAZORPAY',
         method: input.method,
@@ -161,6 +182,9 @@ export class PaymentsService {
         currency: 'INR',
         providerOrderId: gatewayOrder.providerOrderId,
         displayLabel: input.displayLabel,
+        idempotencyKey: input.idempotencyKey ?? null,
+        checkoutSnapshot:
+          input.checkoutSnapshot as unknown as Prisma.InputJsonValue,
         attempts: {
           create: { status: 'CREATED' },
         },
@@ -183,7 +207,7 @@ export class PaymentsService {
   /**
    * Called from the frontend's Razorpay Checkout.js success callback —
    * fast, gives the customer an immediate result. Deliberately NOT the
-   * only path that can capture a payment: verifyWebhookEvent below does
+   * only path that can capture a payment: handleWebhookEvent below does
    * the same underlying confirmCapture and is the authoritative source,
    * since a customer can close the tab after paying but before this
    * callback fires. Both paths converge on the same idempotent
@@ -194,7 +218,7 @@ export class PaymentsService {
     paymentId: string,
     userId: string,
     input: VerifyPaymentInput,
-  ): Promise<Payment> {
+  ): Promise<{ payment: Payment; order: ReturnType<typeof toPublicOrder> }> {
     const payment = await this.findOwnedOrThrow(paymentId, userId);
     if (payment.provider !== 'RAZORPAY') {
       throw new BadRequestException(
@@ -245,43 +269,180 @@ export class PaymentsService {
       throw new BadRequestException('Payment verification failed.');
     }
 
-    return this.confirmCapture(payment, input.providerPaymentId);
+    const captured = await this.confirmCapture(
+      payment,
+      input.providerPaymentId,
+    );
+    return captured;
   }
 
   /**
    * Idempotent by construction: re-applying this to an already-CAPTURED
-   * payment is a safe no-op, since both the client callback (verify) and
-   * the webhook can each reach here independently for the same real
-   * payment.
+   * payment is a safe no-op that just returns the existing order, since
+   * both the client callback (verify) and the webhook can each reach here
+   * independently for the same real payment.
+   *
+   * The CREATED/FAILED → CAPTURED transition itself is an atomic
+   * conditional update (`updateMany` with a `status` precondition), not a
+   * plain read-then-write — this is what makes it safe against
+   * expireStalePayments concurrently racing to expire the very same
+   * payment (see that method's doc comment and PAYMENT_EXPIRY_MINUTES's):
+   * exactly one of {CAPTURED, EXPIRED} can win for a given payment, never
+   * both, because Postgres serializes the two single-row UPDATE
+   * statements against each other regardless of which transaction reads
+   * first.
    */
   private async confirmCapture(
     payment: Payment,
     providerPaymentId: string,
-  ): Promise<Payment> {
-    if (payment.status === 'CAPTURED') return payment;
+  ): Promise<{ payment: Payment; order: ReturnType<typeof toPublicOrder> }> {
+    if (payment.status === 'CAPTURED') {
+      return { payment, order: await this.confirmAndCreateOrder(payment) };
+    }
 
-    const updated = await this.prisma.payment.update({
-      where: { id: payment.id },
+    const { count } = await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: { notIn: ['CAPTURED', 'EXPIRED'] } },
       data: { status: 'CAPTURED', providerPaymentId },
     });
-    await this.recordAttempt(payment.id, 'CAPTURED', { providerPaymentId });
-    await this.prisma.order.update({
-      where: { id: payment.orderId },
-      data: {
-        status: 'PROCESSING',
-        paymentTransactionId: providerPaymentId,
-        paymentDisplayLabel: payment.displayLabel,
-      },
-    });
-    await this.clearCartFor(payment.userId);
 
+    const current = await this.prisma.payment.findUniqueOrThrow({
+      where: { id: payment.id },
+    });
+
+    if (count === 0) {
+      if (current.status === 'CAPTURED') {
+        return {
+          payment: current,
+          order: await this.confirmAndCreateOrder(current),
+        };
+      }
+      // Lost the race to expireStalePayments: Razorpay says captured, but
+      // this system had already given up on the reservation and it may
+      // have gone to someone else. Rare by design (the reservation TTL
+      // and PAYMENT_EXPIRY_MINUTES share the same window), but a real gap
+      // this system surfaces loudly rather than silently creating an
+      // order against stock that might no longer be held.
+      this.logger.error(
+        `Payment ${payment.id} was captured by Razorpay after this system had already marked it ${current.status} — needs manual reconciliation/refund.`,
+      );
+      throw new BadRequestException(
+        'This payment window had already expired when your payment completed. Please contact support — your payment may need to be refunded.',
+      );
+    }
+
+    await this.recordAttempt(payment.id, 'CAPTURED', { providerPaymentId });
+
+    const order = await this.confirmAndCreateOrder(current);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
     this.eventEmitter.emit(PAYMENT_EVENTS.CAPTURED, {
-      orderId: payment.orderId,
-      userId: payment.userId,
-      paymentId: payment.id,
+      orderId: order.id,
+      userId: current.userId,
+      paymentId: current.id,
     });
-    return updated;
+    return { payment: current, order };
+  }
+
+  /**
+   * The real order-creation step: commits every reservation
+   * Payment.checkoutSnapshot recorded and creates the Order row from that
+   * frozen snapshot, all inside one transaction alongside setting
+   * Payment.orderId — see InventoryService.commitReservation's doc
+   * comment for exactly why sharing one transaction (rather than each
+   * step committing independently) is what prevents an
+   * inventory-decremented-but-order-missing state. Idempotent: if
+   * payment.orderId is already set, this payment already produced its
+   * order (a prior call, possibly from the other of verify()/webhook, or
+   * a retried COD confirmation), and this is a safe no-op that returns
+   * the existing order rather than creating a second one.
+   *
+   * Also the one place ANALYTICS_EVENTS.ORDER_CREATED is emitted (Phase 1
+   * emitted it from OrdersController.checkout() instead, unconditionally
+   * — wrong once order creation became asynchronous for gateway methods):
+   * emitting only on the genuine-creation branch below, never on the
+   * idempotent-replay early return above, is what keeps the "Order
+   * Placed" notification and analytics log firing exactly once per real
+   * order, regardless of whether COD, verify(), or the webhook is what
+   * actually produced it.
+   */
+  private async confirmAndCreateOrder(
+    payment: Payment,
+  ): Promise<ReturnType<typeof toPublicOrder>> {
+    if (payment.orderId) {
+      const existing = await this.prisma.order.findUniqueOrThrow({
+        where: { id: payment.orderId },
+        include: { items: true },
+      });
+      return toPublicOrder(existing as never);
+    }
+
+    const snapshot = payment.checkoutSnapshot as unknown as CheckoutSnapshot;
+    if (!snapshot) {
+      throw new BadRequestException(
+        'This payment has no checkout details recorded and cannot be confirmed.',
+      );
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      for (const line of snapshot.items) {
+        await this.inventoryService.commitReservation(line.reservationId, tx);
+      }
+
+      const order = await tx.order.create({
+        data: {
+          id: snapshot.orderId,
+          userId: payment.userId,
+          subtotal: snapshot.subtotal,
+          discount: snapshot.discount,
+          couponCode: snapshot.couponCode ?? undefined,
+          shippingCost: snapshot.shippingCost,
+          tax: snapshot.tax,
+          total: snapshot.total,
+          shippingAddressSnapshot:
+            snapshot.shippingAddressSnapshot as unknown as Prisma.InputJsonValue,
+          billingAddressSnapshot:
+            snapshot.billingAddressSnapshot as unknown as Prisma.InputJsonValue,
+          deliveryMethod: snapshot.deliveryMethod,
+          estimatedDelivery: snapshot.estimatedDelivery,
+          status: 'PROCESSING',
+          paymentMethod: payment.method,
+          paymentDisplayLabel: payment.displayLabel ?? payment.method,
+          paymentTransactionId: payment.providerPaymentId ?? payment.id,
+          courierId: snapshot.courierId,
+          trackingNumber: snapshot.trackingNumber,
+          customerNotes: snapshot.customerNotes ?? undefined,
+          items: {
+            create: snapshot.items.map((item) => ({
+              productId: item.productId,
+              slug: item.slug,
+              name: item.name,
+              categorySlug: item.categorySlug,
+              variantId: item.variantId,
+              variantLabel: item.variantLabel,
+              price: item.price,
+              quantity: item.quantity,
+              inventoryItemId: item.inventoryItemId,
+            })),
+          },
+        },
+        include: { items: true },
+      });
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { orderId: order.id },
+      });
+
+      return order;
+    });
+
+    await this.clearCartFor(payment.userId);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+    this.eventEmitter.emit(ANALYTICS_EVENTS.ORDER_CREATED, {
+      orderId: created.id,
+      userId: payment.userId,
+      total: Number(created.total),
+    });
+    return toPublicOrder(created as never);
   }
 
   private async markFailed(
@@ -290,20 +451,20 @@ export class PaymentsService {
     errorDescription?: string,
   ): Promise<void> {
     if (payment.status === 'CAPTURED') return; // never downgrade a real success
-    await this.prisma.payment.update({
-      where: { id: payment.id },
+    await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: { notIn: ['CAPTURED', 'EXPIRED'] } },
       data: { status: 'FAILED' },
     });
     await this.recordAttempt(payment.id, 'FAILED', {
       errorCode,
       errorDescription,
     });
-    // Order deliberately stays in PENDING_PAYMENT, not moved to
-    // CANCELLED — a failed attempt is retryable (see retry() below); only
-    // an explicit cancellation or the expiry sweep ends the order.
+    // The reservation stays held (not released here) — a failed/declined
+    // attempt is retryable against the SAME reservation (see retry()
+    // below), only an explicit expiry (expireStalePayments) or its
+    // TTL backstop (InventoryService.releaseExpiredReservations) frees it.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     this.eventEmitter.emit(PAYMENT_EVENTS.FAILED, {
-      orderId: payment.orderId,
       userId: payment.userId,
       paymentId: payment.id,
       errorDescription,
@@ -311,21 +472,23 @@ export class PaymentsService {
   }
 
   /**
-   * Lets a customer try a fresh Razorpay order against the same Folia
-   * order after a decline/expiry — Payment stays the same row (1:1 with
-   * Order) rather than creating a second Payment, since "the payment for
-   * this order" is a single evolving record, and PaymentAttempt already
-   * carries the per-try history.
+   * Lets a customer try a fresh Razorpay order after a decline/expiry —
+   * keyed by paymentId now (Phase 2), not orderId, since an unconfirmed
+   * payment has no order yet to key off of. Payment stays the same row
+   * (its checkoutSnapshot/reservations are untouched) rather than creating
+   * a second Payment, since "the payment for this checkout attempt" is a
+   * single evolving record, and PaymentAttempt already carries the
+   * per-try history.
    */
-  async retry(orderId: string, userId: string): Promise<CreatePaymentResult> {
-    const payment = await this.prisma.payment.findUnique({
-      where: { orderId },
-    });
-    if (!payment || payment.userId !== userId) {
-      throw new NotFoundException('Payment not found.');
-    }
+  async retry(paymentId: string, userId: string): Promise<CreatePaymentResult> {
+    const payment = await this.findOwnedOrThrow(paymentId, userId);
     if (payment.status === 'CAPTURED') {
       throw new BadRequestException('This order has already been paid for.');
+    }
+    if (payment.status === 'EXPIRED') {
+      throw new BadRequestException(
+        'This payment has expired. Please start checkout again.',
+      );
     }
     if (payment.provider !== 'RAZORPAY') {
       throw new BadRequestException(
@@ -336,7 +499,7 @@ export class PaymentsService {
     const gatewayOrder = await this.razorpay.createOrder({
       amount: Number(payment.amount),
       currency: payment.currency,
-      receipt: orderId,
+      receipt: payment.id,
     });
     await this.prisma.payment.update({
       where: { id: payment.id },
@@ -494,83 +657,70 @@ export class PaymentsService {
   }
 
   /**
-   * Closes the real gap Phase 1 introduced by making payment
-   * asynchronous: an order that decremented real stock at checkout but
-   * whose customer never completed (or abandoned) payment would
-   * otherwise sit in PENDING_PAYMENT forever, with that stock gone for
-   * good. Scheduled by jobs/expire-stale-payments.processor.ts, same
-   * pattern as the existing release-expired-reservations job. Restoring
-   * stock to the exact InventoryItem each line was decremented from
-   * (via OrderItem.inventoryItemId — see InventoryService.decrementForProduct's
-   * doc comment) rather than "a" matching item is what makes this
-   * correct across multiple warehouses, not just approximately right.
+   * Closes the gap of a customer who reserved stock at checkout but never
+   * completed (or abandoned) payment: without this, a CREATED payment
+   * would sit forever and — pre-Phase-2, when checkout decremented real
+   * stock up front — that stock would be gone for good. Now (Phase 2)
+   * nothing has actually been decremented yet at this point, only
+   * reserved, so the fix is simpler: mark the payment EXPIRED and release
+   * its reservations back to available stock.
    *
-   * Deliberately narrow in scope for Phase 1: this is a safety-net sweep
-   * for the current one-decrement-per-line checkout path, not the real
-   * fix — Phase 2 (inventory concurrency + atomic checkout) replaces the
-   * decrement-then-hope-it-pays-off pattern with reserve-before-pay
-   * entirely, at which point stale reservations already expire via the
-   * existing release-expired-reservations job and this method's job
-   * shrinks to just marking Payment/Order state, no stock math.
+   * The CREATED → EXPIRED transition is an atomic conditional update, not
+   * a plain read-then-write, for the same reason confirmCapture's
+   * transition is: it's what guarantees this sweep and a
+   * verify()/webhook-driven capture can never both "win" for the same
+   * payment. `updated === 0` means some concurrent call already moved
+   * this payment off CREATED (most likely: it just got captured) — this
+   * sweep backs off entirely rather than releasing reservations out from
+   * under a payment that turned out to be a real, paid order.
+   *
+   * Deliberately does NOT touch payments in any other non-terminal status
+   * (e.g. FAILED-and-abandoned) — releaseExpiredReservations already
+   * covers those via the reservation's own TTL (see
+   * PAYMENT_EXPIRY_MINUTES's doc comment for why the two windows are kept
+   * equal), which doesn't care what state the Payment is in.
    */
   async expireStalePayments(): Promise<number> {
     const cutoff = new Date(Date.now() - PAYMENT_EXPIRY_MINUTES * 60 * 1000);
     const stale = await this.prisma.payment.findMany({
       where: { status: 'CREATED', createdAt: { lt: cutoff } },
-      include: { order: { include: { items: true } } },
     });
 
     let count = 0;
     for (const payment of stale) {
-      if (payment.order.status !== 'PENDING_PAYMENT') continue; // already resolved by a race with verify()/webhook — leave it alone
-
-      await this.prisma.payment.update({
-        where: { id: payment.id },
+      const { count: updated } = await this.prisma.payment.updateMany({
+        where: { id: payment.id, status: 'CREATED' },
         data: { status: 'EXPIRED' },
       });
+      if (updated === 0) continue; // lost the race to a concurrent capture — leave it alone, it's now a real order
+
       await this.recordAttempt(payment.id, 'EXPIRED', {
         errorDescription: `No payment completed within ${PAYMENT_EXPIRY_MINUTES} minutes`,
       });
-      await this.prisma.order.update({
-        where: { id: payment.orderId },
-        data: { status: 'CANCELLED' },
-      });
-      for (const item of payment.order.items) {
-        if (item.inventoryItemId) {
-          await this.inventoryService.restoreQuantity(
-            item.inventoryItemId,
-            item.quantity,
-          );
+
+      const snapshot =
+        payment.checkoutSnapshot as unknown as CheckoutSnapshot | null;
+      if (snapshot) {
+        for (const item of snapshot.items) {
+          try {
+            await this.inventoryService.releaseReservation(item.reservationId);
+          } catch (err) {
+            // Already released/committed by another path (e.g. the
+            // generic reservation-TTL sweep got there first) — a benign
+            // race, not a failure, since the end state (reservation no
+            // longer holding stock for this payment) is the same either way.
+            this.logger.warn(
+              `Could not release reservation ${item.reservationId} for expired payment ${payment.id}: ${(err as Error).message}`,
+            );
+          }
         }
       }
       count++;
     }
     if (count > 0) {
-      this.logger.log(`Expired ${count} stale pending-payment order(s)`);
+      this.logger.log(`Expired ${count} stale payment(s)`);
     }
     return count;
-  }
-
-  /**
-   * Closes out a Payment whose order was cancelled before payment ever
-   * completed (OrdersService.requestCancellation, PENDING_PAYMENT case) —
-   * same terminal state as expireStalePayments, different trigger
-   * (explicit customer action vs. a timeout sweep). A no-op if the
-   * payment already resolved (CAPTURED) by the time this runs, since a
-   * captured payment can no longer be "never paid for."
-   */
-  async cancelForOrder(orderId: string): Promise<void> {
-    const payment = await this.prisma.payment.findUnique({
-      where: { orderId },
-    });
-    if (!payment || payment.status === 'CAPTURED') return;
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: 'EXPIRED' },
-    });
-    await this.recordAttempt(payment.id, 'EXPIRED', {
-      errorDescription: 'Order cancelled before payment completed',
-    });
   }
 
   async findOwnedOrThrow(paymentId: string, userId: string): Promise<Payment> {

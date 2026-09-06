@@ -41,16 +41,13 @@ export class PaymentsController {
   }
 
   @ApiBearerAuth()
-  @Post('orders/:orderId/retry')
+  @Post(':id/retry')
   @ApiOperation({
     summary:
-      'Opens a fresh Razorpay order against an existing Folia order after a decline or expiry — same order, new payment attempt.',
+      "Opens a fresh Razorpay order against an existing, not-yet-captured Payment after a decline or expiry — same reservation, new payment attempt. Keyed by paymentId, not orderId: an unconfirmed payment has no order yet (see PaymentsService's class doc comment).",
   })
-  retry(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('orderId') orderId: string,
-  ) {
-    return this.paymentsService.retry(orderId, user.id);
+  retry(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.paymentsService.retry(id, user.id);
   }
 
   @ApiBearerAuth()

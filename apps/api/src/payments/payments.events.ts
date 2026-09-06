@@ -10,8 +10,12 @@ export interface PaymentCapturedPayload {
   paymentId: string;
 }
 
+/**
+ * No orderId (Phase 2): a failed/declined attempt never got as far as
+ * creating an Order — confirmAndCreateOrder only ever runs once a payment
+ * is actually CAPTURED — so there is no order to reference here.
+ */
 export interface PaymentFailedPayload {
-  orderId: string;
   userId: string;
   paymentId: string;
   errorDescription?: string;

@@ -15,7 +15,6 @@ import { CancelOrderDto } from './dto/cancel-order.dto';
 import { ReturnOrderDto } from './dto/return-order.dto';
 import { UpdateNotesDto } from './dto/update-notes.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { AuthenticatedUser } from '../users/user.types';
 
@@ -33,29 +32,23 @@ export class OrdersController {
     summary:
       "Submits the caller's current cart as a real order — computes tax/discount/total, processes payment, decrements inventory, clears the cart.",
   })
+  /**
+   * No ANALYTICS_EVENTS.ORDER_CREATED emission here (Phase 1 had one,
+   * unconditionally, right after this call): Phase 2 only ever creates an
+   * Order once payment is confirmed, which for a gateway method hasn't
+   * happened yet by the time this returns — see
+   * PaymentsService.confirmAndCreateOrder, the one place an Order row is
+   * actually created (whether via COD's immediate synchronous path, a
+   * client verify() callback, or the authoritative webhook), which is
+   * where that event is emitted now so it fires exactly once per real
+   * order regardless of which of those three paths produced it.
+   */
   async checkout(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CheckoutDto,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
-    const order = await this.ordersService.checkout(
-      user.id,
-      dto,
-      idempotencyKey,
-    );
-
-    if (!order.isIdempotentReplay) {
-      // Known eventemitter2 package type-resolution quirk (tsc has zero
-      // complaints here) — see products.controller.ts's findBySlug for the
-      // full explanation, not repeated at every call site.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      this.eventEmitter.emit(ANALYTICS_EVENTS.ORDER_CREATED, {
-        orderId: order.id,
-        userId: user.id,
-        total: order.total,
-      });
-    }
-    return order;
+    return this.ordersService.checkout(user.id, dto, idempotencyKey);
   }
 
   @Get('orders')
