@@ -24,12 +24,19 @@ tracks status at a glance and layers in what that document doesn't cover
 
 ## Known-mocked flows with security-relevant consequences
 
-- **Payment status is never independently verified against a real provider**,
-  because there is no real provider yet (Phase 1). Once one exists, the
-  server must treat frontend-reported payment status, amount, and transaction
-  ID as untrusted, verifying independently via the provider's API/webhook —
-  called out explicitly so Phase 1 doesn't repeat the "trust the client"
-  mistake even accidentally.
+- **Payment status independent verification (Phase 1/2 update):** implemented
+  as designed — `PaymentsService.verify()` never trusts the client's claimed
+  status or amount; it independently re-fetches the payment from Razorpay and
+  rejects on any mismatch, and the webhook (`handleWebhookEvent()`) is the
+  authoritative path regardless of whether the client ever calls `verify()`
+  at all. This is unit-tested (signature-invalid, amount-mismatch, and
+  not-actually-captured cases all rejected) but **not yet exercised against a
+  real Razorpay payment** — no sandbox credentials are configured in this
+  environment (see `API_INTEGRATION_STATUS.md`). Webhook signature
+  verification is real (HMAC-SHA256 over the raw request body via
+  `Razorpay.validateWebhookSignature`), and webhook idempotency is enforced
+  at the database level (`providerEventId` unique constraint), not an
+  in-memory guard.
 - **Password-reset tokens are returned directly in the API response body**
   outside production (`devToken` pattern) because no email provider exists.
   This is gated behind `isProduction` today and is not itself exploitable in
@@ -41,7 +48,8 @@ tracks status at a glance and layers in what that document doesn't cover
 ## Not yet assessed in this pass (deferred to Phase 9)
 
 XSS surface review, IDOR sweep beyond the one documented fix in
-`apps/api/SECURITY.md`, mass-assignment review of every DTO, webhook signature
-verification (no webhooks exist yet — see `API_INTEGRATION_STATUS.md`), and a
-live cookie-flag inspection over real HTTPS. Phase 9 is where these get a
+`apps/api/SECURITY.md`, mass-assignment review of every DTO, and a
+live cookie-flag inspection over real HTTPS. (Webhook signature verification
+now exists — Phase 1 — and is unit-tested; see the payments entry above.)
+Phase 9 is where these get a
 dedicated pass; Phase 0 only inventories what's already known.

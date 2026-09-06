@@ -1,7 +1,8 @@
 # Folia — Production Status
 
 **Baseline established:** 2026-09-06 · Phase 0
-**Rollback checkpoint:** `b617b9a` (origin/main, clean working tree at time of baseline)
+**Last updated:** 2026-09-06 · after Phase 2 gate passed
+**Rollback checkpoint (Phase 0 baseline):** `b617b9a` (origin/main, clean working tree at time of baseline)
 
 This document is the single source of truth for "does it actually work right now."
 It is regenerated at the end of every phase in `PRODUCTION_ROADMAP.md`. Nothing in
@@ -14,11 +15,32 @@ out not to exist).
 
 | Workspace | Build | Typecheck | Lint | Test |
 |---|---|---|---|---|
-| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`) | ✅ 375/375 pass (unit, mocked Prisma) |
-| `apps/api` (e2e) | — | — | — | ❌ **FAIL** — config bug, not an environment limitation (see below) |
-| `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** |
+| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`), unchanged since Phase 0, not touched by Phases 1/2 | ✅ 422/422 pass (unit, mocked Prisma; up from 375 at Phase 0 — Phases 1/2 added payments, inventory-locking, and checkout-flow tests) |
+| `apps/api` (e2e) | — | — | — | ❌ **FAIL** — same Jest config bug as Phase 0, still not fixed (out of scope for Phases 1/2) |
+| `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged since Phase 0) |
 | `packages/*` | n/a | ⚠️ only `shared-types` has a `typecheck` script; `api-client`/`shared-utils` have none | — | — |
 | root (`turbo run *`) | ❌ **FAILS TO RESOLVE** — root `package.json` has no `packageManager` field, so Turbo can't resolve the workspace at all | — | — | — |
+
+## Phase 1 (Payments) + Phase 2 (Inventory concurrency) — what changed
+
+Both gates passed — see `PRODUCTION_ROADMAP.md` for the full gate reports. Net
+effect on the "does it actually work" picture below:
+
+- **Payments**: no longer mocked. Real Razorpay Orders/verification/webhook/
+  refund integration exists and is unit-tested plus live-verified for COD and
+  for the "gateway not configured" failure path. **The real gateway success
+  path (an actual captured charge) has never been exercised** — no sandbox
+  Razorpay credentials exist in this environment. Do not read "Razorpay
+  integration exists" as "payments are proven to work end-to-end" — see
+  `API_INTEGRATION_STATUS.md`.
+- **Inventory concurrency**: the race condition called out below as a known
+  gap is **fixed**. `InventoryService` now uses real `SELECT ... FOR UPDATE`
+  row locking, proven live against real Postgres: two concurrent checkouts for
+  a single last-unit-in-stock item resolve to exactly one order, not two.
+- **Checkout is now atomic by construction**: an `Order` row only ever exists
+  once payment has actually resolved (reserve → pay → confirm → commit →
+  create order → clear cart), closing the "stock gone, no order" and "order
+  exists, never paid" gaps the original Phase 0 audit flagged.
 
 ### New findings this session (not in the prior audit)
 
@@ -29,8 +51,8 @@ out not to exist).
 
 ### Carried forward from the pre-Phase-0 audit (full detail: see the published Folia Readiness Audit artifact from this session)
 
-- Payments, shipping, tracking, delivery-availability: **mocked**, by explicit design, both frontend and backend.
-- Inventory: real schema, but checkout's actual decrement path has a confirmed, code-acknowledged race condition (no row lock / optimistic concurrency).
+- Payments: **no longer mocked as of Phase 1** — real Razorpay integration exists; see the Phase 1/2 summary above and `API_INTEGRATION_STATUS.md` for exactly what is and isn't live-verified. Shipping, tracking, delivery-availability remain **mocked**, by explicit design, both frontend and backend (Phase 5).
+- Inventory: **the race condition is fixed as of Phase 2** — real `SELECT ... FOR UPDATE` row locking, live-proven against concurrent checkouts. See the Phase 1/2 summary above.
 - Admin frontend: fully disconnected from the real, RBAC-guarded admin API — reads a client-side mock baseline instead.
 - Notifications: real in-app records, zero outbound delivery channel (no email/SMS provider anywhere).
 - Reviews: read-only API, no submission endpoint, all seed data.
@@ -40,14 +62,17 @@ out not to exist).
 - Zero product photography anywhere in the frontend.
 - India-market shape is wrong throughout: USD currency, mock GSTIN, flat non-slab tax rate, US ZIP validation instead of Indian PIN codes.
 
-## Live deployment state (as of this baseline)
+## Live deployment state
 
 - Frontend: `https://web-drab-mu-24.vercel.app` (Vercel, Hobby/free)
 - API: `https://folia-api.onrender.com` (Render, free web service + free Postgres 16 + free Key-Value/Redis)
-- `GET /api/health/ready` → `{"status":"ok","info":{"database":{"status":"up"},"redis":{"status":"up"}}}` (confirmed live)
+- `GET /api/health/ready` → `{"status":"ok","info":{"database":{"status":"up"},"redis":{"status":"up"}}}` (confirmed live after Phase 1/2 merged to `main`)
+- Confirmed the live deployment is actually running Phase 2's code, not stale: the old `POST /payments/orders/:orderId/retry` route returns 404 (removed in Phase 2) and the new `POST /payments/:id/retry` route returns 401 (exists, requires auth) — and since the container's own startup command is `prisma migrate deploy && node dist/main.js` (see `apps/api/Dockerfile`), a healthy DB connection here means the Phase 2 migration applied cleanly against the live production database too, not just the local dev one.
 - Free Postgres created ~2026-09-03, auto-deletes ~2026-10-03 without a plan upgrade.
+- **Razorpay keys are NOT set on the live Render service** (`render.yaml` declares them `sync: false`, prompted-for in the dashboard, never committed) — real card/UPI/net-banking/wallet checkout will fail loudly with "not available right now" on the live site until the business owner adds real keys there. COD works end-to-end live.
 
 ## Git safety
 
-- Working tree was clean before this baseline; `docs/` additions are the only change this phase.
-- Rollback point: `b617b9a`.
+- Working tree was clean before the Phase 0 baseline; `docs/` additions were the only change that phase.
+- Phase 0 rollback point: `b617b9a`.
+- Current `main` after Phase 0 + Phase 1 + Phase 2 all merged: `4180b98`.

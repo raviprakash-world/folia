@@ -8,7 +8,7 @@ repo root for why that discipline is enforced here specifically.
 
 | Integration | Status | Account owner | Notes |
 |---|---|---|---|
-| Payment gateway (Razorpay candidate) | **NOT STARTED** | Business owner must create the account | No SDK, no keys, no code. Needed before Phase 1 can do anything beyond scaffolding. |
+| Payment gateway (Razorpay) | **CODE COMPLETE, NOT LIVE-VERIFIED** | Business owner must supply real sandbox keys | Real SDK integration (Orders API, signature verification, webhooks, refunds) built and unit-tested in Phases 1–2. **No real Razorpay sandbox credentials have ever been configured in this environment** — `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`/`RAZORPAY_WEBHOOK_SECRET` are unset both locally and on the live Render deployment (`render.yaml` declares them `sync: false`). Live-verified: COD end-to-end, and the "gateway not configured" failure path (real 400 response, reservation correctly released). **Not live-verified: an actual captured card/UPI/net-banking charge.** Do not upgrade this row to VERIFIED without running a real Checkout.js flow against real test keys. |
 | Courier / logistics (Shiprocket/Delhivery candidate) | **NOT STARTED** | Business owner must create the account | No SDK, no keys, no code. Needed before Phase 5. |
 | Transactional email (SendGrid/Postmark/SES candidate) | **NOT STARTED** | Business owner must create the account | No SDK, no keys, no code. Needed before Phase 3. |
 | SMS / WhatsApp | **NOT STARTED** | Business owner, if pursued | Explicitly optional for initial launch per the roadmap brief. |
@@ -27,6 +27,17 @@ successfully in this project (Vercel, Render, GitHub) applies again here: the
 owner creates the account and hands over **sandbox/test-mode** credentials;
 implementation and verification then proceed the same way DB credential
 rotation and the Render Blueprint deploy did earlier in this project's history.
+
+**Update (Phases 1–2):** the payments code itself was NOT left blocked on this —
+Phase 1 built the full Razorpay integration (real SDK, signature verification,
+webhooks, refunds) and Phase 2 rearchitected checkout around it, both without
+real credentials, by unit-testing every gateway-dependent path against a mocked
+provider client and live-verifying every path that doesn't require a real
+charge (COD, the "not configured" failure, concurrency, idempotency). This is a
+deliberate, honest middle ground: real, tested code exists and is genuinely
+ready to take a real charge, but "ready to verify" is not "verified" — the row
+above stays CODE COMPLETE, NOT LIVE-VERIFIED, not VERIFIED, until real sandbox
+keys are added and a real Checkout.js charge is actually captured.
 
 Nothing in Phases 1, 3, 5, or 7 should be marked VERIFIED — or even attempted
 beyond abstraction-layer scaffolding — without a real sandbox credential to test
