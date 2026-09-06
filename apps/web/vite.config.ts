@@ -160,6 +160,23 @@ export default defineConfig(({ mode }) => {
             },
           }
         : {}),
+      ...(env.VITE_REAL_ADMIN_API === 'true'
+        ? {
+            '/api/admin': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/admin/, '/api/v1/admin'),
+            },
+            // Same flag as /api/admin above — the admin dashboards and
+            // the admin management endpoints are one real feature from
+            // the frontend's point of view, never toggled independently.
+            '/api/analytics': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/analytics/, '/api/v1/analytics'),
+            },
+          }
+        : {}),
     },
   },
   build: {

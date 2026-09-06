@@ -14,7 +14,10 @@ function createDeps() {
       findMany: jest.fn().mockResolvedValue([]),
       groupBy: jest.fn().mockResolvedValue([]),
     },
+    orderItem: { groupBy: jest.fn().mockResolvedValue([]) },
+    product: { findMany: jest.fn().mockResolvedValue([]) },
     user: { count: jest.fn().mockResolvedValue(0) },
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
   const service = new AnalyticsService(prisma as never);
   return { prisma, service };
@@ -172,5 +175,79 @@ describe('AnalyticsService.getCustomerStats', () => {
     const { service } = createDeps();
     const result = await service.getCustomerStats();
     expect(result.repeatPurchaseRate).toBe(0);
+  });
+});
+
+describe('AnalyticsService.getDailyOrderMetrics', () => {
+  it('maps raw day-bucketed rows into date/orders/revenue, converting bigint and Decimal-as-text back to numbers', async () => {
+    const { prisma, service } = createDeps();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        day: new Date('2026-09-01T00:00:00Z'),
+        orderCount: 3n,
+        revenue: '150.50',
+      },
+      { day: new Date('2026-09-02T00:00:00Z'), orderCount: 0n, revenue: null },
+    ]);
+
+    const result = await service.getDailyOrderMetrics(30);
+
+    expect(result).toEqual([
+      { date: '2026-09-01', orders: 3, revenue: 150.5 },
+      { date: '2026-09-02', orders: 0, revenue: 0 },
+    ]);
+  });
+
+  it('queries against a cutoff derived from the requested day count', async () => {
+    const { prisma, service } = createDeps();
+    await service.getDailyOrderMetrics(7);
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+  });
+});
+
+describe('AnalyticsService.getTopSellingProducts', () => {
+  it('sorts descending for "best" and attaches real product names', async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderItem.groupBy.mockResolvedValue([
+      { productId: 'prod-1', _sum: { quantity: 42 } },
+      { productId: 'prod-2', _sum: { quantity: 10 } },
+    ]);
+    prisma.product.findMany.mockResolvedValue([
+      { id: 'prod-1', name: 'ZZ Plant' },
+      { id: 'prod-2', name: 'Pothos' },
+    ]);
+
+    const result = await service.getTopSellingProducts('best', 10);
+
+    expect(result).toEqual([
+      { productId: 'prod-1', name: 'ZZ Plant', unitsSold: 42 },
+      { productId: 'prod-2', name: 'Pothos', unitsSold: 10 },
+    ]);
+    expect(prisma.orderItem.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { _sum: { quantity: 'desc' } },
+      }),
+    );
+  });
+
+  it('sorts ascending for "worst"', async () => {
+    const { prisma, service } = createDeps();
+    await service.getTopSellingProducts('worst', 5);
+    expect(prisma.orderItem.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { _sum: { quantity: 'asc' } },
+      }),
+    );
+  });
+
+  it('falls back to the raw product id when a product has since been deleted', async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderItem.groupBy.mockResolvedValue([
+      { productId: 'prod-gone', _sum: { quantity: 5 } },
+    ]);
+    prisma.product.findMany.mockResolvedValue([]);
+
+    const result = await service.getTopSellingProducts('best', 10);
+    expect(result[0].name).toBe('prod-gone');
   });
 });

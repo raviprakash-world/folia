@@ -4,7 +4,7 @@ import { StatCard } from '@/components/admin/StatCard';
 import { MetricCard } from '@/components/admin/MetricCard';
 import { AreaChartWidget } from '@/components/admin/charts/AreaChartWidget';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
-import { useRevenueAnalytics, useOrdersAnalytics, useCustomerAnalytics, useSearchAnalytics } from '@/hooks/useAdminAnalytics';
+import { useRevenueAnalytics, useOrdersAnalytics, useCustomerAnalytics, useSearchAnalytics, useRealAdminApi } from '@/hooks/useAdminAnalytics';
 import { useOrderStore } from '@/store/orderStore';
 import { formatCurrency } from '@/utils/currency';
 
@@ -27,7 +27,11 @@ export default function AdminOverview() {
     <div>
       <PageHeader
         title="Dashboard Overview"
-        description="Baseline platform data (last 90 days, deterministic mock) combined with this session's real activity."
+        description={
+          useRealAdminApi
+            ? 'Live data from the store database.'
+            : "Baseline platform data (last 90 days, deterministic mock) combined with this session's real activity."
+        }
       />
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
@@ -56,7 +60,11 @@ export default function AdminOverview() {
       <div className="grid sm:grid-cols-3 gap-4 mb-10">
         <StatCard label="Delivery rate" value={`${performance.deliveryRate}%`} Icon={Package} />
         <StatCard label="Return rate" value={`${performance.returnRate}%`} Icon={RotateCcw} />
-        <StatCard label="Search click-through" value={`${conversion.clickThroughRate}%`} Icon={Search} />
+        {useRealAdminApi ? (
+          <StatCard label="Repeat purchase rate" value={`${customers.repeatPurchaseRate}%`} Icon={Users} />
+        ) : (
+          <StatCard label="Search click-through" value={`${conversion.clickThroughRate}%`} Icon={Search} />
+        )}
       </div>
 
       <div>

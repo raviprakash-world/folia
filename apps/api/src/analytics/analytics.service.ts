@@ -161,4 +161,77 @@ export class AnalyticsService {
         customersWithOrders > 0 ? repeatCustomers / customersWithOrders : 0,
     };
   }
+
+  /**
+   * Real daily order counts + revenue from the Order table, bucketed by
+   * calendar day — the admin dashboard's revenue/orders charts (Phase 4).
+   * Raw SQL, not Prisma's query builder: grouping by a truncated date has
+   * no query-builder equivalent (`groupBy` can only group by an actual
+   * column), the same reasoning InventoryService's row-locking queries
+   * already established for this codebase. Table/column names are quoted
+   * verbatim to match what Prisma generated for this model (table
+   * "orders", camelCase columns, no per-field @map).
+   */
+  async getDailyOrderMetrics(
+    days = 30,
+  ): Promise<{ date: string; orders: number; revenue: number }[]> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.$queryRaw<
+      { day: Date; orderCount: bigint; revenue: string | null }[]
+    >`
+      SELECT
+        date_trunc('day', "createdAt") AS day,
+        COUNT(*)::bigint AS "orderCount",
+        SUM("total")::text AS revenue
+      FROM "orders"
+      WHERE "createdAt" >= ${since} AND "status" != 'CANCELLED'
+      GROUP BY day
+      ORDER BY day ASC
+    `;
+    return rows.map((row) => ({
+      date: row.day.toISOString().slice(0, 10),
+      orders: Number(row.orderCount),
+      revenue: row.revenue ? Number(row.revenue) : 0,
+    }));
+  }
+
+  /**
+   * Real top/bottom-selling products by actual units sold (OrderItem
+   * quantities), not view-event counts — a genuinely better "best
+   * sellers" signal than topProductsByEventType('PRODUCT_VIEW', ...)
+   * above, which only this method actually reflects real purchases.
+   * Known, stated limitation for the 'worst' direction: this can only
+   * rank products that have at least one real sale in the window — a
+   * product with zero sales simply has no OrderItem rows to group, so it
+   * never appears here at all (there's no way to distinguish "never
+   * ordered" from "not in this result page" from this query alone). A
+   * true "products with zero sales" view would need a second query
+   * (all products minus this result set) — out of scope for what this
+   * phase actually needed.
+   */
+  async getTopSellingProducts(
+    direction: 'best' | 'worst' = 'best',
+    limit = 10,
+  ): Promise<{ productId: string; name: string; unitsSold: number }[]> {
+    const grouped = await this.prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: { order: { status: { notIn: ['CANCELLED'] } } },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: direction === 'best' ? 'desc' : 'asc' } },
+      take: limit,
+    });
+
+    const productIds = grouped.map((g) => g.productId);
+    const products = (await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true },
+    })) as { id: string; name: string }[];
+    const nameById = new Map(products.map((p) => [p.id, p.name]));
+
+    return grouped.map((g) => ({
+      productId: g.productId,
+      name: nameById.get(g.productId) ?? g.productId,
+      unitsSold: g._sum.quantity ?? 0,
+    }));
+  }
 }

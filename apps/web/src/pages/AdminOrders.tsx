@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ShoppingBag, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/admin/StatCard';
@@ -6,7 +7,20 @@ import { BarChartWidget } from '@/components/admin/charts/BarChartWidget';
 import { PieChartWidget } from '@/components/admin/charts/PieChartWidget';
 import { DateRangeFilter } from '@/components/admin/DateRangeFilter';
 import { ExportButton } from '@/components/admin/ExportButton';
-import { useOrdersAnalytics } from '@/hooks/useAdminAnalytics';
+import { TableWidget } from '@/components/admin/TableWidget';
+import { useOrdersAnalytics, useRealAdminApi } from '@/hooks/useAdminAnalytics';
+import { fetchAdminOrders, updateAdminOrderStatus } from '@/services/adminApiService';
+import { formatCurrency } from '@/utils/currency';
+import type { Order, OrderStatus } from '@/types/order';
+
+/** Forward fulfillment steps only — matches the backend's own canTransitionStatus, which deliberately excludes cancel/return (those stay customer-initiated). */
+const nextForwardStatus: Partial<Record<OrderStatus, Extract<OrderStatus, 'confirmed' | 'shipped' | 'delivered'>>> = {
+  processing: 'confirmed',
+  confirmed: 'shipped',
+  shipped: 'delivered',
+};
+
+const ORDERS_QUERY_KEY = ['admin-orders-list'];
 
 const statusColorVar: Record<string, string> = {
   delivered: 'var(--color-fern)',
@@ -21,6 +35,18 @@ const statusColorVar: Record<string, string> = {
 export default function AdminOrders() {
   const [windowDays, setWindowDays] = useState(90);
   const { perDay, byStatus, performance } = useOrdersAnalytics(30, windowDays);
+  const queryClient = useQueryClient();
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ORDERS_QUERY_KEY,
+    queryFn: () => fetchAdminOrders(),
+    enabled: useRealAdminApi,
+  });
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Extract<OrderStatus, 'confirmed' | 'shipped' | 'delivered'> }) =>
+      updateAdminOrderStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY }),
+  });
 
   const pieData = byStatus.map((s) => ({
     name: s.status,
@@ -62,6 +88,46 @@ export default function AdminOrders() {
           />
         </div>
       </div>
+
+      {useRealAdminApi ? (
+        <div className="mt-10">
+          <h2 className="font-display text-lg font-semibold text-heading mb-4">Manage orders</h2>
+          <TableWidget
+            caption="Every order with a fulfillment action"
+            emptyMessage="No orders yet."
+            rows={orders}
+            keyExtractor={(o: Order) => o.id}
+            columns={[
+              { key: 'id', label: 'Order', render: (o: Order) => o.id },
+              { key: 'customer', label: 'Customer', render: (o: Order) => o.shippingAddress.fullName },
+              { key: 'status', label: 'Status', render: (o: Order) => o.status },
+              { key: 'total', label: 'Total', align: 'right', render: (o: Order) => formatCurrency(o.total) },
+              {
+                key: 'action',
+                label: 'Action',
+                render: (o: Order) => {
+                  const next = nextForwardStatus[o.status];
+                  if (!next) return <span className="text-ink-soft text-xs">—</span>;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => statusMutation.mutate({ id: o.id, status: next })}
+                      disabled={statusMutation.isPending}
+                      className="text-xs px-2.5 py-1 rounded-full border border-stone-dark hover:border-fern disabled:opacity-50 capitalize"
+                    >
+                      Mark {next}
+                    </button>
+                  );
+                },
+              },
+            ]}
+          />
+        </div>
+      ) : (
+        <p className="mt-10 text-sm text-ink-soft">
+          Order management actions require the real backend (set <code>VITE_REAL_ADMIN_API=true</code>).
+        </p>
+      )}
     </div>
   );
 }

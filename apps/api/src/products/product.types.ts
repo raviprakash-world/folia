@@ -142,6 +142,7 @@ export function toPublicProduct(product: ProductRecord) {
 /** Matches apps/web/src/types/product.ts's Category shape exactly (used for both categories and collections). */
 export function toPublicCategory(category: CategoryRecord) {
   return {
+    id: category.id,
     slug: category.slug,
     name: category.name,
     description: category.description,
