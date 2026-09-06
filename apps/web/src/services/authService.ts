@@ -80,6 +80,14 @@ export async function resetPassword(token: string, password: string): Promise<vo
   }
 }
 
+export async function verifyEmail(token: string): Promise<void> {
+  try {
+    await apiClient.post('/auth/verify-email', { token });
+  } catch (error) {
+    throw new AuthError(extractApiErrorMessage(error, 'That verification link is invalid or has expired.'));
+  }
+}
+
 export async function changePassword(token: string, currentPassword: string, newPassword: string): Promise<void> {
   try {
     await apiClient.post(

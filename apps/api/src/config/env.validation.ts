@@ -101,6 +101,30 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   RAZORPAY_WEBHOOK_SECRET?: string;
+
+  /**
+   * Same optional-at-validation reasoning as the Razorpay keys above — an
+   * environment with no Resend key configured must still boot.
+   * ResendProvider fails loudly at the point of actual use instead. Unlike
+   * Razorpay, a missing email config is deliberately non-fatal even at
+   * the call site for most callers (AuthService/EmailEventListener log
+   * and continue rather than letting a down/unconfigured email provider
+   * break registration, checkout, or any other primary request flow —
+   * see those files' own comments for why).
+   */
+  @IsString()
+  @IsOptional()
+  RESEND_API_KEY?: string;
+
+  /** Resend's own shared sandbox address works with zero setup (no domain verification) but can only deliver to the Resend account's own verified email — real delivery to arbitrary customer inboxes needs a verified sending domain. See docs/API_INTEGRATION_STATUS.md. */
+  @IsString()
+  @IsOptional()
+  RESEND_FROM_EMAIL = 'Folia <onboarding@resend.dev>';
+
+  /** Absolute origin used to build links inside emails (reset-password, verify-email, order pages) — an email client has no notion of "relative to this site" the way an in-app link does. */
+  @IsString()
+  @IsOptional()
+  FRONTEND_URL = 'http://localhost:5173';
 }
 
 export function validate(config: Record<string, unknown>) {

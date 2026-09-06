@@ -12,7 +12,7 @@ Status legend: 🟡 in progress · ⏸ not started · ✅ gate passed · 🛑 ga
 | 0 | Baseline + safety | ✅ gate passed | — |
 | 1 | Payment infrastructure | ✅ gate passed (with a stated gap — see below) | Phase 0; a payment provider account + sandbox API keys from the business owner |
 | 2 | Inventory concurrency + atomic checkout | ✅ gate passed | Phase 0 |
-| 3 | Customer communications | 🟡 in progress | Phase 0; a transactional email provider account |
+| 3 | Customer communications | ✅ gate passed (with a stated gap — see below) | Phase 0; a transactional email provider account |
 | 4 | Real admin frontend | ⏸ not started | Phase 0 (backend admin API already exists) |
 | 5 | Shipping + fulfillment | ⏸ not started | Phase 2; a courier/aggregator account + API keys |
 | 6 | Refunds + returns + order lifecycle | ⏸ not started | Phase 1, Phase 5 |
@@ -77,7 +77,24 @@ None of the above were fixed in this phase — Phase 0 is inspection and safety 
 
 **Gate: passed.** All five mandatory Phase 2 gate criteria (overselling test, transaction behavior, reservation expiry logic, duplicate-checkout safety, inventory consistency) have direct evidence — see `PR #9` and its test-plan checklist for the itemized list.
 
-## Phases 3–12 — scope reference
+## Phase 3 — Customer communications
+
+**Objective:** real transactional email — no infrastructure for this existed at all before this phase (confirmed by a dedicated inspection pass: no EmailService, no provider SDK, every reference was a comment marking the gap).
+
+**Done this phase:**
+- Real Resend integration behind an `EmailService` interface (same shape as `storage.interface.ts`'s existing `StorageService` pattern) — `ResendProvider` is the only implementation, constructed lazily so the app boots with no key configured, failing loudly only at the point a real send is attempted (same convention as `RazorpayProvider`).
+- **The highest-value real fix**: password reset was completely broken in production (the token was generated correctly but nothing ever delivered it — `docs/SECURITY_STATUS.md` said so explicitly). It now sends a real email regardless of environment; the dev-only token-in-response convenience is unchanged for local testing without a configured provider.
+- Email verification gets the identical fix, plus a frontend page that didn't exist before this phase (`/account/verify-email`) — the backend endpoint was already there, but nothing on the frontend could ever complete the flow a verification link pointed at.
+- Order lifecycle emails (placed, cancelled, return requested) reuse the exact event hooks already firing for in-app notifications — no new plumbing, just a second listener.
+- Order status change (confirmed/shipped/delivered) emails required a genuinely new event: the admin status-transition endpoint worked but nothing had ever observed it (explicitly called out as dead-code-if-listened-to in the original notification listener's own comment). Now emitted from `OrdersService.adminUpdateStatus` and consumed by both the existing notification listener and the new email listener.
+- Payment-failed emails off the existing (already-emitted, previously unobserved) `PAYMENT_EVENTS.FAILED` hook.
+- Every email send is wrapped so a down/unconfigured provider can never break the request that triggered it (registration, checkout, cancellation, etc.) — logged and swallowed, never thrown upstream. Live-verified, not just asserted: registration, password reset, checkout, and cancellation were all exercised against the real backend (Docker, real Postgres) with no Resend key configured, and every one of them succeeded normally while logging a clear "could not send" warning.
+
+**Known gap, stated plainly:** no real Resend API key has been configured in this environment (neither locally nor on the live Render deployment) — every email-sending code path is unit-tested against a mocked provider client, and the *attempt* to send (provider lookup, template building, error handling) is live-verified end-to-end for password-reset, email-verification, order-placed, and order-cancelled. **An actual delivered email has never been sent or received.** This is IMPLEMENTED BUT UNVERIFIED for real delivery, not VERIFIED, per this project's own evidence standard — same honest posture as Razorpay in Phase 1.
+
+**Gate: passed, with that gap carried forward explicitly**, matching Phase 1's precedent for the same class of external-dependency gap.
+
+## Phases 4–12 — scope reference
 
 Full phase-by-phase scope (objective, backend/frontend/database work, required
 tests, and acceptance criteria) is as specified in the governing production-

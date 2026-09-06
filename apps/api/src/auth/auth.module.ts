@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module';
 import { RolesModule } from '../roles/roles.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { StorageModule } from '../storage/storage.module';
+import { EmailModule } from '../email/email.module';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/app-config.service';
 
@@ -20,6 +21,7 @@ import { AppConfigService } from '../config/app-config.service';
     RolesModule,
     SessionsModule,
     StorageModule,
+    EmailModule,
     JwtModule.registerAsync({
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => ({

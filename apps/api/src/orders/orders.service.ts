@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
@@ -33,6 +34,8 @@ import {
 } from './order.types';
 import { canCancelOrder, canReturnOrder } from './refund.util';
 import { canTransitionStatus } from './order-status.util';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
+import type { OrderStatusChangedPayload } from '../notifications/notification.events';
 import type { CheckoutDto } from './dto/checkout.dto';
 import type { CancelOrderDto } from './dto/cancel-order.dto';
 import type { ReturnOrderDto } from './dto/return-order.dto';
@@ -77,6 +80,7 @@ export class OrdersService {
     private readonly inventoryService: InventoryService,
     private readonly trackingService: TrackingService,
     private readonly config: AppConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -520,6 +524,22 @@ export class OrdersService {
       where: { id: orderId },
       data: { status: newStatus as OrderStatus },
     });
-    return this.findOneForUser((order as { userId: string }).userId, orderId);
+
+    const userId = (order as { userId: string }).userId;
+    // Emitted from here, not the admin controller, since this is the one
+    // place that already has both the new status and the order's userId
+    // in scope — see notification.events.ts's ORDER_STATUS_CHANGED comment.
+    // Only ever fires for the three statuses canTransitionStatus actually
+    // allows an admin to set (CONFIRMED/SHIPPED/DELIVERED), matching
+    // ADMIN_SETTABLE_STATUSES.
+    const payload: OrderStatusChangedPayload = {
+      orderId,
+      userId,
+      status: newStatus as OrderStatusChangedPayload['status'],
+    };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.ORDER_STATUS_CHANGED, payload);
+
+    return this.findOneForUser(userId, orderId);
   }
 }
