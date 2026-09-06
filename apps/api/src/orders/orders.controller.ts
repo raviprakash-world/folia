@@ -6,16 +6,30 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrdersService } from './orders.service';
+import { ReturnsService } from './returns.service';
 import { CheckoutDto } from './dto/checkout.dto';
 import { CancelOrderDto } from './dto/cancel-order.dto';
-import { ReturnOrderDto } from './dto/return-order.dto';
+import { CreateReturnClaimDto } from './dto/create-return-claim.dto';
 import { UpdateNotesDto } from './dto/update-notes.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
+import {
+  MAX_EVIDENCE_FILES,
+  MAX_EVIDENCE_FILE_BYTES,
+} from './evidence-file.util';
 import type { AuthenticatedUser } from '../users/user.types';
 
 @ApiTags('orders')
@@ -24,6 +38,7 @@ import type { AuthenticatedUser } from '../users/user.types';
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
+    private readonly returnsService: ReturnsService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -84,23 +99,38 @@ export class OrdersController {
     return result;
   }
 
-  @Post('orders/:id/return')
+  /**
+   * Phase 6D-3 — replaces the old whole-order, always-auto-approved
+   * `POST orders/:id/return` (removed, not deprecated: it had no
+   * plant-vs-non-plant awareness at all, so leaving it live would let a
+   * customer trivially bypass the newly locked "no ordinary plant
+   * change-of-mind returns" rule right next to the endpoint that enforces
+   * it — see docs/PHASE_6D_MIGRATION_DESIGN.md for the full reasoning).
+   * multipart/form-data: `items` arrives as a JSON-encoded string field
+   * (see CreateReturnClaimDto), evidence as 0+ files under the `evidence`
+   * field name. A newly created claim always starts PENDING — no refund,
+   * store credit, replacement order, or Order.status change happens here;
+   * that's the admin-resolution phase (Phase 6D-4+).
+   */
+  @Post('orders/:id/returns')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @UseInterceptors(
+    FilesInterceptor('evidence', MAX_EVIDENCE_FILES, {
+      limits: { fileSize: MAX_EVIDENCE_FILE_BYTES },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary:
-      'Only allowed for delivered orders within 30 days, with no existing return request.',
+      'Only allowed for delivered orders with no existing claim. Claim type (standard return vs. plant DOA/damage) is derived server-side from the selected items — never accepted from the client.',
   })
-  async requestReturn(
+  async createReturnClaim(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body() dto: ReturnOrderDto,
+    @Body() dto: CreateReturnClaimDto,
+    @UploadedFiles() evidence: Express.Multer.File[],
   ) {
-    const result = await this.ordersService.requestReturn(user.id, id, dto);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    this.eventEmitter.emit(NOTIFICATION_EVENTS.ORDER_RETURN_REQUESTED, {
-      orderId: id,
-      userId: user.id,
-    });
-    return result;
+    return this.returnsService.createClaim(user.id, id, dto, evidence ?? []);
   }
 
   @Get('orders/:id/tracking')

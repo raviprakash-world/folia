@@ -32,9 +32,8 @@ import {
   TAX_RATE,
   toPublicOrder,
   CANCELLATION_REASON_TO_DB,
-  RETURN_REASON_TO_DB,
 } from './order.types';
-import { canCancelOrder, canReturnOrder } from './refund.util';
+import { canCancelOrder } from './refund.util';
 import { canTransitionStatus } from './order-status.util';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { OrderStatusChangedPayload } from '../notifications/notification.events';
@@ -44,7 +43,6 @@ import {
 } from '../shipping/providers/shipping-provider.interface';
 import type { CheckoutDto } from './dto/checkout.dto';
 import type { CancelOrderDto } from './dto/cancel-order.dto';
-import type { ReturnOrderDto } from './dto/return-order.dto';
 import type {
   DeliveryMethodType,
   PaymentMethodType,
@@ -418,51 +416,6 @@ export class OrdersService {
         );
       }
     }
-
-    return this.findOneForUser(userId, orderId);
-  }
-
-  async requestReturn(userId: string, orderId: string, dto: ReturnOrderDto) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, userId },
-      include: { returnRequest: true, items: true },
-    });
-    if (!order) throw new NotFoundException('Order not found.');
-
-    const typedOrder = order as {
-      status: string;
-      returnRequest: unknown;
-      createdAt: Date;
-      items: { categorySlug: string }[];
-    };
-    if (
-      !canReturnOrder(
-        typedOrder.status,
-        !!typedOrder.returnRequest,
-        typedOrder.createdAt,
-      )
-    ) {
-      throw new BadRequestException('This order is not eligible for a return.');
-    }
-
-    const claimType = typedOrder.items.some((i) => i.categorySlug === 'plants')
-      ? 'DOA_CLAIM'
-      : 'STANDARD_RETURN';
-
-    await this.prisma.$transaction([
-      this.prisma.returnRequest.create({
-        data: {
-          orderId,
-          claimType,
-          reason: RETURN_REASON_TO_DB[dto.reason],
-          note: dto.note,
-        },
-      }),
-      this.prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'RETURNED' },
-      }),
-    ]);
 
     return this.findOneForUser(userId, orderId);
   }

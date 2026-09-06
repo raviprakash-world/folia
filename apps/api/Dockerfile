@@ -56,7 +56,9 @@ ENV NODE_ENV=production
 
 RUN apk add --no-cache openssl curl \
   && addgroup -g 1001 -S nodejs \
-  && adduser -S nestjs -u 1001
+  && adduser -S nestjs -u 1001 \
+  && mkdir -p /app/uploads \
+  && chown nestjs:nodejs /app/uploads
 
 COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=prod-deps --chown=nestjs:nodejs /app/apps/api/prisma ./apps/api/prisma
