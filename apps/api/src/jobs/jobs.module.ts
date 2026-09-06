@@ -4,10 +4,15 @@ import Redis from 'ioredis';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/app-config.service';
 import { InventoryModule } from '../inventory/inventory.module';
+import { PaymentsModule } from '../payments/payments.module';
 import { ReleaseExpiredReservationsProcessor } from './release-expired-reservations.processor';
-import { RELEASE_EXPIRED_RESERVATIONS_QUEUE } from './jobs.constants';
+import { ExpireStalePaymentsProcessor } from './expire-stale-payments.processor';
+import {
+  RELEASE_EXPIRED_RESERVATIONS_QUEUE,
+  EXPIRE_STALE_PAYMENTS_QUEUE,
+} from './jobs.constants';
 
-export { RELEASE_EXPIRED_RESERVATIONS_QUEUE };
+export { RELEASE_EXPIRED_RESERVATIONS_QUEUE, EXPIRE_STALE_PAYMENTS_QUEUE };
 
 @Module({
   imports: [
@@ -25,8 +30,13 @@ export { RELEASE_EXPIRED_RESERVATIONS_QUEUE };
       }),
     }),
     BullModule.registerQueue({ name: RELEASE_EXPIRED_RESERVATIONS_QUEUE }),
+    BullModule.registerQueue({ name: EXPIRE_STALE_PAYMENTS_QUEUE }),
     InventoryModule,
+    PaymentsModule,
   ],
-  providers: [ReleaseExpiredReservationsProcessor],
+  providers: [
+    ReleaseExpiredReservationsProcessor,
+    ExpireStalePaymentsProcessor,
+  ],
 })
 export class JobsModule {}

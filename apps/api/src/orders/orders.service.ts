@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   BadRequestException,
@@ -11,6 +10,7 @@ import { CartService } from '../cart/cart.service';
 import { AddressesService } from '../addresses/addresses.service';
 import { CouponsService } from '../coupons/coupons.service';
 import { PaymentsService } from '../payments/payments.service';
+import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { TrackingService } from '../tracking/tracking.service';
 import { toPublicAddress } from '../addresses/address.types';
@@ -71,6 +71,7 @@ export class OrdersService {
     private readonly paymentsService: PaymentsService,
     private readonly inventoryService: InventoryService,
     private readonly trackingService: TrackingService,
+    private readonly config: AppConfigService,
   ) {}
 
   /**
@@ -90,18 +91,59 @@ export class OrdersService {
    * caught and rejected before anything is charged or decremented. This
    * does not close a genuine race between that check and the later
    * decrement — a real, if narrow, TOCTOU gap under concurrent checkouts
-   * for the same low-stock item.
+   * for the same low-stock item. Phase 2 (inventory concurrency + atomic
+   * checkout) is where this gets fixed for real, by routing through the
+   * existing reserve()/commitReservation() pair instead — deliberately
+   * not touched here, since Phase 1's scope is payments, not inventory
+   * locking.
+   *
+   * Phase 1 (payments) changed what happens after inventory is
+   * decremented: this method no longer decides success/failure itself
+   * (that was the old Math.random() mock) — it creates the Order in
+   * PENDING_PAYMENT (or, for COD, PaymentsService immediately flips it to
+   * PROCESSING, since COD has nothing to wait for) and hands off to
+   * PaymentsService.createForOrder. The cart is no longer cleared here
+   * either, for the same reason: clearing it before a gateway payment is
+   * even attempted would empty a customer's cart for an order that might
+   * never actually get paid for. PaymentsService clears it once payment
+   * genuinely resolves (COD: immediately; gateway: on capture).
    */
   async checkout(userId: string, dto: CheckoutDto, idempotencyKey?: string) {
     if (idempotencyKey) {
       const existing = await this.prisma.order.findUnique({
         where: { userId_idempotencyKey: { userId, idempotencyKey } },
-        include: { items: true, cancellation: true, returnRequest: true },
+        include: {
+          items: true,
+          cancellation: true,
+          returnRequest: true,
+          payment: true,
+        },
       });
       if (existing)
         return {
           ...toPublicOrder(existing as never),
           isIdempotentReplay: true,
+          payment: existing.payment
+            ? {
+                paymentId: existing.payment.id,
+                status: existing.payment.status,
+                requiresGatewayCheckout:
+                  existing.payment.provider === 'RAZORPAY' &&
+                  existing.payment.status === 'CREATED',
+                ...(existing.payment.provider === 'RAZORPAY' &&
+                existing.payment.status === 'CREATED' &&
+                existing.payment.providerOrderId
+                  ? {
+                      gateway: {
+                        keyId: this.config.razorpayKeyId ?? '',
+                        providerOrderId: existing.payment.providerOrderId,
+                        amount: Number(existing.payment.amount),
+                        currency: existing.payment.currency,
+                      },
+                    }
+                  : {}),
+              }
+            : null,
         };
     }
 
@@ -162,17 +204,23 @@ export class OrdersService {
     }
 
     const paymentMethodDb = PAYMENT_METHOD_TO_DB[dto.paymentMethod];
-    const payment = this.paymentsService.process(
-      paymentMethodDb,
-      dto.paymentDisplayLabel,
-    );
+    const isCod = paymentMethodDb === 'COD';
 
+    // Decrement each line, remembering exactly which inventory item it
+    // came from — PaymentsService.expireStalePayments needs this to
+    // restore stock precisely if this order's payment never completes
+    // (see that method's doc comment). Still one-decrement-per-line, not
+    // one shared transaction — see this method's doc comment above.
+    const decrementedItemIds: string[] = [];
+    const decremented: { inventoryItemId: string; quantity: number }[] = [];
     for (const item of cart.items) {
-      await this.inventoryService.decrementForProduct(
+      const inventoryItemId = await this.inventoryService.decrementForProduct(
         item.productId,
         item.variantId,
         item.quantity,
       );
+      decrementedItemIds.push(inventoryItemId);
+      decremented.push({ inventoryItemId, quantity: item.quantity });
     }
 
     const orderId = generateOrderId();
@@ -198,15 +246,22 @@ export class OrdersService {
           billingSnapshot as unknown as Prisma.InputJsonValue,
         deliveryMethod: deliveryMethodDb,
         estimatedDelivery,
-        paymentMethod: payment.method,
-        paymentDisplayLabel: payment.displayLabel,
-        paymentTransactionId: payment.transactionId,
+        // status starts PENDING_PAYMENT for a real gateway method — a
+        // customer hasn't paid yet, and PaymentsService flips this once
+        // they do (or the expiry sweep cancels it if they never do). COD
+        // skips straight to PROCESSING inside
+        // PaymentsService.createForOrder, since there's no gateway
+        // authorization to wait for.
+        status: isCod ? 'PROCESSING' : 'PENDING_PAYMENT',
+        paymentMethod: paymentMethodDb,
+        // paymentDisplayLabel/paymentTransactionId stay unset here — both
+        // are populated by PaymentsService once payment actually resolves.
         courierId,
         trackingNumber,
         customerNotes: dto.customerNotes,
         idempotencyKey: idempotencyKey ?? null,
         items: {
-          create: cart.items.map((item) => ({
+          create: cart.items.map((item, index) => ({
             productId: item.productId,
             slug: item.product.slug,
             name: item.product.name,
@@ -215,15 +270,62 @@ export class OrdersService {
             variantLabel: item.variant?.label ?? null,
             price: item.unitPrice.toNumber(),
             quantity: item.quantity,
+            inventoryItemId: decrementedItemIds[index],
           })),
         },
       },
       include: { items: true },
     });
 
-    await this.cartService.clearCart(cart.id);
+    let paymentResult;
+    try {
+      paymentResult = await this.paymentsService.createForOrder({
+        orderId: order.id,
+        userId,
+        method: paymentMethodDb,
+        amount: total,
+        displayLabel: dto.paymentDisplayLabel,
+      });
+    } catch (err) {
+      // Real gap this closes, found by actually running this end-to-end
+      // against a live database rather than trusting the unit tests
+      // alone: the order and its inventory decrement above are already
+      // committed by this point. If creating the gateway payment itself
+      // fails (Razorpay unreachable, misconfigured keys, a timeout — see
+      // PaymentsService.createGatewayPayment), there is no Payment row
+      // for expireStalePayments to ever find, so that safety-net sweep
+      // can't rescue this order — it would sit in PENDING_PAYMENT with
+      // its stock gone forever. This is a synchronous rollback for a
+      // synchronous, immediately-known failure, not a substitute for
+      // that sweep (which still exists for the customer-abandons-payment
+      // case, where a real Payment row genuinely does exist).
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'CANCELLED' },
+      });
+      for (const { inventoryItemId, quantity } of decremented) {
+        await this.inventoryService.restoreQuantity(inventoryItemId, quantity);
+      }
+      throw err;
+    }
 
-    return { ...toPublicOrder(order as never), isIdempotentReplay: false };
+    // COD resolved synchronously above (order flipped to PROCESSING,
+    // paymentTransactionId/displayLabel set, cart cleared) — re-read so
+    // the response reflects that instead of the pre-payment snapshot.
+    // Gateway methods stay as originally created (PENDING_PAYMENT, no
+    // payment fields yet) until the customer actually completes checkout.
+    const finalOrder = isCod
+      ? await this.prisma.order.findUniqueOrThrow({
+          where: { id: order.id },
+          include: { items: true },
+        })
+      : order;
+
+    return {
+      ...toPublicOrder(finalOrder as never),
+      isIdempotentReplay: false,
+      payment: paymentResult,
+    };
   }
 
   async findAllForUser(userId: string) {
@@ -261,7 +363,7 @@ export class OrdersService {
   ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-      include: { cancellation: true },
+      include: { cancellation: true, items: true },
     });
     if (!order) throw new NotFoundException('Order not found.');
 
@@ -269,10 +371,19 @@ export class OrdersService {
       status: string;
       cancellation: unknown;
       paymentMethod: string;
+      items: { inventoryItemId: string | null; quantity: number }[];
     };
     if (!canCancelOrder(typedOrder.status, !!typedOrder.cancellation)) {
       throw new BadRequestException('This order can no longer be cancelled.');
     }
+
+    // A PENDING_PAYMENT order (Phase 1) was never actually paid for —
+    // nothing was captured, so there is nothing to refund, unlike
+    // cancelling an order that already reached PROCESSING via a real
+    // capture or COD. Distinct from the general "was this COD" check
+    // below, which is about method, not about whether payment ever
+    // resolved at all.
+    const wasNeverPaid = typedOrder.status === 'PENDING_PAYMENT';
 
     await this.prisma.$transaction([
       this.prisma.cancellationRequest.create({
@@ -280,7 +391,7 @@ export class OrdersService {
           orderId,
           reason: CANCELLATION_REASON_TO_DB[dto.reason],
           note: dto.note,
-          hasRefund: typedOrder.paymentMethod !== 'COD',
+          hasRefund: !wasNeverPaid && typedOrder.paymentMethod !== 'COD',
         },
       }),
       this.prisma.order.update({
@@ -288,6 +399,23 @@ export class OrdersService {
         data: { status: 'CANCELLED' },
       }),
     ]);
+
+    if (wasNeverPaid) {
+      // Mirrors PaymentsService.expireStalePayments — cancelling before
+      // payment ever completed must give the stock back for the same
+      // reason letting it sit forever would be wrong there. Payment
+      // itself is closed out via the same service so retry() correctly
+      // refuses a cancelled order.
+      await this.paymentsService.cancelForOrder(orderId);
+      for (const item of typedOrder.items) {
+        if (item.inventoryItemId) {
+          await this.inventoryService.restoreQuantity(
+            item.inventoryItemId,
+            item.quantity,
+          );
+        }
+      }
+    }
 
     return this.findOneForUser(userId, orderId);
   }

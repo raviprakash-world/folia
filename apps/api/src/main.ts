@@ -5,6 +5,7 @@ import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { json, urlencoded } from 'express';
+import type { Request } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { AppConfigService } from './config/app-config.service';
@@ -37,7 +38,22 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.use(helmet());
   app.use(cookieParser());
-  app.use(json({ limit: JSON_BODY_LIMIT }));
+  app.use(
+    json({
+      limit: JSON_BODY_LIMIT,
+      // Stashes the exact bytes Razorpay sent alongside the parsed body.
+      // Required for webhook signature verification (Razorpay signs the
+      // raw request body with HMAC-SHA256 — re-serializing the parsed
+      // JSON is not guaranteed to byte-for-byte match what was actually
+      // sent, so verifying against anything other than these original
+      // bytes is a real, silent way to make signature checks flaky).
+      // Cheap for every other route too — the bytes are already buffered
+      // by this point either way, this just also keeps a reference.
+      verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(urlencoded({ extended: true, limit: JSON_BODY_LIMIT }));
   app.enableCors({ origin: config.corsOrigins, credentials: true });
 

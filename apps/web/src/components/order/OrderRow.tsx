@@ -16,7 +16,7 @@ export function OrderRow({ order }: { order: Order }) {
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm text-ink">{order.id}</span>
-          <Tag tone={orderStatusTone[status]}>{status}</Tag>
+          <Tag tone={orderStatusTone[status]}>{status.replace('-', ' ')}</Tag>
         </div>
         <p className="text-xs text-ink-soft mt-1">
           {formatDate(order.createdAt)} — {order.items.length} {order.items.length === 1 ? 'item' : 'items'}

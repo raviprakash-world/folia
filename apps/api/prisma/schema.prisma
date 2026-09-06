@@ -578,7 +578,16 @@ enum PaymentMethodType {
   WALLET
 }
 
+/// PENDING_PAYMENT is a new Phase-1 (payments) addition: an order created
+/// against a real gateway (Razorpay) exists in this state from the moment
+/// the customer starts checkout until PaymentsService confirms a capture
+/// (via the verify callback or, authoritatively, the webhook) and flips it
+/// to PROCESSING. COD orders skip it entirely — they go straight to
+/// PROCESSING with Payment.status = COD_PENDING, since no gateway
+/// authorization is ever awaited for COD. Deliberately not admin-settable
+/// (see order-status.util.ts) — only PaymentsService transitions out of it.
 enum OrderStatus {
+  PENDING_PAYMENT
   PROCESSING
   CONFIRMED
   SHIPPED
@@ -586,6 +595,47 @@ enum OrderStatus {
   CANCELLED
   RETURNED
   REFUNDED
+}
+
+/// RAZORPAY is the only real gateway integrated (Phase 1, India-first —
+/// see docs/API_INTEGRATION_STATUS.md for why). COD is modeled as a
+/// "provider" too so Payment's shape (status/attempts/refunds) is uniform
+/// across every payment method, including the one that never touches a
+/// real gateway — see PaymentsService's COD handling for why COD is still
+/// a real Payment row, never silently marked paid.
+enum PaymentProvider {
+  RAZORPAY
+  COD
+}
+
+/// CREATED: a Razorpay order exists, customer hasn't paid yet.
+/// CAPTURED: Razorpay confirmed the charge (via verify callback or,
+/// authoritatively, the webhook — see PaymentsService.confirmCapture).
+/// FAILED: Razorpay reported a decline; a fresh PaymentAttempt/Payment can
+/// be created for the same order (see PaymentsService.retry).
+/// EXPIRED: the Razorpay order was never completed and is no longer valid
+/// (set by the expiry sweep — see jobs/expire-stale-payments.processor.ts).
+/// COD_PENDING / COD_COLLECTED: COD's own lifecycle — never CAPTURED,
+/// since no gateway authorization ever happens; COD_COLLECTED is a real
+/// admin action recorded on actual delivery/cash collection, not implied
+/// by any order-status change.
+/// REFUNDED / PARTIALLY_REFUNDED: derived from this Payment's Refund rows
+/// summing to the full amount or less — see PaymentsService.refundStatus.
+enum PaymentStatus {
+  CREATED
+  CAPTURED
+  FAILED
+  EXPIRED
+  COD_PENDING
+  COD_COLLECTED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSED
+  FAILED
 }
 
 enum CourierId {
@@ -656,8 +706,20 @@ model Order {
   estimatedDelivery  String
 
   paymentMethod        PaymentMethodType
-  paymentDisplayLabel  String
-  paymentTransactionId String
+  /// Nullable as of Phase 1 (payments): both are unknown until Payment
+  /// actually resolves (PaymentsService.confirmCapture / COD's immediate
+  /// COD_PENDING assignment) — an order sitting in PENDING_PAYMENT genuinely
+  /// doesn't have either value yet. Populated the moment payment is real.
+  paymentDisplayLabel  String?
+  paymentTransactionId String?
+  /// Real payment record — see the Payment model. Optional on this side
+  /// only because Prisma requires the non-FK-owning side of a 1:1 relation
+  /// to be nullable in its type even though every Order created after
+  /// Phase 1 always gets exactly one Payment (enforced in
+  /// OrdersService.checkout, not at the DB level, matching this schema's
+  /// existing convention of application-enforced invariants like
+  /// Warehouse.isDefault).
+  payment Payment?
 
   courierId       CourierId
   trackingNumber  String
@@ -693,9 +755,129 @@ model OrderItem {
   price    Decimal @db.Decimal(10, 2)
   quantity Int
 
+  /// Phase 1 (payments): which exact InventoryItem row this line's stock
+  /// was decremented from at checkout — set so a failed/expired payment
+  /// can restore stock to precisely the row it came from (see
+  /// InventoryService.restoreQuantity), not "a" row for this product that
+  /// happens to match. No FK relation, deliberately — same reasoning as
+  /// this model's own productId field: this is a point-in-time reference
+  /// for reversal, not a live relationship the order needs to survive an
+  /// inventory item being reorganized/deleted. Nullable because orders
+  /// created before this column existed have no value here.
+  inventoryItemId String?
+
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+/// One row per order, created the moment checkout starts (before the
+/// gateway has confirmed anything) — see OrdersService.checkout and
+/// PaymentsService. userId is a plain indexed column, not a User relation,
+/// same reasoning as OrderItem.productId above: this is a reference for
+/// filtering, not a cascade-relevant relationship (an order and its
+/// payment must survive exactly as long as each other, which the
+/// orderId → Order relation below already guarantees).
+model Payment {
+  id       String @id @default(uuid())
+  orderId  String @unique
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId   String
+
+  provider PaymentProvider
+  method   PaymentMethodType
+  status   PaymentStatus @default(CREATED)
+
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("INR")
+
+  /// Razorpay's order_id (order_xxx) — set at creation for RAZORPAY,
+  /// always null for COD.
+  providerOrderId String?
+  /// Razorpay's payment_id (pay_xxx) — set only once captured.
+  providerPaymentId String?
+  /// Already-masked, e.g. "Visa •••• 4242" / "Pay on delivery" — never raw
+  /// card/account data, matching this project's existing convention (see
+  /// the payment DTO this replaces).
+  displayLabel String?
+
+  attempts PaymentAttempt[]
+  refunds  Refund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([providerOrderId])
+  @@map("payments")
+}
+
+/// Append-only log of every create/verify/webhook outcome for a Payment —
+/// what PaymentsController's endpoints actually saw from Razorpay each
+/// time, including failures, so a declined card shows up as history, not
+/// just a final FAILED status with no record of what was tried.
+model PaymentAttempt {
+  id        String  @id @default(uuid())
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  status            PaymentStatus
+  providerPaymentId String?
+  errorCode         String?
+  errorDescription  String?
+  /// Raw provider response/webhook payload for this attempt — kept for
+  /// real reconciliation/debugging, never rendered back to the customer.
+  rawResponse Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@map("payment_attempts")
+}
+
+/// A real refund against a real Payment. Distinct from CancellationRequest/
+/// ReturnRequest (Order-level, "did the customer ask for this") — Refund is
+/// Payment-level, "did the money actually move back." Phase 6 wires
+/// cancellation/return approval to creating these; Phase 1 only builds the
+/// gateway-facing half (PaymentsService.refund), since nothing upstream
+/// triggers a refund automatically yet.
+model Refund {
+  id        String  @id @default(uuid())
+  paymentId String
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  amount           Decimal      @db.Decimal(10, 2)
+  status           RefundStatus @default(PENDING)
+  providerRefundId String?
+  reason           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([paymentId])
+  @@map("refunds")
+}
+
+/// Every inbound Razorpay webhook call, keyed on the provider's own event
+/// id — @unique on providerEventId is what makes webhook processing
+/// actually idempotent (a redelivered webhook is rejected by the DB
+/// constraint before any state changes, not by an in-memory check that a
+/// second server instance wouldn't share). processedAt is null until the
+/// handler finishes applying the event's effect; a webhook whose row exists
+/// but has a null processedAt means processing crashed partway and is safe
+/// to reprocess (the constraint only prevents *duplicate* processing, not
+/// *incomplete* processing).
+model PaymentWebhookEvent {
+  id              String          @id @default(uuid())
+  provider        PaymentProvider
+  providerEventId String          @unique
+  eventType       String
+  payload         Json
+  processedAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("payment_webhook_events")
 }
 
 // --- Phase 6: Order Management (cancellation, returns, tracking) ---

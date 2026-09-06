@@ -80,6 +80,27 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CORS_ORIGINS = 'http://localhost:5173';
+
+  /**
+   * All three optional at the validation layer, deliberately — an
+   * environment with no Razorpay keys configured (a fresh local checkout,
+   * CI, this session's own sandbox before real test keys existed) must
+   * still be able to boot the app. PaymentsService/RazorpayProvider fail
+   * loudly at the point of actual use instead (same pattern already
+   * established for the missing email provider — see auth.service.ts),
+   * not here at startup.
+   */
+  @IsString()
+  @IsOptional()
+  RAZORPAY_KEY_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  RAZORPAY_KEY_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  RAZORPAY_WEBHOOK_SECRET?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

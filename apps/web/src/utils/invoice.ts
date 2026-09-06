@@ -154,8 +154,10 @@ export async function downloadInvoice(order: Order): Promise<void> {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(...INK_SOFT);
-  doc.text(`Paid via ${order.payment.displayLabel}`, margin, y);
-  doc.text(`Transaction ${order.payment.transactionId}`, margin, y + 13);
+  doc.text(`Paid via ${order.payment.displayLabel ?? 'pending payment'}`, margin, y);
+  if (order.payment.transactionId) {
+    doc.text(`Transaction ${order.payment.transactionId}`, margin, y + 13);
+  }
 
   // QR placeholder — explicitly not a real, scannable QR code.
   const qrSize = 64;

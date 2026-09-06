@@ -14,3 +14,6 @@
  */
 export const RELEASE_EXPIRED_RESERVATIONS_QUEUE =
   'release-expired-reservations';
+
+/** Same circular-import reasoning as the constant above — kept in this file, not jobs.module.ts, for the same reason. */
+export const EXPIRE_STALE_PAYMENTS_QUEUE = 'expire-stale-payments';

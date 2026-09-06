@@ -59,8 +59,10 @@ export function OrderSummary({ order }: { order: Order }) {
         </div>
         <div>
           <p className="text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">Payment</p>
-          <p className="text-sm text-ink">{order.payment.displayLabel}</p>
-          <p className="font-mono text-xs text-ink-soft">{order.payment.transactionId}</p>
+          <p className="text-sm text-ink">{order.payment.displayLabel ?? 'Awaiting payment'}</p>
+          {order.payment.transactionId && (
+            <p className="font-mono text-xs text-ink-soft">{order.payment.transactionId}</p>
+          )}
         </div>
       </div>
 

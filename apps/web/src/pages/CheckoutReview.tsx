@@ -14,6 +14,8 @@ import { formatCurrency } from '@/utils/currency';
 import { generateOrderId } from '@/utils/orderId';
 import { assignCourier, generateTrackingNumber } from '@/utils/tracking';
 import { checkoutReal } from '@/services/ordersApiService';
+import { openRazorpayCheckout, retryPayment, verifyPayment, PaymentCancelledError } from '@/services/paymentsApiService';
+import type { GatewayCheckoutInfo } from '@/services/paymentsApiService';
 import type { Order, OrderItem } from '@/types/order';
 
 const PLACE_ORDER_DELAY_MS = 700;
@@ -23,6 +25,17 @@ export default function CheckoutReview() {
   const navigate = useNavigate();
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Real gateway path only (Phase 1): once /checkout returns a real order
+  // awaiting payment, this is what a "Retry payment" click re-opens
+  // Razorpay against — realOrderId so retryPayment() knows which order,
+  // pendingGateway so a plain modal-dismiss can reopen the SAME gateway
+  // order (still valid — the customer never actually attempted a charge)
+  // without a network round-trip, distinct from an actual decline, which
+  // does need a fresh gateway order via retryPayment (see handleGatewayFailure).
+  const [realOrderId, setRealOrderId] = useState<string | null>(null);
+  const [pendingGateway, setPendingGateway] = useState<{ paymentId: string; gateway: GatewayCheckoutInfo } | null>(
+    null
+  );
   // Generated once on mount (not at submit time) so the courier/tracking
   // assignment shown in the preview — both deterministically seeded by
   // order id — matches exactly what gets persisted on "Place order".
@@ -116,6 +129,55 @@ export default function CheckoutReview() {
     returnRequest: null,
   };
 
+  /** Opens Razorpay against the given gateway order, verifies the result server-side, and only then treats the order as placed. Shared by the initial checkout attempt and a "Retry payment" click, since both end the same way. */
+  async function resolveGatewayPayment(paymentId: string, gateway: GatewayCheckoutInfo, orderIdForDescription: string) {
+    setPendingGateway({ paymentId, gateway });
+    try {
+      const verifyInput = await openRazorpayCheckout(gateway, `Order ${orderIdForDescription}`);
+      await verifyPayment(paymentId, verifyInput);
+      setPendingGateway(null);
+      clearCart();
+      resetCheckout();
+      void navigate(`/checkout/confirmation/${orderIdForDescription}`);
+    } catch (err) {
+      if (err instanceof PaymentCancelledError) {
+        // Still the same, still-valid gateway order (never attempted) —
+        // pendingGateway stays set so "Try again" reopens it directly,
+        // no backend call needed.
+        setError('Payment was cancelled. You can try again below.');
+      } else {
+        // A real decline (verifyPayment threw) — this gateway order may
+        // now be spent/invalid, so "Try again" must fetch a fresh one via
+        // retryPayment rather than reopening this one.
+        setPendingGateway(null);
+        setError(err instanceof Error ? err.message : 'Payment failed. You can try again below.');
+      }
+      setPlacing(false);
+    }
+  }
+
+  async function handleRetryPayment() {
+    if (!realOrderId) return;
+    setPlacing(true);
+    setError(null);
+    try {
+      if (pendingGateway) {
+        // A plain cancellation — the existing gateway order was never
+        // actually attempted, so reopen exactly it, no backend call.
+        await resolveGatewayPayment(pendingGateway.paymentId, pendingGateway.gateway, realOrderId);
+      } else {
+        // A real decline already closed out that gateway order server-side — need a fresh one.
+        const result = await retryPayment(realOrderId);
+        if (result.gateway) {
+          await resolveGatewayPayment(result.paymentId, result.gateway, realOrderId);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not restart payment. Please try again.');
+      setPlacing(false);
+    }
+  }
+
   async function handlePlaceOrder() {
     setPlacing(true);
     setError(null);
@@ -127,11 +189,19 @@ export default function CheckoutReview() {
             billingAddressId: billingAddressChecked.id,
             deliveryMethod: deliveryMethodChecked,
             paymentMethod: paymentChecked.method,
-            paymentDisplayLabel: paymentChecked.displayLabel,
+            paymentDisplayLabel: paymentChecked.displayLabel ?? '',
             couponCode: coupon?.code,
           },
           idempotencyKey
         );
+
+        if (realOrder.payment.requiresGatewayCheckout && realOrder.payment.gateway) {
+          setRealOrderId(realOrder.id);
+          await resolveGatewayPayment(realOrder.payment.paymentId, realOrder.payment.gateway, realOrder.id);
+          return;
+        }
+
+        // COD (or an already-resolved idempotent replay) — nothing further to wait for.
         // No manual addNotification calls here on the real path — the
         // real backend's own ORDER_CREATED event listener (Phase 15)
         // already creates an "Order Placed" notification server-side;
@@ -189,9 +259,9 @@ export default function CheckoutReview() {
           size="lg"
           disabled={placing}
           icon={placing ? <Loader2 size={16} className="animate-spin" /> : undefined}
-          onClick={() => void handlePlaceOrder()}
+          onClick={() => void (realOrderId ? handleRetryPayment() : handlePlaceOrder())}
         >
-          {placing ? 'Placing order…' : 'Place order'}
+          {placing ? 'Processing…' : realOrderId ? 'Try payment again' : 'Place order'}
         </Button>
       </div>
     </div>

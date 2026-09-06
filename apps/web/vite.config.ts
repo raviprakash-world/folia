@@ -148,6 +148,16 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               rewrite: (requestPath: string) => requestPath.replace(/^\/api\/orders/, '/api/v1/orders'),
             },
+            // Phase 1 (payments) — no separate VITE_REAL_PAYMENTS_API flag:
+            // payments only ever happen as part of a real checkout, so
+            // this rides on the same flag as /api/checkout and /api/orders
+            // above rather than adding a flag that could never
+            // meaningfully be toggled independently of them.
+            '/api/payments': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/payments/, '/api/v1/payments'),
+            },
           }
         : {}),
     },

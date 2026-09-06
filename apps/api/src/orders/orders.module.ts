@@ -7,6 +7,7 @@ import { CouponsModule } from '../coupons/coupons.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { TrackingModule } from '../tracking/tracking.module';
+import { AppConfigModule } from '../config/config.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TrackingModule } from '../tracking/tracking.module';
     PaymentsModule,
     InventoryModule,
     TrackingModule,
+    AppConfigModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
