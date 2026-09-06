@@ -111,4 +111,42 @@ describe('RazorpayProvider — amount unit conversion (rupees in this codebase, 
 
     expect(result.amount).toBe(71.3);
   });
+
+  it('refund multiplies rupees by 100 before calling the SDK, and passes the reason as a note', async () => {
+    const provider = new RazorpayProvider({
+      razorpayKeyId: 'rzp_test_x',
+      razorpayKeySecret: 'secret',
+    } as never);
+    const refund = jest.fn().mockResolvedValue({ id: 'rfnd_abc' });
+    (provider as unknown as { client: unknown }).client = {
+      payments: { refund },
+    };
+
+    const result = await provider.refund({
+      providerPaymentId: 'pay_abc',
+      amount: 40,
+      reason: 'requested_by_customer',
+    });
+
+    expect(refund).toHaveBeenCalledWith('pay_abc', {
+      amount: 4000,
+      notes: { reason: 'requested_by_customer' },
+    });
+    expect(result.providerRefundId).toBe('rfnd_abc');
+  });
+
+  it('refund omits the amount entirely for a full refund (no amount given), rather than sending 0', async () => {
+    const provider = new RazorpayProvider({
+      razorpayKeyId: 'rzp_test_x',
+      razorpayKeySecret: 'secret',
+    } as never);
+    const refund = jest.fn().mockResolvedValue({ id: 'rfnd_abc' });
+    (provider as unknown as { client: unknown }).client = {
+      payments: { refund },
+    };
+
+    await provider.refund({ providerPaymentId: 'pay_abc' });
+
+    expect(refund).toHaveBeenCalledWith('pay_abc', {});
+  });
 });

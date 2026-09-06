@@ -4,10 +4,11 @@ import { Tag } from '@/components/ui/Tag';
 import { formatCurrency, formatDate } from '@/utils/currency';
 import { orderStatusTone } from '@/utils/orderStatus';
 import { getEffectiveOrderStatus } from '@/utils/refund';
+import { useRealOrdersApi } from '@/hooks/useOrders';
 import type { Order } from '@/types/order';
 
 export function OrderRow({ order }: { order: Order }) {
-  const status = getEffectiveOrderStatus(order);
+  const status = getEffectiveOrderStatus(order, useRealOrdersApi);
   return (
     <Link
       to={`/account/orders/${order.id}`}

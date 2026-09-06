@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 // Same reasoning as auth.service.spec.ts's top-of-file comment.
 import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { PAYMENT_EXPIRY_MINUTES } from '../payments/payments.service';
 import type { CheckoutDto } from './dto/checkout.dto';
@@ -159,6 +160,11 @@ function createDeps() {
       status: 'COD_PENDING',
       requiresGatewayCheckout: false,
       order: makePublicOrder(),
+    }),
+    refund: jest.fn().mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
     }),
   };
   const inventoryService = {
@@ -590,8 +596,8 @@ describe('OrdersService.requestCancellation', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('sets hasRefund to false for a COD order (nothing was ever charged)', async () => {
-    const { prisma, service } = createDeps();
+  it('sets hasRefund to false for a COD order (nothing was ever charged), and never attempts a refund', async () => {
+    const { prisma, paymentsService, service } = createDeps();
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
     prisma.order.findFirst = jest
       .fn()
@@ -599,6 +605,7 @@ describe('OrdersService.requestCancellation', () => {
         status: 'PROCESSING',
         cancellation: null,
         paymentMethod: 'COD',
+        payment: null,
       })
       .mockResolvedValueOnce(makeCreatedOrder());
 
@@ -611,16 +618,18 @@ describe('OrdersService.requestCancellation', () => {
         data: expect.objectContaining({ hasRefund: false }),
       }),
     );
+    expect(paymentsService.refund).not.toHaveBeenCalled();
   });
 
-  it('sets hasRefund to true for a real charged payment method — every order reaching this method was, by construction, actually paid for (Phase 2: an Order only exists once PaymentsService.confirmAndCreateOrder has already run)', async () => {
-    const { prisma, service } = createDeps();
+  it('sets hasRefund to true for a real charged payment method, and attempts a real refund against the real payment — every order reaching this method was, by construction, actually paid for (Phase 2: an Order only exists once PaymentsService.confirmAndCreateOrder has already run)', async () => {
+    const { prisma, paymentsService, service } = createDeps();
     prisma.order.findFirst = jest
       .fn()
       .mockResolvedValueOnce({
         status: 'PROCESSING',
         cancellation: null,
         paymentMethod: 'CREDIT_CARD',
+        payment: { id: 'pay-42' },
       })
       .mockResolvedValueOnce(makeCreatedOrder());
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
@@ -634,6 +643,57 @@ describe('OrdersService.requestCancellation', () => {
         data: expect.objectContaining({ hasRefund: true }),
       }),
     );
+    expect(paymentsService.refund).toHaveBeenCalledWith(
+      'pay-42',
+      expect.objectContaining({
+        reason: expect.stringContaining('changed-mind'),
+      }),
+    );
+  });
+
+  it("still returns the cancelled order when the refund attempt itself fails — a down/unconfigured gateway must not fail the cancellation, matching this codebase's existing non-fatal-side-effect pattern for email sends", async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.order.findFirst = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 'PROCESSING',
+        cancellation: null,
+        paymentMethod: 'CREDIT_CARD',
+        payment: { id: 'pay-42' },
+      })
+      .mockResolvedValueOnce(makeCreatedOrder());
+    prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
+    paymentsService.refund.mockRejectedValue(
+      new Error('Razorpay is not configured'),
+    );
+
+    await expect(
+      service.requestCancellation('user-1', 'order-1', {
+        reason: 'changed-mind',
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('rejects a losing concurrent cancellation attempt with a clean BadRequestException, not a raw unique-constraint error', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst = jest.fn().mockResolvedValueOnce({
+      status: 'PROCESSING',
+      cancellation: null,
+      paymentMethod: 'COD',
+      payment: null,
+    });
+    prisma.$transaction = jest.fn().mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    await expect(
+      service.requestCancellation('user-1', 'order-1', {
+        reason: 'changed-mind',
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 });
 

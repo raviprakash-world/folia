@@ -96,7 +96,13 @@ function makeOrderRow(overrides: Record<string, unknown> = {}) {
 function createDeps() {
   const orderTx = {
     order: { create: jest.fn().mockResolvedValue(makeOrderRow()) },
-    payment: { update: jest.fn() },
+    payment: { update: jest.fn(), findUnique: jest.fn() },
+    refund: {
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    $queryRaw: jest.fn(),
   };
   const prisma = {
     payment: {
@@ -109,7 +115,7 @@ function createDeps() {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     paymentAttempt: { create: jest.fn() },
-    refund: { create: jest.fn() },
+    refund: { create: jest.fn(), update: jest.fn() },
     paymentWebhookEvent: { create: jest.fn(), update: jest.fn() },
     order: { findUniqueOrThrow: jest.fn() },
     $transaction: jest.fn((cb: (tx: typeof orderTx) => unknown) => cb(orderTx)),
@@ -673,15 +679,23 @@ describe('PaymentsService.retry', () => {
 
 describe('PaymentsService.refund', () => {
   it('refunds a captured payment against the real gateway and marks it REFUNDED', async () => {
-    const { prisma, razorpay, service } = createDeps();
-    prisma.payment.findUnique.mockResolvedValue(
+    const { orderTx, razorpay, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
       makePayment({ status: 'CAPTURED', providerPaymentId: 'pay_abc' }),
     );
-    razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
-    prisma.refund.create.mockResolvedValue({
+    orderTx.refund.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: null } }) // nothing claimed yet, at reserve time
+      .mockResolvedValueOnce({ _sum: { amount: 71.3 } }); // the full amount, once this refund is PROCESSED
+    orderTx.refund.create.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PENDING',
+    });
+    orderTx.refund.update.mockResolvedValue({
       id: 'refund-1',
       status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
     });
+    razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
 
     const result = await service.refund('pay-1', {});
 
@@ -689,36 +703,117 @@ describe('PaymentsService.refund', () => {
       expect.objectContaining({ providerPaymentId: 'pay_abc' }),
     );
     expect(result.providerRefundId).toBe('rfnd_1');
-    expect(prisma.payment.update).toHaveBeenCalledWith(
+    expect(orderTx.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'REFUNDED' } }),
     );
   });
 
   it('marks PARTIALLY_REFUNDED, not REFUNDED, when the refund amount is less than the full payment', async () => {
-    const { prisma, razorpay, service } = createDeps();
-    prisma.payment.findUnique.mockResolvedValue(
+    const { orderTx, razorpay, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
       makePayment({
         status: 'CAPTURED',
         providerPaymentId: 'pay_abc',
         amount: decimal(100),
       }),
     );
-    razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
-    prisma.refund.create.mockResolvedValue({
+    orderTx.refund.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: null } })
+      .mockResolvedValueOnce({ _sum: { amount: 40 } });
+    orderTx.refund.create.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PENDING',
+    });
+    orderTx.refund.update.mockResolvedValue({
       id: 'refund-1',
       status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
     });
+    razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_1' });
 
     await service.refund('pay-1', { amount: 40 });
 
-    expect(prisma.payment.update).toHaveBeenCalledWith(
+    expect(orderTx.payment.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'PARTIALLY_REFUNDED' } }),
     );
   });
 
+  it('correctly marks REFUNDED (not PARTIALLY_REFUNDED again) once a second partial refund brings the true total to 100% — the exact sequential-accumulation bug this fix closes', async () => {
+    const { orderTx, razorpay, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
+      makePayment({
+        status: 'PARTIALLY_REFUNDED',
+        providerPaymentId: 'pay_abc',
+        amount: decimal(100),
+      }),
+    );
+    // 60 already PROCESSED from an earlier partial refund; this call asks for the remaining 40.
+    orderTx.refund.aggregate
+      .mockResolvedValueOnce({ _sum: { amount: 60 } })
+      .mockResolvedValueOnce({ _sum: { amount: 100 } });
+    orderTx.refund.create.mockResolvedValue({
+      id: 'refund-2',
+      status: 'PENDING',
+    });
+    orderTx.refund.update.mockResolvedValue({
+      id: 'refund-2',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_2',
+    });
+    razorpay.refund.mockResolvedValue({ providerRefundId: 'rfnd_2' });
+
+    await service.refund('pay-1', { amount: 40 });
+
+    expect(orderTx.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'REFUNDED' } }),
+    );
+  });
+
+  it('rejects a refund that would exceed what remains refundable — closing both the concurrent-double-refund race and the sequential over-refund bug in one check', async () => {
+    const { orderTx, razorpay, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
+      makePayment({
+        status: 'PARTIALLY_REFUNDED',
+        providerPaymentId: 'pay_abc',
+        amount: decimal(100),
+      }),
+    );
+    // 60 already claimed (PENDING or PROCESSED — e.g. a concurrent refund's own reservation) — only 40 remains.
+    orderTx.refund.aggregate.mockResolvedValueOnce({ _sum: { amount: 60 } });
+
+    await expect(service.refund('pay-1', { amount: 50 })).rejects.toThrow(
+      /only ₹40\.00 of this payment remains refundable/,
+    );
+    expect(razorpay.refund).not.toHaveBeenCalled();
+    expect(orderTx.refund.create).not.toHaveBeenCalled();
+  });
+
+  it('releases the PENDING claim (marks it FAILED) when the real gateway call throws, instead of leaving it stuck occupying refundable headroom', async () => {
+    const { prisma, orderTx, razorpay, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
+      makePayment({ status: 'CAPTURED', providerPaymentId: 'pay_abc' }),
+    );
+    orderTx.refund.aggregate.mockResolvedValueOnce({ _sum: { amount: null } });
+    orderTx.refund.create.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PENDING',
+    });
+    razorpay.refund.mockRejectedValue(new Error('gateway unreachable'));
+
+    await expect(service.refund('pay-1', {})).rejects.toThrow(
+      'gateway unreachable',
+    );
+
+    expect(prisma.refund.update).toHaveBeenCalledWith({
+      where: { id: 'refund-1' },
+      data: { status: 'FAILED' },
+    });
+    expect(orderTx.payment.update).not.toHaveBeenCalled();
+  });
+
   it('rejects refunding a payment that was never captured', async () => {
-    const { prisma, service } = createDeps();
-    prisma.payment.findUnique.mockResolvedValue(
+    const { orderTx, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
       makePayment({ status: 'CREATED' }),
     );
 
@@ -728,8 +823,8 @@ describe('PaymentsService.refund', () => {
   });
 
   it('rejects a duplicate refund of an already-fully-REFUNDED payment', async () => {
-    const { prisma, service } = createDeps();
-    prisma.payment.findUnique.mockResolvedValue(
+    const { orderTx, service } = createDeps();
+    orderTx.payment.findUnique.mockResolvedValue(
       makePayment({ status: 'REFUNDED' }),
     );
 

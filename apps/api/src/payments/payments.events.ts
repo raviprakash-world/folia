@@ -2,6 +2,16 @@
 export const PAYMENT_EVENTS = {
   CAPTURED: 'payment.captured',
   FAILED: 'payment.failed',
+  /**
+   * Phase 6 — emitted from PaymentsService.refund() itself (the single
+   * place a refund can actually happen), not from whatever triggered it
+   * (OrdersService.requestCancellation today; a future return-approval
+   * flow or direct admin action later) — so every real refund path gets
+   * the same notification/email for free, matching PAYMENT_EVENTS.CAPTURED's
+   * own reasoning for living in the provider-facing service rather than
+   * each caller re-emitting it.
+   */
+  REFUNDED: 'payment.refunded',
 } as const;
 
 export interface PaymentCapturedPayload {
@@ -19,4 +29,12 @@ export interface PaymentFailedPayload {
   userId: string;
   paymentId: string;
   errorDescription?: string;
+}
+
+export interface PaymentRefundedPayload {
+  /** Null only in the theoretical case a refundable payment never got an order — never actually possible today (confirmAndCreateOrder always sets this before a payment can reach CAPTURED), kept nullable for honesty rather than asserting it. */
+  orderId: string | null;
+  userId: string;
+  paymentId: string;
+  amount: number;
 }

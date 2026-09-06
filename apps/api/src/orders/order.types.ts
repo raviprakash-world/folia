@@ -111,6 +111,8 @@ export interface OrderRecord {
   customerNotes: string | null;
   cancellation?: CancellationRequestRecord | null;
   returnRequest?: ReturnRequestRecord | null;
+  /** Phase 6: the real Payment.status, when the caller's query included it — lets toPublicCancellation derive a real refundStatus instead of the elapsed-time simulation. Optional because not every caller needs cancellation detail (and the raw Prisma `include` shape puts this at order.payment.status, not flattened). */
+  payment?: { status: string } | null;
 }
 
 /** Matches apps/web/src/types/order.ts's Order exactly. cancellation/returnRequest are always null here — a freshly created order has neither; a later order-management phase owns setting them. */
@@ -149,7 +151,7 @@ export function toPublicOrder(order: OrderRecord) {
     trackingUrl: order.trackingUrl,
     customerNotes: order.customerNotes,
     cancellation: order.cancellation
-      ? toPublicCancellation(order.cancellation)
+      ? toPublicCancellation(order.cancellation, order.payment?.status)
       : null,
     returnRequest: order.returnRequest
       ? toPublicReturn(order.returnRequest)
@@ -218,12 +220,33 @@ export interface ReturnRequestRecord {
   requestedAt: Date;
 }
 
-export function toPublicCancellation(c: CancellationRequestRecord) {
+const REFUNDED_PAYMENT_STATUSES = new Set(['REFUNDED', 'PARTIALLY_REFUNDED']);
+
+/**
+ * Phase 6: refundStatus is now derived from the real Payment.status when
+ * it's known (requestCancellation synchronously attempts a real refund —
+ * see OrdersService — so by the time this order is re-read, Payment.status
+ * already reflects whatever really happened), not from
+ * refund.util.ts's elapsed-time simulation. That simulation is kept as
+ * the fallback for the rare case a caller didn't include payment (and is
+ * still exactly what toPublicReturn below uses, since returns aren't
+ * wired to a real refund attempt yet).
+ */
+export function toPublicCancellation(
+  c: CancellationRequestRecord,
+  paymentStatus?: string | null,
+) {
   return {
     requestedAt: c.requestedAt.toISOString(),
     reason: cancellationReasonToPublic[c.reason],
     note: c.note,
-    refundStatus: c.hasRefund ? deriveRefundStatus(c.requestedAt) : null,
+    refundStatus: !c.hasRefund
+      ? null
+      : paymentStatus
+        ? REFUNDED_PAYMENT_STATUSES.has(paymentStatus)
+          ? 'refunded'
+          : 'processing'
+        : deriveRefundStatus(c.requestedAt),
   };
 }
 
