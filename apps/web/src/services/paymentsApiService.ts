@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { Order } from '@/types/order';
 
 export interface GatewayCheckoutInfo {
   keyId: string;
@@ -12,6 +13,8 @@ export interface CreatePaymentResult {
   status: string;
   requiresGatewayCheckout: boolean;
   gateway?: GatewayCheckoutInfo;
+  /** Only ever set for a payment that resolved synchronously at creation (COD) — a gateway payment has no order yet; verifyPayment's result is what eventually carries one. */
+  order?: Order | null;
 }
 
 export interface VerifyPaymentInput {
@@ -20,13 +23,20 @@ export interface VerifyPaymentInput {
   signature: string;
 }
 
-export async function verifyPayment(paymentId: string, input: VerifyPaymentInput): Promise<{ status: string }> {
-  const { data } = await apiClient.post<{ status: string }>(`/payments/${paymentId}/verify`, input);
+/** Phase 2: an Order is only ever created once payment is confirmed, so this — not checkout() — is where a gateway checkout's real order first exists. */
+export interface VerifyPaymentResult {
+  payment: { id: string; status: string };
+  order: Order;
+}
+
+export async function verifyPayment(paymentId: string, input: VerifyPaymentInput): Promise<VerifyPaymentResult> {
+  const { data } = await apiClient.post<VerifyPaymentResult>(`/payments/${paymentId}/verify`, input);
   return data;
 }
 
-export async function retryPayment(orderId: string): Promise<CreatePaymentResult> {
-  const { data } = await apiClient.post<CreatePaymentResult>(`/payments/orders/${orderId}/retry`);
+/** Keyed by paymentId (Phase 2), not orderId — an unconfirmed gateway payment has no order yet to key off of. */
+export async function retryPayment(paymentId: string): Promise<CreatePaymentResult> {
+  const { data } = await apiClient.post<CreatePaymentResult>(`/payments/${paymentId}/retry`);
   return data;
 }
 

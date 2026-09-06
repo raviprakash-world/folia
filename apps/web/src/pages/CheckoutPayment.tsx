@@ -57,7 +57,12 @@ export default function CheckoutPayment() {
     // previous behavior (processPayment's generic, always-succeeds
     // summary) regardless of this flag.
     if (useRealOrdersApi && method !== 'cod') {
-      setPayment({ method, displayLabel: GATEWAY_METHOD_LABELS[method] ?? displayLabel, transactionId: null });
+      // transactionId is a placeholder here, not real (Phase 2: the real
+      // one only exists once checkout()'s payment actually resolves,
+      // still a step away) — matching PaymentSummary's non-nullable
+      // shape (an Order's payment fields are always known by the time an
+      // Order itself exists) rather than using null for "not yet known".
+      setPayment({ method, displayLabel: GATEWAY_METHOD_LABELS[method] ?? displayLabel, transactionId: '' });
       void navigate('/checkout/review');
       return;
     }
