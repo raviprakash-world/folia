@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { apiClient } from './apiClient';
 import type { Order, OrderStatus } from '@/types/order';
 import type { User } from '@/types/auth';
@@ -101,8 +102,13 @@ export async function updateAdminOrderStatus(
 
 /** The real fulfillment action (Phase 5) — creates an actual shipment via the configured courier provider and only then moves the order to SHIPPED. See admin-orders.controller.ts's POST :id/ship. */
 export async function shipAdminOrder(id: string): Promise<Order> {
-  const { data } = await apiClient.post<Order>(`/admin/orders/${id}/ship`);
-  return data;
+  try {
+    const { data } = await apiClient.post<Order>(`/admin/orders/${id}/ship`);
+    return data;
+  } catch (error) {
+    const axiosError = error as AxiosError<{ message?: string }>;
+    throw new Error(axiosError.response?.data?.message ?? 'Shipment failed.', { cause: error });
+  }
 }
 
 // --- Product management (apps/api/src/admin/admin-products.controller.ts) ---

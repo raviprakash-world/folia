@@ -14,7 +14,7 @@ Status legend: 🟡 in progress · ⏸ not started · ✅ gate passed · 🛑 ga
 | 2 | Inventory concurrency + atomic checkout | ✅ gate passed | Phase 0 |
 | 3 | Customer communications | ✅ gate passed (with a stated gap — see below) | Phase 0; a transactional email provider account |
 | 4 | Real admin frontend | ✅ gate passed | Phase 0 (backend admin API already exists) |
-| 5 | Shipping + fulfillment | 🟡 in progress — code complete, unit-tested; live Docker verification pending | Phase 2; a courier/aggregator account + API keys |
+| 5 | Shipping + fulfillment | ✅ gate passed (with a stated gap — see below) | Phase 2; a courier/aggregator account + API keys |
 | 6 | Refunds + returns + order lifecycle | ⏸ not started | Phase 1, Phase 5 |
 | 7 | Media + product catalog + India commerce | ⏸ not started | Phase 0; an object-storage (S3-compatible) account; real product photography; real GST/business details |
 | 8 | DevOps + CI/CD + backups + observability | ⏸ not started | Phase 0 |
@@ -115,7 +115,7 @@ None of the above were fixed in this phase — Phase 0 is inspection and safety 
 
 **Gate: passed.** Both halves of the phase's stated scope (real dashboards, net-new management UI) are done, live-verified end-to-end, and every metric with no real backend equivalent is honestly labeled rather than fabricated.
 
-## Phase 5 — Shipping + fulfillment (IN PROGRESS — gate not yet called)
+## Phase 5 — Shipping + fulfillment
 
 **Objective:** replace the fully-simulated shipping-rate/tracking logic with a real courier aggregator (Shiprocket, chosen per the user's explicit direction, behind a swappable provider interface so a second courier is a new class, not a rewrite), and add the real fulfillment action (assigning a courier, creating a shipment, generating a tracking number) that never existed at all — Phase 4's audit found only a bare status flip behind "mark shipped."
 
@@ -134,9 +134,19 @@ None of the above were fixed in this phase — Phase 0 is inspection and safety 
 - Frontend `tsc -b`, `vite build`, and `eslint . --max-warnings 0` all pass.
 - The Prisma migration itself was verified end-to-end (existing DB + fresh DB), per this project's migration discipline.
 
-**Not yet done — this phase is not closed:**
-- **Live Docker verification has not been run.** The API container needs rebuilding to pick up this phase's code, and that rebuild is currently blocked by the host machine running out of disk space (Docker's buildkit cache write failed with "read-only file system" / ~130MB free) — a host environment issue, not a code issue. The user is freeing up space; once the rebuild succeeds, this phase still needs the same live-verification pass every prior phase got: confirm the app boots with no `SHIPROCKET_*` set, confirm `/shipping/estimate` actually falls back gracefully against real Postgres, confirm the admin ship action actually fails loudly with the expected error, and confirm `getTracking` actually returns the "awaiting fulfillment" shape for a real unshipped order.
-- **Gate: not yet called.** Per this project's own rule, a phase's code compiling and its unit tests passing is not the same as the feature working — this phase stays open until the live-Docker pass above actually runs.
+**Live-verified against Docker (real Postgres), not just unit tests** (after the host's disk-space issue was resolved and the API image rebuilt):
+- The app boots clean and healthy with no `SHIPROCKET_*` variables set at all.
+- `POST /shipping/estimate`: a valid 6-digit PIN returns the graceful-fallback flat rate with a clear logged warning ("Real shipping estimate unavailable, falling back to the flat-rate heuristic: Shiprocket is not configured…"); an old 5-digit ZIP now correctly rejects with 400; the free-shipping threshold still applies on top of the fallback.
+- **A real end-to-end checkout** (fresh user, fresh address, real COD order) produced an Order with `courierId`/`trackingNumber`/`trackingUrl` all `null` — confirmed no courier is ever fabricated at checkout time anymore.
+- `GET /orders/:id/tracking` on that unshipped order returned the honest "awaiting fulfillment" shape: only the `order-placed` stage marked complete, everything else pending, no fabricated location/ETA/proof-of-delivery.
+- The admin ship action (`POST /admin/orders/:id/ship`) on a `CONFIRMED` order failed loudly with the exact "Shiprocket is not configured" error and left the order's status/courier/tracking fields completely untouched — confirmed via a direct re-fetch. Attempting to ship a `PROCESSING` order was rejected before ever reaching the provider ("must be CONFIRMED first"). The generic `PUT :id/status` endpoint now rejects `SHIPPED` outright (`"status must be one of the following values: CONFIRMED, DELIVERED"`), and the `audit_logs` table correctly shows zero `ORDER_SHIP` rows — no phantom success was ever recorded.
+- Existing pre-Phase-5 orders (created before the migration, with the old fictional courier enum values) came through the migration with their `courierId`/`trackingNumber` intact as plain text, confirmed via `GET /admin/orders`.
+- Frontend, driven in a real browser: the cart-page shipping estimator now asks for a "PIN code" and round-trips a real `₹6.50 shipping to 560001 — 2–4 business days` result through the real endpoint; the admin Orders page shows "Ship via courier" instead of the old bare "Mark shipped" button for confirmed orders, and clicking it surfaces the real, specific backend error inline per-row. **A real bug was found and fixed during this pass**: `adminApiService.ts`'s `shipAdminOrder` was letting the raw Axios error through instead of extracting the backend's actual message (the UI showed a generic "Request failed with status code 500" instead of "Shiprocket is not configured…") — fixed to match the same error-passthrough pattern already used by `couponService.ts`/`shippingService.ts`, and confirmed fixed live in the same browser session.
+- Test data (the throwaway user, address, and order created for this pass) was deleted afterward.
+
+**Known gap, stated plainly:** no real Shiprocket account has ever been configured in this environment — every provider-dependent code path (real rate lookup, real shipment creation, real tracking fetch) is unit-tested against a mocked HTTP layer and live-verified for its "not configured" / graceful-fallback behavior only. **An actual real shipment, AWB, or live tracking fetch has never been exercised.** This is IMPLEMENTED BUT UNVERIFIED for the real success path, not VERIFIED, per this project's own evidence standard — same honest posture as Razorpay in Phase 1 and Resend in Phase 3. Also carried forward: the admin product-management table's dependency on `VITE_REAL_CATALOG_API` (noted in Phase 4) is unrelated and unaffected; and the cart-page shipping estimate and actual checkout pricing still use two independent rate tables (noted during this phase's investigation, not unified — out of scope here).
+
+**Gate: passed, with that gap carried forward explicitly**, matching Phase 1/3's precedent for the same class of external-dependency gap.
 
 ## Phases 6–12 — scope reference
 
