@@ -156,3 +156,28 @@ export const netBankingSchema = z.object({
 });
 
 export type NetBankingFormValues = z.infer<typeof netBankingSchema>;
+
+const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+// Kept as validated strings rather than z.coerce.number() — coercion makes
+// a schema's input type (what the form holds) diverge from its output type
+// (what parsing produces), which breaks useForm<T>'s single-type generic.
+// The page converts to a real number only after validation, at submit time.
+const priceString = (label: string) =>
+  z
+    .string()
+    .min(1, `Enter ${label}`)
+    .refine((v) => !isNaN(Number(v)) && Number(v) > 0, `Enter ${label} greater than 0`);
+
+export const adminProductSchema = z.object({
+  slug: z.string().min(1, 'Enter a slug').regex(SLUG_REGEX, 'Lowercase letters, numbers, and hyphens only'),
+  name: z.string().min(1, 'Enter a product name').max(150),
+  price: priceString('a price'),
+  compareAtPrice: z.union([priceString('a compare-at price'), z.literal('')]).optional(),
+  description: z.string().min(1, 'Enter a description').max(4000),
+  categoryId: z.string().min(1, 'Select a category'),
+  badge: z.enum(['New', 'Sale', 'Bestseller', 'Low stock', '']).optional(),
+  careLevel: z.enum(['Easy', 'Moderate', 'Advanced', '']).optional(),
+});
+
+export type AdminProductFormValues = z.infer<typeof adminProductSchema>;

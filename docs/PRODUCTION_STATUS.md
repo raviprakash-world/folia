@@ -1,7 +1,7 @@
 # Folia — Production Status
 
 **Baseline established:** 2026-09-06 · Phase 0
-**Last updated:** 2026-09-06 · after Phase 3 gate passed
+**Last updated:** 2026-09-06 · after Phase 4 gate passed
 **Rollback checkpoint (Phase 0 baseline):** `b617b9a` (origin/main, clean working tree at time of baseline)
 
 This document is the single source of truth for "does it actually work right now."
@@ -15,7 +15,7 @@ out not to exist).
 
 | Workspace | Build | Typecheck | Lint | Test |
 |---|---|---|---|---|
-| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`) in pre-existing files, unchanged since Phase 0; every file Phases 1–3 touched is separately confirmed lint-clean | ✅ 437/437 pass (unit, mocked Prisma; up from 375 at Phase 0 — Phases 1–3 added payments, inventory-locking, checkout-flow, and email tests) |
+| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`) in pre-existing files, unchanged since Phase 0; every file Phases 1–4 touched is separately confirmed lint-clean | ✅ 442/442 pass (unit, mocked Prisma; up from 375 at Phase 0 — Phases 1–4 added payments, inventory-locking, checkout-flow, email, and analytics tests) |
 | `apps/api` (e2e) | — | — | — | ❌ **FAIL** — same Jest config bug as Phase 0, still not fixed (out of scope for Phases 1–3) |
 | `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged since Phase 0) |
 | `packages/*` | n/a | ⚠️ only `shared-types` has a `typecheck` script; `api-client`/`shared-utils` have none | — | — |
@@ -67,6 +67,16 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`.
   explicitly documented as never invoked because nothing fired its event)
   is now wired to a real trigger — `OrdersService.adminUpdateStatus`.
 
+## Phase 4 (Real admin frontend) — what changed
+
+Gate passed — full report in `PRODUCTION_ROADMAP.md`.
+
+- **Admin dashboards are no longer disconnected from the real backend.** A backend gap was found and closed first — `AnalyticsService` had no daily revenue/order time series and no real best/worst-seller endpoint — then all six admin pages (`Overview`, `Revenue`, `Orders`, `Products`, `Customers`, `Search`) were wired to it behind a new `VITE_REAL_ADMIN_API` flag, unit-tested and live-verified (real `curl` calls against Docker Postgres, then driven through the actual running app in a browser as the seeded admin user).
+- **Every metric the real backend genuinely can't compute is honestly labeled, not fabricated.** Revenue's discount/shipping breakdown, active/new-customer counts, lifetime value, wishlist/return/co-purchase analytics, and per-search-term counts all have no real backend equivalent — real mode hides or relabels each of these ("Not yet tracked server-side") rather than rendering a fabricated zero or an empty mock-shaped table.
+- **Net-new management UI that never existed before this phase**, even though the backend endpoints and audit logging were already real: order fulfillment-status changes, full product create/edit/delete (with a real category picker), and user role/deactivate management — all three live-verified end-to-end, including confirming each write produced a real `audit_logs` row.
+- **A real pre-existing bug was found and fixed along the way**: the shared `Modal` component (also used by the storefront's `AddressForm`) had no scroll handling, making its submit button permanently unreachable once its content exceeded the viewport height. Fixed with `max-h-[90vh] overflow-y-auto`, confirmed live in-browser before and after.
+- **Known gap, stated plainly**: the admin product-management table reuses the public catalog endpoints, which are gated by the separate `VITE_REAL_CATALOG_API` flag rather than `VITE_REAL_ADMIN_API` — both happen to be `true` in this repo's `.env`, but a deployment that sets one without the other will silently fall back to mock catalog data in the admin panel.
+
 ### New findings this session (not in the prior audit)
 
 1. **Turbo can't run.** `npx turbo run build` fails immediately with `Could not resolve workspace: Missing devEngines.packageManager or legacy packageManager field`. Every `npm run <script>` at the root that delegates to Turbo (`build`, `dev`, `lint`, `test`, `test:e2e`, `typecheck`) is currently broken. Every verification in this document was run per-workspace directly instead. **Fix:** add a `packageManager` field to root `package.json` (e.g. `"packageManager": "npm@10.x.x"`). Trivial, not yet applied — deferred to whichever phase touches root tooling (candidate: Phase 8).
@@ -78,7 +88,7 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`.
 
 - Payments: **no longer mocked as of Phase 1** — real Razorpay integration exists; see the Phase 1/2 summary above and `API_INTEGRATION_STATUS.md` for exactly what is and isn't live-verified. Shipping, tracking, delivery-availability remain **mocked**, by explicit design, both frontend and backend (Phase 5).
 - Inventory: **the race condition is fixed as of Phase 2** — real `SELECT ... FOR UPDATE` row locking, live-proven against concurrent checkouts. See the Phase 1/2 summary above.
-- Admin frontend: fully disconnected from the real, RBAC-guarded admin API — reads a client-side mock baseline instead.
+- Admin frontend: **wired to the real, RBAC-guarded admin API as of Phase 4** — see the Phase 4 summary above for exactly which metrics stayed honestly mock/unavailable rather than fabricated.
 - Notifications: real in-app records, plus a real email channel as of Phase 3 (code complete, not live-delivery-verified — see the Phase 3 summary above). SMS still has no provider anywhere.
 - Reviews: read-only API, no submission endpoint, all seed data.
 - CI/CD: **does not exist** despite `PRODUCTION_READINESS.md` and `apps/api/CHANGELOG.md` both describing a working GitHub Actions pipeline.

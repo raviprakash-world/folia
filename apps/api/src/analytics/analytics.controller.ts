@@ -75,4 +75,30 @@ export class AnalyticsController {
   getSearch() {
     return this.searchService.getTrending();
   }
+
+  @Get('daily')
+  @ApiOperation({
+    summary:
+      'Real daily order counts + revenue, bucketed by calendar day — the dashboard revenue/orders charts.',
+  })
+  getDaily(@Query('days') days?: string) {
+    return this.analyticsService.getDailyOrderMetrics(
+      days ? Number(days) : undefined,
+    );
+  }
+
+  @Get('top-products')
+  @ApiOperation({
+    summary:
+      'Real best/worst-selling products by actual units sold (not view events).',
+  })
+  getTopProducts(
+    @Query('direction') direction?: 'best' | 'worst',
+    @Query('limit') limit?: string,
+  ) {
+    return this.analyticsService.getTopSellingProducts(
+      direction,
+      limit ? Number(limit) : undefined,
+    );
+  }
 }

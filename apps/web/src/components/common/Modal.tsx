@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ duration: 0.15 }}
-              className="pointer-events-auto w-full max-w-sm bg-stone-light rounded-[var(--radius-card)] shadow-[var(--shadow-lifted)] p-6"
+              className="pointer-events-auto w-full max-w-sm max-h-[90vh] overflow-y-auto bg-stone-light rounded-[var(--radius-card)] shadow-[var(--shadow-lifted)] p-6"
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 id="modal-title" className="font-display text-lg font-semibold text-heading">

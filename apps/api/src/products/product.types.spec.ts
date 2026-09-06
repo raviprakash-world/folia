@@ -94,7 +94,7 @@ describe('toPublicProduct', () => {
 });
 
 describe('toPublicCategory', () => {
-  it('matches the Category shape exactly, no extra fields leaked (e.g. internal id, type)', () => {
+  it('matches the Category shape exactly, plus the real id (Phase 4: the admin product form needs a real categoryId for its category picker, since AdminProductInputDto takes an id, not a slug) — but never the internal type field', () => {
     const category: CategoryRecord = {
       id: 'cat-1',
       slug: 'plants',
@@ -104,11 +104,11 @@ describe('toPublicCategory', () => {
     };
     const result = toPublicCategory(category);
     expect(result).toEqual({
+      id: 'cat-1',
       slug: 'plants',
       name: 'Plants',
       description: 'Living plants',
     });
-    expect(result).not.toHaveProperty('id');
     expect(result).not.toHaveProperty('type');
   });
 });

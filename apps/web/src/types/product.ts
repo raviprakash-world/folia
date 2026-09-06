@@ -66,6 +66,8 @@ export interface ProductQueryResult {
 }
 
 export interface Category {
+  /** Real backend only (Phase 4) — the admin product form's category picker needs a real id, since the admin create/update endpoint takes one, not a slug. Always present from the real API; absent from the older mock catalog data, hence optional. */
+  id?: string;
   slug: string;
   name: string;
   description: string;
