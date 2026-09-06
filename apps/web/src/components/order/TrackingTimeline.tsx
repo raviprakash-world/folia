@@ -16,6 +16,7 @@ import {
   Weight,
   FileSignature,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Alert } from '@/components/common/Alert';
@@ -65,11 +66,15 @@ export function TrackingTimeline({ order }: { order: Order }) {
     return <Alert tone="error">Couldn't load tracking information for this order.</Alert>;
   }
 
-  const courier = getCourier(tracking.courierId);
+  const courier = tracking.courierId ? getCourier(tracking.courierId) : null;
   const isCancelledOrReturned = order.status === 'cancelled' || order.status === 'returned';
 
   return (
     <div className="flex flex-col gap-8">
+      {!courier && !isCancelledOrReturned && (
+        <Alert tone="info">Your order is being prepared. Tracking will appear here once it ships.</Alert>
+      )}
+
       {tracking.isDelayed && !isCancelledOrReturned && (
         <Alert tone="info">
           <span className="flex items-center gap-1.5">
@@ -87,38 +92,57 @@ export function TrackingTimeline({ order }: { order: Order }) {
       )}
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <Card variant="flat" className="p-4 flex items-center gap-3">
-          <span
-            className="flex items-center justify-center w-11 h-11 rounded-full text-stone-light font-mono text-sm font-semibold shrink-0"
-            style={{ backgroundColor: courier.color }}
-            aria-hidden="true"
-          >
-            {courier.monogram}
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-ink">{courier.name}</p>
-            <p className="font-mono text-xs text-ink-soft">{tracking.trackingNumber}</p>
-            <div className="flex items-center gap-3 mt-1 text-xs text-ink-soft">
-              <span className="flex items-center gap-1">
-                <Phone size={11} />
-                {courier.supportPhone}
-              </span>
-              <span className="flex items-center gap-1">
-                <Mail size={11} />
-                {courier.supportEmail}
-              </span>
+        {courier && (
+          <Card variant="flat" className="p-4 flex items-center gap-3">
+            <span
+              className="flex items-center justify-center w-11 h-11 rounded-full text-stone-light font-mono text-sm font-semibold shrink-0"
+              style={{ backgroundColor: courier.color }}
+              aria-hidden="true"
+            >
+              {courier.monogram}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">{courier.name}</p>
+              <p className="font-mono text-xs text-ink-soft">{tracking.trackingNumber}</p>
+              <div className="flex items-center gap-3 mt-1 text-xs text-ink-soft">
+                {courier.supportPhone && (
+                  <span className="flex items-center gap-1">
+                    <Phone size={11} />
+                    {courier.supportPhone}
+                  </span>
+                )}
+                {courier.supportEmail && (
+                  <span className="flex items-center gap-1">
+                    <Mail size={11} />
+                    {courier.supportEmail}
+                  </span>
+                )}
+                {tracking.trackingUrl && (
+                  <a
+                    href={tracking.trackingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-fern hover:text-heading transition-colors"
+                  >
+                    <ExternalLink size={11} />
+                    Track on carrier site
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         <Card variant="flat" className="p-4">
           <p className="text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">Estimated delivery</p>
           <p className="text-sm text-ink">{order.estimatedDelivery}</p>
           <div className="flex items-center gap-4 mt-2 text-xs text-ink-soft">
-            <span className="flex items-center gap-1">
-              <MapPin size={11} />
-              {tracking.currentLocation}
-            </span>
+            {tracking.currentLocation && (
+              <span className="flex items-center gap-1">
+                <MapPin size={11} />
+                {tracking.currentLocation}
+              </span>
+            )}
             <span className="flex items-center gap-1">
               <Weight size={11} />
               {packageDetails.weightLbs} lbs · {packageDetails.dimensions}

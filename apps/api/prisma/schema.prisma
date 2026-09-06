@@ -18,8 +18,8 @@ datasource db {
 /// relation, not a free-text string, so RBAC checks always resolve
 /// against a real, seeded Role row.
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
+  id           String @id @default(uuid())
+  email        String @unique
   passwordHash String
 
   firstName String
@@ -92,17 +92,17 @@ model Permission {
 /// revoke each active session, and a compromised refresh token can be
 /// revoked without invalidating every other session.
 model Session {
-  id                String    @id @default(uuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refreshTokenHash  String    @unique
-  userAgent         String?
-  ipAddress         String?
-  deviceName        String?
-  createdAt         DateTime  @default(now())
-  lastUsedAt        DateTime  @default(now())
-  expiresAt         DateTime
-  revokedAt         DateTime?
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ipAddress        String?
+  deviceName       String?
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
 
   @@index([userId])
   @@map("sessions")
@@ -174,8 +174,8 @@ model Category {
 /// queryable infrastructure ahead of the frontend feature that will
 /// eventually use it, not a placeholder.
 model Brand {
-  id   String  @id @default(uuid())
-  slug String  @unique
+  id   String @id @default(uuid())
+  slug String @unique
   name String
 
   products Product[]
@@ -206,12 +206,12 @@ enum CareLevel {
 }
 
 model Product {
-  id              String        @id @default(uuid())
-  slug            String        @unique
-  name            String
-  price           Decimal       @db.Decimal(10, 2)
-  compareAtPrice  Decimal?      @db.Decimal(10, 2)
-  description     String
+  id             String   @id @default(uuid())
+  slug           String   @unique
+  name           String
+  price          Decimal  @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  description    String
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
@@ -219,22 +219,22 @@ model Product {
   brandId String?
   brand   Brand?  @relation(fields: [brandId], references: [id])
 
-  badge      ProductBadge?
-  careLevel  CareLevel?
-  rating     Decimal?      @db.Decimal(2, 1)
-  reviewCount Int          @default(0)
+  badge       ProductBadge?
+  careLevel   CareLevel?
+  rating      Decimal?      @db.Decimal(2, 1)
+  reviewCount Int           @default(0)
 
   inStock    Boolean @default(true)
   stockCount Int     @default(0)
 
-  variants ProductVariant[]
-  specs    ProductSpec[]
-  images   ProductImage[]
-  reviews  Review[]
+  variants       ProductVariant[]
+  specs          ProductSpec[]
+  images         ProductImage[]
+  reviews        Review[]
   inventoryItems InventoryItem[]
   cartItems      CartItem[]
   wishlistedBy   WishlistItem[]
-  tags     Tag[]            @relation("ProductTags")
+  tags           Tag[]            @relation("ProductTags")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -252,12 +252,12 @@ model Product {
 /// system (the frontend's product page doesn't price variants
 /// differently, so this doesn't invent that capability speculatively).
 model ProductVariant {
-  id      String  @id @default(uuid())
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  label   String
-  swatch  String?
-  inStock Boolean @default(true)
+  id             String          @id @default(uuid())
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label          String
+  swatch         String?
+  inStock        Boolean         @default(true)
   inventoryItems InventoryItem[]
   cartItems      CartItem[]
 
@@ -325,10 +325,10 @@ model Review {
 // --- Phase 3: Inventory ---
 
 model Warehouse {
-  id       String  @id @default(uuid())
-  code     String  @unique
-  name     String
-  isActive Boolean @default(true)
+  id        String  @id @default(uuid())
+  code      String  @unique
+  name      String
+  isActive  Boolean @default(true)
   /// Exactly one warehouse should be the default at any time — enforced
   /// in WarehousesService.setDefault(), not at the schema level (Prisma/
   /// Postgres don't support a "only one row where X=true" constraint
@@ -354,8 +354,8 @@ model Warehouse {
 /// read path (ProductsService, already built and tested) needed zero
 /// changes because of this design.
 model InventoryItem {
-  id        String  @id @default(uuid())
-  sku       String  @unique
+  id  String @id @default(uuid())
+  sku String @unique
 
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -366,9 +366,9 @@ model InventoryItem {
   warehouseId String
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
 
-  quantityOnHand  Int @default(0)
+  quantityOnHand   Int @default(0)
   quantityReserved Int @default(0)
-  reorderPoint    Int @default(0)
+  reorderPoint     Int @default(0)
 
   reservations StockReservation[]
 
@@ -407,16 +407,16 @@ enum ReservationReferenceType {
 }
 
 model StockReservation {
-  id              String            @id @default(uuid())
+  id              String                   @id @default(uuid())
   inventoryItemId String
-  inventoryItem   InventoryItem     @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem            @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   quantity        Int
   referenceType   ReservationReferenceType
   referenceId     String
-  status          ReservationStatus @default(ACTIVE)
+  status          ReservationStatus        @default(ACTIVE)
   expiresAt       DateTime
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
   @@index([inventoryItemId])
   @@index([referenceType, referenceId])
@@ -452,15 +452,15 @@ model Cart {
 /// level — adding the same product+variant again is a quantity update,
 /// not a second row, mirroring apps/web's buildLineId composite-key logic.
 model CartItem {
-  id        String         @id @default(uuid())
+  id        String          @id @default(uuid())
   cartId    String
-  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
-  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
   quantity  Int
-  unitPrice Decimal        @db.Decimal(10, 2)
+  unitPrice Decimal         @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -532,17 +532,17 @@ enum DeliveryTimeSlot {
 /// field — including the geo placeholder (never a real geolocation
 /// lookup, same as the frontend's own explicit "mock" labeling).
 model Address {
-  id      String @id @default(uuid())
-  userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  fullName        String
-  phone           String
-  alternatePhone  String?
-  email           String?
-  companyName     String?
+  fullName       String
+  phone          String
+  alternatePhone String?
+  email          String?
+  companyName    String?
 
-  addressLine1        String
+  addressLine1         String
   addressLine2         String?
   landmark             String?
   deliveryInstructions String?
@@ -641,14 +641,6 @@ enum RefundStatus {
   FAILED
 }
 
-enum CourierId {
-  SWIFTPOST
-  CASCADE_EXPRESS
-  TRAILRUNNER
-  NORTHLINE
-  QUICKHATCH
-}
-
 /// Matches apps/web/src/types/order.ts's Order exactly. Addresses are
 /// snapshotted as JSON (see shippingAddressSnapshot/billingAddressSnapshot
 /// below), not a live FK to Address, deliberately — an order's shipping/
@@ -659,23 +651,25 @@ model Order {
   /// by OrdersService, matching apps/web/src/utils/orderId.ts's
   /// generateOrderId() format ("FOL-YYYYMMDD-NNNN") exactly. This is the
   /// same string the frontend already displays as the order id/number,
-  /// and it's also the seed hashOrderId() uses to deterministically
-  /// assign a courier and tracking number — a random UUID here would
-  /// break that derivation entirely.
-  id        String      @id
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  /// and it's also the id passed to Shiprocket as the real shipment's
+  /// own "order_id" (Phase 5) so a support agent can correlate a
+  /// Shiprocket dashboard entry back to this order without a database
+  /// lookup — a random UUID here would be just as valid for that, but
+  /// there's no reason to change a format the frontend already displays.
+  id     String @id
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  status    OrderStatus @default(PROCESSING)
+  status OrderStatus @default(PROCESSING)
 
   items OrderItem[]
 
-  subtotal     Decimal  @db.Decimal(10, 2)
-  discount     Decimal  @db.Decimal(10, 2) @default(0)
+  subtotal     Decimal @db.Decimal(10, 2)
+  discount     Decimal @default(0) @db.Decimal(10, 2)
   couponCode   String?
-  shippingCost Decimal  @db.Decimal(10, 2)
-  tax          Decimal  @db.Decimal(10, 2)
-  total        Decimal  @db.Decimal(10, 2)
+  shippingCost Decimal @db.Decimal(10, 2)
+  tax          Decimal @db.Decimal(10, 2)
+  total        Decimal @db.Decimal(10, 2)
 
   /// The full Address object (apps/web/src/types/address.ts's shape,
   /// including id) as it was at checkout time, stored as JSON rather than
@@ -688,8 +682,8 @@ model Order {
   shippingAddressSnapshot Json
   billingAddressSnapshot  Json
 
-  deliveryMethod     DeliveryMethodType
-  estimatedDelivery  String
+  deliveryMethod    DeliveryMethodType
+  estimatedDelivery String
 
   paymentMethod        PaymentMethodType
   /// Required again as of Phase 2 (inventory concurrency + atomic
@@ -710,10 +704,29 @@ model Order {
   /// OrdersService.checkout, not at the DB level, matching this schema's
   /// existing convention of application-enforced invariants like
   /// Warehouse.isDefault).
-  payment Payment?
+  payment              Payment?
 
-  courierId       CourierId
-  trackingNumber  String
+  /// Phase 5: no longer a fixed CourierId enum (5 fictional couriers,
+  /// deterministically assigned at checkout) — a real courier aggregator
+  /// (Shiprocket) can return any of dozens of real courier names, so this
+  /// is free text now. All three are null until an admin actually ships
+  /// the order (AdminOrdersController's POST .../ship, backed by
+  /// ShippingProviderClient.createShipment) — an Order is created the
+  /// moment payment resolves, which is genuinely before any courier has
+  /// been chosen or an AWB assigned; OrdersService.getTracking returns an
+  /// honest "awaiting fulfillment" response for these rather than
+  /// simulating transit for a shipment that doesn't exist yet.
+  courierId      String?
+  trackingNumber String?
+  /// A real, direct link to the shipment's tracking page on the
+  /// courier/aggregator's own site, when the provider returns one.
+  trackingUrl    String?
+  /// When the real shipment was actually created — distinct from
+  /// createdAt (order placement/payment time). OrdersService.getTracking
+  /// simulates progress from this timestamp once set, not from
+  /// createdAt, since a delivery window genuinely starts when a courier
+  /// takes the package, not when the order was placed.
+  shippedAt      DateTime?
 
   customerNotes String?
 
@@ -733,17 +746,17 @@ model Order {
 /// snapshot above: an order must stay historically accurate even if the
 /// product is later renamed, repriced, or deleted.
 model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
+  id           String  @id @default(uuid())
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
   slug         String
   name         String
   categorySlug String
   variantId    String?
   variantLabel String?
-  price    Decimal @db.Decimal(10, 2)
-  quantity Int
+  price        Decimal @db.Decimal(10, 2)
+  quantity     Int
 
   /// Phase 1 (payments): which exact InventoryItem row this line's stock
   /// was decremented from at checkout — set so a failed/expired payment
@@ -782,10 +795,10 @@ model OrderItem {
 /// payment's reservations — see that method for why both must be atomic
 /// together.
 model Payment {
-  id       String @id @default(uuid())
-  orderId  String? @unique
-  order    Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  userId   String
+  id      String  @id @default(uuid())
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId  String
 
   /// Moved here from Order in Phase 2 — Payment, not Order, is now the
   /// first thing created on checkout, so it's the natural idempotency
@@ -796,20 +809,20 @@ model Payment {
 
   provider PaymentProvider
   method   PaymentMethodType
-  status   PaymentStatus @default(CREATED)
+  status   PaymentStatus     @default(CREATED)
 
   amount   Decimal @db.Decimal(10, 2)
   currency String  @default("INR")
 
   /// Razorpay's order_id (order_xxx) — set at creation for RAZORPAY,
   /// always null for COD.
-  providerOrderId String?
+  providerOrderId   String?
   /// Razorpay's payment_id (pay_xxx) — set only once captured.
   providerPaymentId String?
   /// Already-masked, e.g. "Visa •••• 4242" / "Pay on delivery" — never raw
   /// card/account data, matching this project's existing convention (see
   /// the payment DTO this replaces).
-  displayLabel String?
+  displayLabel      String?
 
   /// Everything OrdersService.confirmAndCreateOrder needs to create the
   /// real Order row once this payment is confirmed: the pre-generated
@@ -846,7 +859,7 @@ model PaymentAttempt {
   errorDescription  String?
   /// Raw provider response/webhook payload for this attempt — kept for
   /// real reconciliation/debugging, never rendered back to the customer.
-  rawResponse Json?
+  rawResponse       Json?
 
   createdAt DateTime @default(now())
 

@@ -8,6 +8,7 @@ import { PaymentsModule } from '../payments/payments.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { TrackingModule } from '../tracking/tracking.module';
 import { AppConfigModule } from '../config/config.module';
+import { ShippingModule } from '../shipping/shipping.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AppConfigModule } from '../config/config.module';
     InventoryModule,
     TrackingModule,
     AppConfigModule,
+    ShippingModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

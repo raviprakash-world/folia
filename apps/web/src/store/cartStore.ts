@@ -172,7 +172,7 @@ export const useCartStore = create<CartState>()(
             shippingError: null,
           });
         } catch (error) {
-          const message = error instanceof ShippingError ? error.message : "Couldn't estimate shipping for that ZIP.";
+          const message = error instanceof ShippingError ? error.message : "Couldn't estimate shipping for that PIN code.";
           set({ shippingStatus: 'error', shippingError: message, shippingCost: null, shippingEta: null });
         }
       },

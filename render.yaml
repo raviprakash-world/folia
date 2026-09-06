@@ -58,3 +58,15 @@ services:
         value: 'Folia <onboarding@resend.dev>'
       - key: FRONTEND_URL
         value: https://web-drab-mu-24.vercel.app
+      # Same sync: false / boots-without-it treatment as Razorpay/Resend
+      # above — the cart-page shipping estimate falls back to a flat-rate
+      # heuristic, and the admin "ship this order" action fails loudly,
+      # until these are real Shiprocket values.
+      - key: SHIPROCKET_EMAIL
+        sync: false
+      - key: SHIPROCKET_PASSWORD
+        sync: false
+      - key: SHIPROCKET_PICKUP_LOCATION
+        sync: false
+      - key: SHIPROCKET_PICKUP_PINCODE
+        sync: false

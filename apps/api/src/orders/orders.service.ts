@@ -2,6 +2,7 @@
 import { randomUUID } from 'crypto';
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,17 +19,16 @@ import {
 import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { TrackingService } from '../tracking/tracking.service';
-import { toPublicAddress } from '../addresses/address.types';
 import {
-  assignCourier,
-  generateOrderId,
-  generateTrackingNumber,
-} from './order-id.util';
+  TRACKING_STAGE_DEFS,
+  stagePublicName,
+} from '../tracking/tracking.types';
+import { toPublicAddress } from '../addresses/address.types';
+import { generateOrderId } from './order-id.util';
 import {
   DELIVERY_METHOD_DEFS,
   TAX_RATE,
   toPublicOrder,
-  courierIdToPublicName,
   CANCELLATION_REASON_TO_DB,
   RETURN_REASON_TO_DB,
 } from './order.types';
@@ -36,6 +36,10 @@ import { canCancelOrder, canReturnOrder } from './refund.util';
 import { canTransitionStatus } from './order-status.util';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { OrderStatusChangedPayload } from '../notifications/notification.events';
+import {
+  SHIPPING_PROVIDER,
+  type ShippingProviderClient,
+} from '../shipping/providers/shipping-provider.interface';
 import type { CheckoutDto } from './dto/checkout.dto';
 import type { CancelOrderDto } from './dto/cancel-order.dto';
 import type { ReturnOrderDto } from './dto/return-order.dto';
@@ -43,7 +47,6 @@ import type {
   DeliveryMethodType,
   PaymentMethodType,
   AddressSnapshot,
-  CourierIdDb,
   CheckoutSnapshot,
 } from './order.types';
 
@@ -81,6 +84,8 @@ export class OrdersService {
     private readonly trackingService: TrackingService,
     private readonly config: AppConfigService,
     private readonly eventEmitter: EventEmitter2,
+    @Inject(SHIPPING_PROVIDER)
+    private readonly shippingProvider: ShippingProviderClient,
   ) {}
 
   /**
@@ -219,16 +224,12 @@ export class OrdersService {
     }
 
     const orderId = generateOrderId();
-    const courierId = assignCourier(orderId);
-    const trackingNumber = generateTrackingNumber(orderId, courierId);
 
     const shippingSnapshot: AddressSnapshot = toPublicAddress(shippingAddress);
     const billingSnapshot: AddressSnapshot = toPublicAddress(billingAddress);
 
     const checkoutSnapshot: CheckoutSnapshot = {
       orderId,
-      courierId,
-      trackingNumber,
       subtotal,
       discount,
       couponCode: couponCode ?? null,
@@ -413,11 +414,24 @@ export class OrdersService {
       createdAt: Date;
       deliveryMethod: DeliveryMethodType;
       shippingAddressSnapshot: { city: string };
-      courierId: string;
-      trackingNumber: string;
+      courierId: string | null;
+      trackingNumber: string | null;
+      trackingUrl: string | null;
+      shippedAt: Date | null;
       cancellation: { requestedAt: Date } | null;
       returnRequest: { requestedAt: Date } | null;
     };
+
+    // No real shipment exists yet (Phase 5: courier assignment moved out
+    // of checkout, into the admin ship action) — an honest "we have your
+    // order, haven't shipped it yet" response, not a fabricated in-transit
+    // simulation for a courier that was never actually assigned.
+    if (!typedOrder.courierId || !typedOrder.trackingNumber) {
+      return this.buildAwaitingFulfillmentTracking(
+        orderId,
+        typedOrder.createdAt,
+      );
+    }
 
     // A cancelled/returned order's tracking simulation freezes at the
     // moment it was cancelled/returned — it shouldn't keep "progressing"
@@ -426,15 +440,145 @@ export class OrdersService {
       typedOrder.cancellation?.requestedAt ??
       typedOrder.returnRequest?.requestedAt;
 
-    return this.trackingService.simulate({
+    const simulated = this.trackingService.simulate({
       orderId,
-      placedAt: typedOrder.createdAt,
+      // Progress counts from when the shipment actually left (shippedAt),
+      // not from order placement — a delivery window starts when a
+      // courier takes the package, not when payment resolved.
+      placedAt: typedOrder.shippedAt ?? typedOrder.createdAt,
       deliveryMethod: typedOrder.deliveryMethod,
       destinationCity: typedOrder.shippingAddressSnapshot.city,
-      courierId: courierIdToPublicName(typedOrder.courierId as CourierIdDb),
+      courierId: typedOrder.courierId,
       trackingNumber: typedOrder.trackingNumber,
       frozenAt,
     });
+    return { ...simulated, trackingUrl: typedOrder.trackingUrl };
+  }
+
+  private buildAwaitingFulfillmentTracking(orderId: string, placedAt: Date) {
+    const stages = TRACKING_STAGE_DEFS.map((def, i) => ({
+      stage: stagePublicName(def.stage),
+      label: def.label,
+      description: def.description,
+      completed: i === 0,
+      timestamp: i === 0 ? placedAt.toISOString() : null,
+    }));
+    return {
+      orderId,
+      courierId: null,
+      trackingNumber: null,
+      trackingUrl: null,
+      currentLocation: null,
+      progressPercent: Math.round((1 / TRACKING_STAGE_DEFS.length) * 100),
+      stages,
+      isDelayed: false,
+      delayHours: null,
+      estimatedWindowStart: null,
+      estimatedWindowEnd: null,
+      proofOfDelivery: null,
+    };
+  }
+
+  /**
+   * The real fulfillment action Phase 4's admin panel was missing (see
+   * docs/PRODUCTION_STATUS.md) — creates a real shipment via
+   * ShippingProviderClient.createShipment, assigning a genuine courier
+   * name, AWB (tracking number), and tracking link, then moves the order
+   * to SHIPPED. Deliberately its own method rather than going through
+   * adminUpdateStatus/canTransitionStatus: CONFIRMED -> SHIPPED is no
+   * longer a bare status flip (see order-status.util.ts's doc comment)
+   * — it has a real, failable side effect that must complete before the
+   * status changes, so an admin who clicks "ship" and gets a Shiprocket
+   * error sees the order still sitting in CONFIRMED, not silently marked
+   * shipped with no real shipment behind it.
+   */
+  async shipOrder(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException('Order not found.');
+
+    const typedOrder = order as unknown as {
+      status: string;
+      userId: string;
+      total: { toNumber(): number };
+      paymentMethod: string;
+      shippingAddressSnapshot: {
+        fullName: string;
+        addressLine1: string;
+        addressLine2?: string;
+        city: string;
+        state: string;
+        postalCode: string;
+        country: string;
+        phone: string;
+        email?: string;
+      };
+      items: {
+        name: string;
+        quantity: number;
+        price: { toNumber(): number };
+      }[];
+    };
+
+    if (typedOrder.status !== 'CONFIRMED') {
+      throw new BadRequestException(
+        `Cannot ship an order in ${typedOrder.status} status — it must be CONFIRMED first.`,
+      );
+    }
+
+    const shipment = await this.shippingProvider.createShipment({
+      orderId,
+      orderDate: new Date(),
+      shippingAddress: {
+        fullName: typedOrder.shippingAddressSnapshot.fullName,
+        addressLine1: typedOrder.shippingAddressSnapshot.addressLine1,
+        addressLine2: typedOrder.shippingAddressSnapshot.addressLine2,
+        city: typedOrder.shippingAddressSnapshot.city,
+        state: typedOrder.shippingAddressSnapshot.state,
+        pincode: typedOrder.shippingAddressSnapshot.postalCode,
+        country: typedOrder.shippingAddressSnapshot.country,
+        phone: typedOrder.shippingAddressSnapshot.phone,
+        email: typedOrder.shippingAddressSnapshot.email,
+      },
+      items: typedOrder.items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.price.toNumber(),
+      })),
+      subtotal: typedOrder.total.toNumber(),
+      isCod: typedOrder.paymentMethod === 'COD',
+      // No real per-product weight catalog exists (see
+      // apps/web/src/utils/packageDetails.ts's own disclaimer) — a
+      // reasonable flat estimate scaled by item count, same honesty
+      // posture as ShiprocketProvider's placeholder parcel dimensions.
+      weightKg: Math.max(
+        0.5,
+        typedOrder.items.reduce((sum, item) => sum + item.quantity, 0) * 0.5,
+      ),
+    });
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'SHIPPED',
+        courierId: shipment.courierName,
+        trackingNumber: shipment.awbCode,
+        trackingUrl: shipment.trackingUrl,
+        shippedAt: new Date(),
+      },
+    });
+
+    const payload: OrderStatusChangedPayload = {
+      orderId,
+      userId: typedOrder.userId,
+      status: 'SHIPPED',
+    };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.ORDER_STATUS_CHANGED, payload);
+
+    return this.findOneForUser(typedOrder.userId, orderId);
   }
 
   /** Real admin visibility across every customer's orders — genuinely new; every prior method in this service is scoped to a single user's own orders. */

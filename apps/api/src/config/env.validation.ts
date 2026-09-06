@@ -125,6 +125,28 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   FRONTEND_URL = 'http://localhost:5173';
+
+  /**
+   * Same optional-at-validation reasoning as Razorpay/Resend above — an
+   * environment with no Shiprocket account configured must still boot.
+   * ShiprocketProvider fails loudly at the point of actual use instead.
+   */
+  @IsString()
+  @IsOptional()
+  SHIPROCKET_EMAIL?: string;
+
+  @IsString()
+  @IsOptional()
+  SHIPROCKET_PASSWORD?: string;
+
+  /** Pickup location nickname from the Shiprocket dashboard — required only for real shipment creation, not for a serviceability/rate check. */
+  @IsString()
+  @IsOptional()
+  SHIPROCKET_PICKUP_LOCATION?: string;
+
+  @IsString()
+  @IsOptional()
+  SHIPROCKET_PICKUP_PINCODE?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

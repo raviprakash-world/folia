@@ -14,7 +14,7 @@ Status legend: 🟡 in progress · ⏸ not started · ✅ gate passed · 🛑 ga
 | 2 | Inventory concurrency + atomic checkout | ✅ gate passed | Phase 0 |
 | 3 | Customer communications | ✅ gate passed (with a stated gap — see below) | Phase 0; a transactional email provider account |
 | 4 | Real admin frontend | ✅ gate passed | Phase 0 (backend admin API already exists) |
-| 5 | Shipping + fulfillment | ⏸ not started | Phase 2; a courier/aggregator account + API keys |
+| 5 | Shipping + fulfillment | 🟡 in progress — code complete, unit-tested; live Docker verification pending | Phase 2; a courier/aggregator account + API keys |
 | 6 | Refunds + returns + order lifecycle | ⏸ not started | Phase 1, Phase 5 |
 | 7 | Media + product catalog + India commerce | ⏸ not started | Phase 0; an object-storage (S3-compatible) account; real product photography; real GST/business details |
 | 8 | DevOps + CI/CD + backups + observability | ⏸ not started | Phase 0 |
@@ -115,7 +115,30 @@ None of the above were fixed in this phase — Phase 0 is inspection and safety 
 
 **Gate: passed.** Both halves of the phase's stated scope (real dashboards, net-new management UI) are done, live-verified end-to-end, and every metric with no real backend equivalent is honestly labeled rather than fabricated.
 
-## Phases 5–12 — scope reference
+## Phase 5 — Shipping + fulfillment (IN PROGRESS — gate not yet called)
+
+**Objective:** replace the fully-simulated shipping-rate/tracking logic with a real courier aggregator (Shiprocket, chosen per the user's explicit direction, behind a swappable provider interface so a second courier is a new class, not a rewrite), and add the real fulfillment action (assigning a courier, creating a shipment, generating a tracking number) that never existed at all — Phase 4's audit found only a bare status flip behind "mark shipped."
+
+**Investigation first, per this project's discipline:** a dedicated read-only pass over `apps/api/src/shipping/*`, `apps/api/src/tracking/*`, and every related frontend service confirmed shipping/tracking were 100% pure, synchronous, zero-I/O computation — no real HTTP call anywhere, no `Shipment` data model (courier/tracking lived as flat scalar columns directly on `Order`), and courier + tracking number were assigned via a deterministic hash *at checkout time*, before any real courier was ever chosen. `TrackingService.simulate`'s own proof-of-delivery output literally strings the words "no real courier integration exists behind this record."
+
+**Done this phase:**
+- New `ShippingProviderClient` interface (`checkServiceability`/`createShipment`/`trackShipment`) + injection token, matching this codebase's established `PaymentProviderClient`/`EmailService` abstraction exactly. `ShiprocketProvider` is the one real implementation — Shiprocket has no official Node SDK, so this talks to its REST API directly via the platform's native `fetch` (no new HTTP-client dependency for one provider), with real email/password login, in-memory bearer-token caching, and an automatic single retry-with-fresh-login on a 401.
+- `ShippingService.estimate()` (the cart-page rate widget) now tries a real Shiprocket serviceability/rate check first, falling back to the existing flat-rate heuristic on any failure or missing configuration — a public, unauthenticated, constantly-hit endpoint must never break over a missing courier account. The admin "ship this order" action deliberately does NOT get this treatment: a real, failable side effect (an actual courier shipment) must fail loudly, not silently no-op.
+- **Real net-new admin fulfillment action**: `POST /admin/orders/:id/ship` creates an actual shipment via the configured provider, then — and only on success — assigns the real courier name, AWB (tracking number), and tracking link, and moves the order to SHIPPED. `CONFIRMED → SHIPPED` was removed from the generic status-only admin endpoint entirely (same reasoning this codebase already applied to CANCELLED/RETURNED: a real side effect needs a real endpoint, not a bare status PUT).
+- **Real schema change, migrated correctly**: `Order.courierId` (a fixed 5-fictional-courier Postgres enum, assigned deterministically at checkout) is now free text — a real aggregator can return dozens of different real courier names — and, along with `trackingNumber`, is nullable: an Order is created the moment payment resolves, genuinely before any courier has been chosen. Added `trackingUrl` (a real deep link to the courier's own tracking page) and `shippedAt` (so tracking simulation counts from actual ship time, not order placement). Migration verified against both the existing dev database (all prior fictional courier values preserved as text, zero data loss) and a fresh database from zero migrations.
+- `OrdersService.getTracking()` now returns an honest "awaiting fulfillment" response (only the first tracking stage marked complete, no fabricated in-transit progress) for any order with no courier assigned yet, instead of simulating transit for a shipment that doesn't exist.
+- Frontend: `Order.courierId`/`trackingNumber` are now `string | null`; `TrackingTimeline.tsx` shows an honest "being prepared" state pre-shipment, a real "track on carrier site" link once shipped, and no longer mislabels an unrecognized real courier name as the fictional "SwiftPost" (the pre-existing `getCourier()` fallback, found and fixed during this phase). The cart-page shipping-estimate widget now validates a 6-digit Indian PIN code instead of a 5-digit US ZIP (forced by integrating a real India-only courier aggregator) — a genuinely new admin "Ship via courier" action replaces the old bare "Mark shipped" button.
+
+**Verified so far:**
+- 452/452 backend unit tests pass (up from 442), including new `ShiprocketProvider`/`ShippingService`/`OrdersService.shipOrder` coverage (real login → bearer-token flow with mocked `fetch`, the 401-retry-once behavior, every "not configured" failure path, the estimate's real-quote-vs-fallback branching, and the ship action's success/failure/wrong-status paths).
+- Frontend `tsc -b`, `vite build`, and `eslint . --max-warnings 0` all pass.
+- The Prisma migration itself was verified end-to-end (existing DB + fresh DB), per this project's migration discipline.
+
+**Not yet done — this phase is not closed:**
+- **Live Docker verification has not been run.** The API container needs rebuilding to pick up this phase's code, and that rebuild is currently blocked by the host machine running out of disk space (Docker's buildkit cache write failed with "read-only file system" / ~130MB free) — a host environment issue, not a code issue. The user is freeing up space; once the rebuild succeeds, this phase still needs the same live-verification pass every prior phase got: confirm the app boots with no `SHIPROCKET_*` set, confirm `/shipping/estimate` actually falls back gracefully against real Postgres, confirm the admin ship action actually fails loudly with the expected error, and confirm `getTracking` actually returns the "awaiting fulfillment" shape for a real unshipped order.
+- **Gate: not yet called.** Per this project's own rule, a phase's code compiling and its unit tests passing is not the same as the feature working — this phase stays open until the live-Docker pass above actually runs.
+
+## Phases 6–12 — scope reference
 
 Full phase-by-phase scope (objective, backend/frontend/database work, required
 tests, and acceptance criteria) is as specified in the governing production-

@@ -12,6 +12,6 @@ export class ShippingController {
 
   @Post('estimate')
   estimate(@Body() dto: EstimateShippingDto) {
-    return this.shippingService.estimate(dto.zip, dto.subtotal);
+    return this.shippingService.estimate(dto.pincode, dto.subtotal);
   }
 }

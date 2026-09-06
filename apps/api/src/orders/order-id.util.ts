@@ -1,8 +1,7 @@
 /**
- * Ported directly from apps/web/src/utils/orderId.ts and tracking.ts —
- * same formats, same deterministic hash — so an order created by this
- * backend looks and behaves identically to one the frontend's mock
- * checkout already produces.
+ * Ported directly from apps/web/src/utils/orderId.ts — same format — so
+ * an order created by this backend looks and behaves identically to one
+ * the frontend's mock checkout already produces.
  */
 export function generateOrderId(date: Date = new Date()): string {
   const y = date.getFullYear();
@@ -20,36 +19,4 @@ export function hashOrderId(input: string): number {
     hash |= 0;
   }
   return Math.abs(hash);
-}
-
-// Order matters — this is the exact array apps/web/src/data/couriers.ts
-// declares, and assignCourier's modulo indexing depends on that order.
-const COURIER_IDS = [
-  'SWIFTPOST',
-  'CASCADE_EXPRESS',
-  'TRAILRUNNER',
-  'NORTHLINE',
-  'QUICKHATCH',
-] as const;
-export type CourierId = (typeof COURIER_IDS)[number];
-
-export function assignCourier(orderId: string): CourierId {
-  const index = hashOrderId(orderId) % COURIER_IDS.length;
-  return COURIER_IDS[index];
-}
-
-export function generateTrackingNumber(
-  orderId: string,
-  courierId: CourierId,
-): string {
-  // Matches apps/web's courierId.slice(0,2) on the *lowercase, hyphenated*
-  // id (e.g. "sw" from "swiftpost", "ca" from "cascade-express") — not the
-  // backend's SCREAMING_SNAKE_CASE enum value, so this maps back to that
-  // exact display form first rather than slicing the enum name itself.
-  const displayId = courierId.toLowerCase().replace(/_/g, '-');
-  const prefix = displayId.slice(0, 2).toUpperCase();
-  const digits = String(hashOrderId(orderId + displayId))
-    .slice(0, 9)
-    .padStart(9, '0');
-  return `${prefix}${digits}`;
 }

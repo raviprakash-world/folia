@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, Min } from 'class-validator';
+import { IsNumber, IsString, Matches, Min } from 'class-validator';
 
 export class EstimateShippingDto {
-  @ApiProperty({ example: '90210' })
+  @ApiProperty({ example: '560001' })
   @IsString()
-  zip!: string;
+  @Matches(/^\d{6}$/, { message: 'Enter a 6-digit PIN code.' })
+  pincode!: string;
 
   @ApiProperty()
   @IsNumber()

@@ -92,6 +92,7 @@ export const trackingHandlers = [
       orderId,
       courierId,
       trackingNumber,
+      trackingUrl: null,
       currentLocation,
       progressPercent: Math.round((completedCount / stageCount) * 100),
       stages,

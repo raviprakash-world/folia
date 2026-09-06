@@ -1,10 +1,13 @@
 import { canTransitionStatus } from './order-status.util';
 
 describe('canTransitionStatus', () => {
-  it('allows the real forward fulfillment progression', () => {
+  it('allows the real forward fulfillment progression this generic endpoint still owns', () => {
     expect(canTransitionStatus('PROCESSING', 'CONFIRMED')).toBe(true);
-    expect(canTransitionStatus('CONFIRMED', 'SHIPPED')).toBe(true);
     expect(canTransitionStatus('SHIPPED', 'DELIVERED')).toBe(true);
+  });
+
+  it('rejects CONFIRMED -> SHIPPED through this generic endpoint (Phase 5): that step now requires the dedicated ship action, which actually creates a real shipment first', () => {
+    expect(canTransitionStatus('CONFIRMED', 'SHIPPED')).toBe(false);
   });
 
   it('rejects skipping a stage', () => {

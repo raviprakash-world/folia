@@ -1,9 +1,4 @@
-import {
-  assignCourier,
-  generateOrderId,
-  generateTrackingNumber,
-  hashOrderId,
-} from './order-id.util';
+import { generateOrderId, hashOrderId } from './order-id.util';
 
 describe('generateOrderId', () => {
   it('produces the FOL-YYYYMMDD-NNNN format, matching apps/web/src/utils/orderId.ts exactly', () => {
@@ -28,45 +23,5 @@ describe('hashOrderId', () => {
     // Computed independently in Node, replicating the exact algorithm
     // from apps/web/src/utils/tracking.ts, before this file was tested.
     expect(hashOrderId('FOL-20260829-1234')).toBe(309801324);
-  });
-});
-
-describe('assignCourier', () => {
-  it('matches the hand-computed reference assignment for a known order id', () => {
-    expect(assignCourier('FOL-20260829-1234')).toBe('QUICKHATCH');
-  });
-
-  it('is deterministic — repeated calls for the same order id always agree', () => {
-    const a = assignCourier('some-order-id');
-    const b = assignCourier('some-order-id');
-    expect(a).toBe(b);
-  });
-});
-
-describe('generateTrackingNumber', () => {
-  it('matches the hand-computed reference tracking number for a known order id + courier', () => {
-    expect(generateTrackingNumber('FOL-20260829-1234', 'QUICKHATCH')).toBe(
-      'QU606769159',
-    );
-  });
-
-  it("the two-letter prefix comes from the courier's lowercase-hyphenated display id, not the SCREAMING_SNAKE_CASE enum value", () => {
-    // "cascade-express" -> "ca", not "CA" from "CASCADE_EXPRESS" -> "CA"
-    // (same result here, but proves the mapping goes through the display
-    // form rather than slicing the enum name directly, which matters for
-    // multi-word ids where the two could diverge).
-    const result = generateTrackingNumber('any-order-id', 'CASCADE_EXPRESS');
-    expect(result.slice(0, 2)).toBe('CA');
-  });
-
-  it('is deterministic for the same order id + courier pair', () => {
-    const a = generateTrackingNumber('order-x', 'SWIFTPOST');
-    const b = generateTrackingNumber('order-x', 'SWIFTPOST');
-    expect(a).toBe(b);
-  });
-
-  it('always produces exactly 9 digits after the 2-letter prefix', () => {
-    const result = generateTrackingNumber('short', 'NORTHLINE');
-    expect(result).toMatch(/^NO\d{9}$/);
   });
 });

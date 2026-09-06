@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import type { CourierId, TrackingStage } from '@/types/order';
+import type { TrackingStage } from '@/types/order';
 
 export interface TrackingStageEvent {
   stage: TrackingStage;
@@ -18,15 +18,18 @@ export interface ProofOfDelivery {
 
 export interface OrderTracking {
   orderId: string;
-  courierId: CourierId;
-  trackingNumber: string;
-  currentLocation: string;
+  /** Null until an admin actually ships the order (Phase 5) — real fulfillment now happens after checkout, not at it. Free text once set — any real courier name a real aggregator returns, not one of a fixed set. */
+  courierId: string | null;
+  trackingNumber: string | null;
+  /** A real, direct link to the shipment's tracking page on the courier/aggregator's own site, when the provider returns one. Always null pre-shipment and in mock mode. */
+  trackingUrl: string | null;
+  currentLocation: string | null;
   progressPercent: number;
   stages: TrackingStageEvent[];
   isDelayed: boolean;
   delayHours: number | null;
-  estimatedWindowStart: string;
-  estimatedWindowEnd: string;
+  estimatedWindowStart: string | null;
+  estimatedWindowEnd: string | null;
   proofOfDelivery: ProofOfDelivery | null;
 }
 
