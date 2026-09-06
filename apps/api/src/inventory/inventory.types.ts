@@ -1,6 +1,6 @@
 // See users/user.types.ts's top-of-file comment for why these are hand-written.
 export type ReservationStatus = 'ACTIVE' | 'COMMITTED' | 'RELEASED' | 'EXPIRED';
-export type ReservationReferenceType = 'CART' | 'ORDER';
+export type ReservationReferenceType = 'CART' | 'ORDER' | 'PAYMENT';
 
 export interface InventoryItemRecord {
   id: string;

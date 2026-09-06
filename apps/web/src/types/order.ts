@@ -4,9 +4,14 @@ export type DeliveryMethodType = 'standard' | 'express' | 'same-day' | 'pickup';
 
 export type PaymentMethodType = 'credit-card' | 'debit-card' | 'upi' | 'net-banking' | 'cod' | 'wallet';
 
-/** 'pending-payment' is Phase 1 (payments) — a real gateway order sits here from checkout until Razorpay confirms the charge (via the verify callback or, authoritatively, the webhook). COD skips it entirely and goes straight to 'processing'. */
+/**
+ * No 'pending-payment' (Phase 1 briefly added one, Phase 2 removed it):
+ * an Order only ever exists once payment has already resolved — a real
+ * gateway checkout awaiting Razorpay confirmation has a paymentId (see
+ * paymentsApiService's CreatePaymentResult) but genuinely no order yet,
+ * rather than an order sitting in a pending state.
+ */
 export type OrderStatus =
-  | 'pending-payment'
   | 'processing'
   | 'confirmed'
   | 'shipped'
@@ -72,9 +77,9 @@ export interface OrderItem {
 
 export interface PaymentSummary {
   method: PaymentMethodType;
-  /** Masked — last 4 digits for cards, masked UPI id, bank name, etc. Never a full card/account number. Null on a real gateway order that hasn't captured yet (Phase 1) — an order in 'pending-payment' genuinely doesn't have one yet. */
-  displayLabel: string | null;
-  transactionId: string | null;
+  /** Masked — last 4 digits for cards, masked UPI id, bank name, etc. Never a full card/account number. Always known (Phase 2): an Order only ever exists once payment has already resolved. */
+  displayLabel: string;
+  transactionId: string;
 }
 
 export interface Order {

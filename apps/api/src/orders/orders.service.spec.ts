@@ -2,6 +2,7 @@
 // Same reasoning as auth.service.spec.ts's top-of-file comment.
 import { BadRequestException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
+import { PAYMENT_EXPIRY_MINUTES } from '../payments/payments.service';
 import type { CheckoutDto } from './dto/checkout.dto';
 
 function decimal(value: number) {
@@ -42,6 +43,7 @@ function makeAddress(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Shape of a DB Order row, as `prisma.order.findFirst`/etc. would return it — still used by every method except checkout() itself (Phase 2 moved Order creation into PaymentsService.confirmAndCreateOrder). */
 function makeCreatedOrder(overrides: Record<string, unknown> = {}) {
   return {
     id: 'FOL-20260829-1234',
@@ -60,10 +62,54 @@ function makeCreatedOrder(overrides: Record<string, unknown> = {}) {
     estimatedDelivery: '3–5 business days',
     paymentMethod: 'COD',
     paymentDisplayLabel: 'Pay on delivery',
-    paymentTransactionId: 'txn_x',
+    paymentTransactionId: 'pay-1',
     courierId: 'SWIFTPOST',
     trackingNumber: 'SW123456789',
     customerNotes: null,
+    ...overrides,
+  };
+}
+
+/** Shape PaymentsService.createForOrder/confirmAndCreateOrder actually returns for its `order` field — order.types.ts's toPublicOrder() output, not a raw DB row. */
+function makePublicOrder(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'FOL-20260829-1234',
+    createdAt: new Date().toISOString(),
+    status: 'processing',
+    items: [],
+    subtotal: 60,
+    discount: 0,
+    couponCode: null,
+    shippingCost: 6.5,
+    tax: 4.8,
+    total: 71.3,
+    shippingAddress: makeAddress(),
+    billingAddress: makeAddress(),
+    deliveryMethod: 'standard',
+    estimatedDelivery: '3–5 business days',
+    payment: {
+      method: 'cod',
+      displayLabel: 'Pay on delivery',
+      transactionId: 'pay-1',
+    },
+    courierId: 'swiftpost',
+    trackingNumber: 'SW123456789',
+    customerNotes: null,
+    cancellation: null,
+    returnRequest: null,
+    ...overrides,
+  };
+}
+
+function makeReservation(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'res-1',
+    inventoryItemId: 'inv-item-1',
+    quantity: 2,
+    referenceType: 'PAYMENT',
+    referenceId: 'payment-generated-id',
+    status: 'ACTIVE',
+    expiresAt: new Date(Date.now() + PAYMENT_EXPIRY_MINUTES * 60 * 1000),
     ...overrides,
   };
 }
@@ -79,14 +125,13 @@ const BASE_DTO: CheckoutDto = {
 function createDeps() {
   const prisma = {
     order: {
-      create: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
-      findUniqueOrThrow: jest.fn().mockResolvedValue(makeCreatedOrder()),
     },
+    payment: { findUnique: jest.fn().mockResolvedValue(null) },
     cancellationRequest: { create: jest.fn() },
     returnRequest: { create: jest.fn() },
     orderItem: { findMany: jest.fn() },
@@ -103,23 +148,23 @@ function createDeps() {
     findOwnedOrThrow: jest.fn().mockResolvedValue(makeAddress()),
   };
   const couponsService = { validate: jest.fn() };
-  // Phase 1 (payments): checkout() now hands off to
-  // PaymentsService.createForOrder rather than deciding success/failure
-  // itself — this mock stands in for the real (separately tested, see
+  // Phase 2: checkout() now hands off to PaymentsService.createForOrder,
+  // which itself owns Order creation (confirmAndCreateOrder) once payment
+  // resolves — this mock stands in for the real (separately tested, see
   // payments.service.spec.ts) COD path, which always resolves
-  // synchronously with no gateway round-trip.
+  // synchronously with no gateway round-trip and a real order attached.
   const paymentsService = {
     createForOrder: jest.fn().mockResolvedValue({
       paymentId: 'pay-1',
       status: 'COD_PENDING',
       requiresGatewayCheckout: false,
+      order: makePublicOrder(),
     }),
-    cancelForOrder: jest.fn(),
   };
   const inventoryService = {
     getAvailability: jest.fn().mockResolvedValue(100),
-    decrementForProduct: jest.fn().mockResolvedValue('inv-item-1'),
-    restoreQuantity: jest.fn(),
+    reserveForProduct: jest.fn().mockResolvedValue(makeReservation()),
+    releaseReservation: jest.fn(),
   };
   const trackingService = { simulate: jest.fn() };
   const config = { razorpayKeyId: 'rzp_test_fake' };
@@ -162,8 +207,7 @@ describe('OrdersService.checkout', () => {
   });
 
   it('verifies ownership of BOTH shipping and billing addresses via AddressesService', async () => {
-    const { addressesService, prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+    const { addressesService, service } = createDeps();
 
     await service.checkout('user-1', {
       ...BASE_DTO,
@@ -181,82 +225,77 @@ describe('OrdersService.checkout', () => {
     );
   });
 
-  it('rejects the whole checkout — before charging payment — when any line lacks sufficient stock', async () => {
+  it('rejects the whole checkout — before charging payment — when reserving any line fails for insufficient stock', async () => {
     const { inventoryService, paymentsService, service } = createDeps();
-    inventoryService.getAvailability.mockResolvedValue(1); // cart wants 2
+    inventoryService.reserveForProduct.mockRejectedValue(
+      new BadRequestException('Not enough stock available for this item.'),
+    );
 
     await expect(service.checkout('user-1', BASE_DTO)).rejects.toThrow(
       BadRequestException,
     );
     expect(paymentsService.createForOrder).not.toHaveBeenCalled();
-    expect(inventoryService.decrementForProduct).not.toHaveBeenCalled();
   });
 
-  it('computes subtotal, tax (8%), and total correctly with no coupon', async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+  it('computes subtotal, tax (8%), and total correctly with no coupon, in the checkout snapshot handed to PaymentsService', async () => {
+    const { paymentsService, service } = createDeps();
 
     await service.checkout('user-1', BASE_DTO);
 
     // subtotal = 30 * 2 = 60; tax = 60 * 0.08 = 4.8; shipping (standard) = 6.5; total = 60 + 4.8 + 6.5 = 71.3
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { subtotal: number; tax: number; total: number };
+    const call = paymentsService.createForOrder.mock.calls[0][0] as {
+      amount: number;
+      checkoutSnapshot: { subtotal: number; tax: number; total: number };
     };
-    expect(createCall.data.subtotal).toBe(60);
-    expect(createCall.data.tax).toBeCloseTo(4.8);
-    expect(createCall.data.total).toBeCloseTo(71.3);
+    expect(call.checkoutSnapshot.subtotal).toBe(60);
+    expect(call.checkoutSnapshot.tax).toBeCloseTo(4.8);
+    expect(call.checkoutSnapshot.total).toBeCloseTo(71.3);
+    expect(call.amount).toBeCloseTo(71.3);
   });
 
   it('applies a percent coupon correctly to the discount and total', async () => {
-    const { prisma, couponsService, service } = createDeps();
+    const { paymentsService, couponsService, service } = createDeps();
     couponsService.validate.mockResolvedValue({
       code: 'FOLIA10',
       type: 'percent',
       value: 10,
       description: 'x',
     });
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
 
     await service.checkout('user-1', { ...BASE_DTO, couponCode: 'folia10' });
 
     // subtotal 60, discount = 10% of 60 = 6, taxable = 54, tax = 4.32, total = 60-6+6.5+4.32 = 64.82
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { discount: number; total: number; couponCode: string };
+    const call = paymentsService.createForOrder.mock.calls[0][0] as {
+      checkoutSnapshot: { discount: number; total: number; couponCode: string };
     };
-    expect(createCall.data.discount).toBe(6);
-    expect(createCall.data.total).toBeCloseTo(64.82);
-    expect(createCall.data.couponCode).toBe('FOLIA10');
+    expect(call.checkoutSnapshot.discount).toBe(6);
+    expect(call.checkoutSnapshot.total).toBeCloseTo(64.82);
+    expect(call.checkoutSnapshot.couponCode).toBe('FOLIA10');
   });
 
   it('applies a fixed coupon correctly', async () => {
-    const { prisma, couponsService, service } = createDeps();
+    const { paymentsService, couponsService, service } = createDeps();
     couponsService.validate.mockResolvedValue({
       code: 'WELCOME5',
       type: 'fixed',
       value: 5,
       description: 'x',
     });
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
 
     await service.checkout('user-1', { ...BASE_DTO, couponCode: 'welcome5' });
 
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { discount: number };
+    const call = paymentsService.createForOrder.mock.calls[0][0] as {
+      checkoutSnapshot: { discount: number };
     };
-    expect(createCall.data.discount).toBe(5);
+    expect(call.checkoutSnapshot.discount).toBe(5);
   });
 
-  it('decrements inventory and creates the order BEFORE payment resolves — Phase 1 made payment asynchronous, so the order must already exist (in PENDING_PAYMENT/PROCESSING) for Payment.orderId to reference', async () => {
-    const { inventoryService, prisma, paymentsService, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+  it('reserves inventory for every line BEFORE creating the payment — reserve-before-pay is the whole point of Phase 2', async () => {
+    const { inventoryService, paymentsService, service } = createDeps();
     const callOrder: string[] = [];
-    inventoryService.decrementForProduct.mockImplementation(() => {
-      callOrder.push('decrement');
-      return Promise.resolve('inv-item-1');
-    });
-    prisma.order.create.mockImplementation(() => {
-      callOrder.push('create-order');
-      return Promise.resolve(makeCreatedOrder());
+    inventoryService.reserveForProduct.mockImplementation(() => {
+      callOrder.push('reserve');
+      return Promise.resolve(makeReservation());
     });
     paymentsService.createForOrder.mockImplementation(() => {
       callOrder.push('create-payment');
@@ -264,134 +303,250 @@ describe('OrdersService.checkout', () => {
         paymentId: 'pay-1',
         status: 'COD_PENDING',
         requiresGatewayCheckout: false,
+        order: makePublicOrder(),
       });
     });
 
     await service.checkout('user-1', BASE_DTO);
 
-    expect(callOrder).toEqual(['decrement', 'create-order', 'create-payment']);
+    expect(callOrder).toEqual(['reserve', 'create-payment']);
   });
 
-  it('rolls back — cancels the order and restores the exact decremented quantity — if PaymentsService.createForOrder itself throws (found by actually running this against a live database: without this, a Razorpay outage/misconfiguration would strand an order with real stock gone and no Payment row for the expiry sweep to ever find)', async () => {
-    const { inventoryService, prisma, paymentsService, service } = createDeps();
-    inventoryService.decrementForProduct.mockResolvedValue('inv-item-42');
-    prisma.order.create.mockResolvedValue(makeCreatedOrder({ id: 'FOL-rollback' }));
+  it('releases every reservation just made if PaymentsService.createForOrder itself throws — there is no Order yet to roll back (Phase 2: an Order only ever exists once payment is confirmed), so releasing the reservations is the entire rollback', async () => {
+    const { inventoryService, paymentsService, service } = createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue(
+      makeReservation({ id: 'res-42', inventoryItemId: 'inv-item-42' }),
+    );
     paymentsService.createForOrder.mockRejectedValue(
-      new BadRequestException('Card/UPI/net-banking/wallet payments are not available right now.'),
+      new BadRequestException(
+        'Card/UPI/net-banking/wallet payments are not available right now.',
+      ),
     );
 
     await expect(
       service.checkout('user-1', { ...BASE_DTO, paymentMethod: 'credit-card' }),
-    ).rejects.toThrow('Card/UPI/net-banking/wallet payments are not available right now.');
+    ).rejects.toThrow(
+      'Card/UPI/net-banking/wallet payments are not available right now.',
+    );
 
-    expect(prisma.order.update).toHaveBeenCalledWith({
-      where: { id: 'FOL-rollback' },
-      data: { status: 'CANCELLED' },
-    });
-    expect(inventoryService.restoreQuantity).toHaveBeenCalledWith('inv-item-42', 2); // BASE_DTO's cart line quantity, from makeCartItem()
+    expect(inventoryService.releaseReservation).toHaveBeenCalledWith('res-42');
   });
 
-  it('decrements inventory for every cart line', async () => {
-    const { inventoryService, prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+  it('reserves inventory for every cart line, against the PAYMENT reference type and the payment-expiry TTL', async () => {
+    const { inventoryService, service } = createDeps();
 
     await service.checkout('user-1', BASE_DTO);
 
-    expect(inventoryService.decrementForProduct).toHaveBeenCalledWith(
+    expect(inventoryService.reserveForProduct).toHaveBeenCalledWith(
       'prod-1',
       null,
       2,
+      'PAYMENT',
+      expect.any(String),
+      PAYMENT_EXPIRY_MINUTES,
     );
   });
 
-  it('records which exact inventory item each order line was decremented from, so a failed/expired payment can restore it precisely', async () => {
-    const { inventoryService, prisma, service } = createDeps();
-    inventoryService.decrementForProduct.mockResolvedValue('warehouse-b-item');
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+  it('records which exact inventory item AND reservation each order line resolved to, in the checkout snapshot handed to PaymentsService', async () => {
+    const { inventoryService, paymentsService, service } = createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue(
+      makeReservation({ id: 'res-99', inventoryItemId: 'warehouse-b-item' }),
+    );
 
     await service.checkout('user-1', BASE_DTO);
 
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { items: { create: { inventoryItemId: string }[] } };
+    const call = paymentsService.createForOrder.mock.calls[0][0] as {
+      checkoutSnapshot: {
+        items: { inventoryItemId: string; reservationId: string }[];
+      };
     };
-    expect(createCall.data.items.create[0].inventoryItemId).toBe(
+    expect(call.checkoutSnapshot.items[0].inventoryItemId).toBe(
       'warehouse-b-item',
     );
+    expect(call.checkoutSnapshot.items[0].reservationId).toBe('res-99');
   });
 
-  it('hands off to PaymentsService.createForOrder with the real order id, amount, and method — this, not checkout() itself, is what resolves payment and eventually clears the cart (see payments.service.spec.ts)', async () => {
-    const { paymentsService, prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder({ id: 'FOL-x' }));
+  it('hands off to PaymentsService.createForOrder with the real amount, method, and a checkout snapshot carrying a real pre-generated order id', async () => {
+    const { paymentsService, service } = createDeps();
 
     await service.checkout('user-1', BASE_DTO);
 
     expect(paymentsService.createForOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderId: 'FOL-x',
         userId: 'user-1',
         method: 'COD',
         amount: 71.3,
         displayLabel: 'Pay on delivery',
+        checkoutSnapshot: expect.objectContaining({
+          orderId: expect.stringMatching(/^FOL-\d{8}-\d{4}$/),
+        }),
       }),
     );
   });
 
-  it("creates a gateway-method order in PENDING_PAYMENT, not PROCESSING — a customer hasn't paid yet", async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+  it('generates a real FOL-format order id and assigns a courier + tracking number deterministically from it', async () => {
+    const { paymentsService, service } = createDeps();
 
-    await service.checkout('user-1', {
+    await service.checkout('user-1', BASE_DTO);
+
+    const call = paymentsService.createForOrder.mock.calls[0][0] as {
+      checkoutSnapshot: {
+        orderId: string;
+        courierId: string;
+        trackingNumber: string;
+      };
+    };
+    expect(call.checkoutSnapshot.orderId).toMatch(/^FOL-\d{8}-\d{4}$/);
+    expect(call.checkoutSnapshot.trackingNumber).toMatch(/^[A-Z]{2}\d{9}$/);
+  });
+
+  it('snapshots the full address objects, not just a subset of fields', async () => {
+    const { paymentsService, addressesService, service } = createDeps();
+    addressesService.findOwnedOrThrow.mockResolvedValue(
+      makeAddress({ email: 'sam@example.com', label: 'Home' }),
+    );
+
+    await service.checkout('user-1', BASE_DTO);
+
+    const call = paymentsService.createForOrder.mock.calls[0][0] as {
+      checkoutSnapshot: {
+        shippingAddressSnapshot: { email?: string; label?: string };
+      };
+    };
+    expect(call.checkoutSnapshot.shippingAddressSnapshot.email).toBe(
+      'sam@example.com',
+    );
+    expect(call.checkoutSnapshot.shippingAddressSnapshot.label).toBe('Home');
+  });
+
+  it("returns PaymentsService's real order for a COD checkout (it resolves synchronously) and the payment result verbatim", async () => {
+    const { paymentsService, service } = createDeps();
+    paymentsService.createForOrder.mockResolvedValue({
+      paymentId: 'pay-cod-1',
+      status: 'COD_PENDING',
+      requiresGatewayCheckout: false,
+      order: makePublicOrder({ id: 'FOL-cod' }),
+    });
+
+    const result = await service.checkout('user-1', BASE_DTO);
+
+    expect(result.order?.id).toBe('FOL-cod');
+    expect(result.payment.paymentId).toBe('pay-cod-1');
+    expect(result.isIdempotentReplay).toBe(false);
+  });
+
+  it('returns a null order for a gateway checkout — nothing is confirmed until verify()/the webhook creates one', async () => {
+    const { paymentsService, service } = createDeps();
+    paymentsService.createForOrder.mockResolvedValue({
+      paymentId: 'pay-gw-1',
+      status: 'CREATED',
+      requiresGatewayCheckout: true,
+      gateway: {
+        keyId: 'rzp_test_fake',
+        providerOrderId: 'order_abc',
+        amount: 71.3,
+        currency: 'INR',
+      },
+    });
+
+    const result = await service.checkout('user-1', {
       ...BASE_DTO,
       paymentMethod: 'credit-card',
     });
 
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { status: string };
-    };
-    expect(createCall.data.status).toBe('PENDING_PAYMENT');
+    expect(result.order).toBeNull();
+    expect(result.payment.requiresGatewayCheckout).toBe(true);
+  });
+});
+
+describe('OrdersService.checkout idempotency', () => {
+  it('returns the existing payment/order for a repeated idempotency key, without touching the cart or reserving inventory again', async () => {
+    const { prisma, cartService, paymentsService, inventoryService, service } =
+      createDeps();
+    prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-original',
+      status: 'COD_PENDING',
+      provider: 'COD',
+      providerOrderId: null,
+      amount: 71.3,
+      currency: 'INR',
+      order: makeCreatedOrder({ id: 'FOL-original' }),
+    });
+
+    const result = await service.checkout('user-1', BASE_DTO, 'idem-key-123');
+
+    expect(result.isIdempotentReplay).toBe(true);
+    expect((result.order as { id: string }).id).toBe('FOL-original');
+    expect(cartService.resolveCart).not.toHaveBeenCalled();
+    expect(paymentsService.createForOrder).not.toHaveBeenCalled();
+    expect(inventoryService.reserveForProduct).not.toHaveBeenCalled();
   });
 
-  it('creates a COD order straight into PROCESSING — nothing to wait for', async () => {
+  it('checks for an existing PAYMENT (moved from Order to Payment in Phase 2) scoped to THIS user and key, via the real compound unique constraint', async () => {
     const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
 
-    await service.checkout('user-1', BASE_DTO);
+    await service.checkout('user-1', BASE_DTO, 'idem-key-123');
 
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { status: string };
-    };
-    expect(createCall.data.status).toBe('PROCESSING');
+    expect(prisma.payment.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId_idempotencyKey: {
+            userId: 'user-1',
+            idempotencyKey: 'idem-key-123',
+          },
+        },
+      }),
+    );
   });
 
-  it('generates a real FOL-format order id and assigns a courier + tracking number deterministically from it', async () => {
+  it('proceeds normally (no idempotency check at all) when no key is supplied', async () => {
     const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
 
     await service.checkout('user-1', BASE_DTO);
 
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { id: string; courierId: string; trackingNumber: string };
-    };
-    expect(createCall.data.id).toMatch(/^FOL-\d{8}-\d{4}$/);
-    expect(createCall.data.trackingNumber).toMatch(/^[A-Z]{2}\d{9}$/);
+    expect(prisma.payment.findUnique).not.toHaveBeenCalled();
   });
 
-  it('snapshots the full address objects, not just a subset of fields', async () => {
-    const { prisma, addressesService, service } = createDeps();
-    addressesService.findOwnedOrThrow.mockResolvedValue(
-      makeAddress({ email: 'sam@example.com', label: 'Home' }),
-    );
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
+  it('marks a genuinely new checkout as isIdempotentReplay: false, not just omitting the field', async () => {
+    const { service } = createDeps();
 
-    await service.checkout('user-1', BASE_DTO);
+    const result = await service.checkout('user-1', BASE_DTO, 'a-new-key');
 
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { shippingAddressSnapshot: { email?: string; label?: string } };
-    };
-    expect(createCall.data.shippingAddressSnapshot.email).toBe(
-      'sam@example.com',
+    expect(result.isIdempotentReplay).toBe(false);
+  });
+
+  it('passes the supplied idempotency key through to PaymentsService.createForOrder', async () => {
+    const { paymentsService, service } = createDeps();
+
+    await service.checkout('user-1', BASE_DTO, 'store-me-123');
+
+    expect(paymentsService.createForOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'store-me-123' }),
     );
-    expect(createCall.data.shippingAddressSnapshot.label).toBe('Home');
+  });
+
+  it('replays a still-pending gateway payment with its gateway checkout details, not just a bare status, and no order yet', async () => {
+    const { prisma, config, service } = createDeps();
+    prisma.payment.findUnique.mockResolvedValue({
+      id: 'pay-pending',
+      status: 'CREATED',
+      provider: 'RAZORPAY',
+      providerOrderId: 'order_abc',
+      amount: 71.3,
+      currency: 'INR',
+      order: null,
+    });
+
+    const result = await service.checkout('user-1', BASE_DTO, 'idem-key-456');
+
+    expect(result.payment.requiresGatewayCheckout).toBe(true);
+    expect(result.payment.gateway).toEqual({
+      keyId: config.razorpayKeyId,
+      providerOrderId: 'order_abc',
+      amount: 71.3,
+      currency: 'INR',
+    });
+    expect(result.order).toBeNull();
   });
 });
 
@@ -422,11 +577,6 @@ describe('OrdersService.requestCancellation', () => {
 
   it('sets hasRefund to false for a COD order (nothing was ever charged)', async () => {
     const { prisma, service } = createDeps();
-    prisma.order.findFirst = jest.fn().mockResolvedValue({
-      status: 'PROCESSING',
-      cancellation: null,
-      paymentMethod: 'COD',
-    });
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
     prisma.order.findFirst = jest
       .fn()
@@ -441,8 +591,6 @@ describe('OrdersService.requestCancellation', () => {
       reason: 'changed-mind',
     });
 
-    const txCalls = prisma.$transaction.mock.calls[0][0] as unknown[];
-    expect(txCalls).toBeDefined();
     expect(prisma.cancellationRequest.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ hasRefund: false }),
@@ -450,7 +598,7 @@ describe('OrdersService.requestCancellation', () => {
     );
   });
 
-  it('sets hasRefund to true for a real charged payment method', async () => {
+  it('sets hasRefund to true for a real charged payment method — every order reaching this method was, by construction, actually paid for (Phase 2: an Order only exists once PaymentsService.confirmAndCreateOrder has already run)', async () => {
     const { prisma, service } = createDeps();
     prisma.order.findFirst = jest
       .fn()
@@ -471,57 +619,6 @@ describe('OrdersService.requestCancellation', () => {
         data: expect.objectContaining({ hasRefund: true }),
       }),
     );
-  });
-
-  it('restores stock and closes out the payment when cancelling BEFORE payment ever completed (Phase 1) — nothing was charged, so hasRefund is false even for a gateway method', async () => {
-    const { prisma, paymentsService, inventoryService, service } = createDeps();
-    prisma.order.findFirst = jest
-      .fn()
-      .mockResolvedValueOnce({
-        status: 'PENDING_PAYMENT',
-        cancellation: null,
-        paymentMethod: 'CREDIT_CARD',
-        items: [
-          { inventoryItemId: 'inv-1', quantity: 2 },
-          { inventoryItemId: 'inv-2', quantity: 1 },
-        ],
-      })
-      .mockResolvedValueOnce(makeCreatedOrder());
-    prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
-
-    await service.requestCancellation('user-1', 'order-1', {
-      reason: 'changed-mind',
-    });
-
-    expect(prisma.cancellationRequest.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ hasRefund: false }),
-      }),
-    );
-    expect(paymentsService.cancelForOrder).toHaveBeenCalledWith('order-1');
-    expect(inventoryService.restoreQuantity).toHaveBeenCalledWith('inv-1', 2);
-    expect(inventoryService.restoreQuantity).toHaveBeenCalledWith('inv-2', 1);
-  });
-
-  it('does NOT restore stock or touch the payment when cancelling an already-paid (PROCESSING) order — that stock is genuinely committed', async () => {
-    const { prisma, paymentsService, inventoryService, service } = createDeps();
-    prisma.order.findFirst = jest
-      .fn()
-      .mockResolvedValueOnce({
-        status: 'PROCESSING',
-        cancellation: null,
-        paymentMethod: 'COD',
-        items: [{ inventoryItemId: 'inv-1', quantity: 2 }],
-      })
-      .mockResolvedValueOnce(makeCreatedOrder());
-    prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
-
-    await service.requestCancellation('user-1', 'order-1', {
-      reason: 'changed-mind',
-    });
-
-    expect(paymentsService.cancelForOrder).not.toHaveBeenCalled();
-    expect(inventoryService.restoreQuantity).not.toHaveBeenCalled();
   });
 });
 
@@ -701,73 +798,6 @@ describe('OrdersService.adminUpdateStatus', () => {
       where: { id: 'order-1' },
       data: { status: 'CONFIRMED' },
     });
-  });
-});
-
-describe('OrdersService.checkout idempotency', () => {
-  it('returns the existing order for a repeated idempotency key, without touching the cart, payment, or inventory again', async () => {
-    const { prisma, cartService, paymentsService, inventoryService, service } =
-      createDeps();
-    prisma.order.findUnique = jest
-      .fn()
-      .mockResolvedValue(makeCreatedOrder({ id: 'FOL-original' }));
-
-    const result = await service.checkout('user-1', BASE_DTO, 'idem-key-123');
-
-    expect(result.id).toBe('FOL-original');
-    expect(result.isIdempotentReplay).toBe(true);
-    expect(cartService.resolveCart).not.toHaveBeenCalled();
-    expect(paymentsService.createForOrder).not.toHaveBeenCalled();
-    expect(inventoryService.decrementForProduct).not.toHaveBeenCalled();
-  });
-
-  it('checks for an existing order scoped to THIS user and key, via the real compound unique constraint', async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.findUnique = jest.fn().mockResolvedValue(null);
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
-
-    await service.checkout('user-1', BASE_DTO, 'idem-key-123');
-
-    expect(prisma.order.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_idempotencyKey: {
-            userId: 'user-1',
-            idempotencyKey: 'idem-key-123',
-          },
-        },
-      }),
-    );
-  });
-
-  it('proceeds normally (no idempotency check at all) when no key is supplied', async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
-
-    await service.checkout('user-1', BASE_DTO);
-
-    expect(prisma.order.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('marks a genuinely new order as isIdempotentReplay: false, not just omitting the field', async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
-
-    const result = await service.checkout('user-1', BASE_DTO, 'a-new-key');
-
-    expect(result.isIdempotentReplay).toBe(false);
-  });
-
-  it('stores the supplied idempotency key on the newly created order', async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.create.mockResolvedValue(makeCreatedOrder());
-
-    await service.checkout('user-1', BASE_DTO, 'store-me-123');
-
-    const createCall = prisma.order.create.mock.calls[0][0] as {
-      data: { idempotencyKey: string | null };
-    };
-    expect(createCall.data.idempotencyKey).toBe('store-me-123');
   });
 });
 

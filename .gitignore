@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secrets — root .env is read by `docker compose` for interpolation
+# (JWT_ACCESS_SECRET/JWT_REFRESH_SECRET etc.), separate from each app's
+# own apps/*/.env, which its own .gitignore already covers.
+.env
+.env.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,4 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Package, ArrowRight } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
@@ -6,11 +7,49 @@ import { Button } from '@/components/ui/Button';
 import { OrderSummary } from '@/components/order/OrderSummary';
 import { ShareButtons } from '@/components/product/ShareButtons';
 import { useOrderStore } from '@/store/orderStore';
+import { useCartStore } from '@/store/cartStore';
+import { useCheckoutStore } from '@/store/checkoutStore';
 import { downloadInvoice } from '@/utils/invoice';
+import type { Order } from '@/types/order';
 
 export default function OrderConfirmation() {
   const { orderId } = useParams<{ orderId: string }>();
-  const order = useOrderStore((s) => (orderId ? s.getOrder(orderId) : undefined));
+  const location = useLocation();
+  // CheckoutReview hands the just-placed order over directly via router
+  // state — the real-API path never adds it to this local mock store (see
+  // that store's own real-vs-mock scope), so without this, a real order's
+  // confirmation page would always show "Order not found" right after a
+  // successful checkout. Falls back to the local store for a bookmarked
+  // or refreshed confirmation URL, where router state is gone.
+  const freshOrder = (location.state as { order?: Order } | null)?.order;
+  const storedOrder = useOrderStore((s) => (orderId ? s.getOrder(orderId) : undefined));
+  const order = freshOrder ?? storedOrder;
+
+  const clearCart = useCartStore((s) => s.clearCart);
+  const resetCheckout = useCheckoutStore((s) => s.reset);
+  useEffect(() => {
+    // Only for a genuinely fresh completion (order arrived via router
+    // state from this exact checkout) — never for a bookmarked/refreshed
+    // visit to an old confirmation URL, which must not touch whatever the
+    // customer currently has in their cart. Deliberately done HERE, in an
+    // effect on the confirmation page itself, rather than in
+    // CheckoutReview right before navigating: this is a real,
+    // live-verified fix for a genuine race — react-router's
+    // createBrowserRouter navigations run inside a React.startTransition,
+    // so clearing the cart synchronously in CheckoutReview immediately
+    // before/after calling navigate() could still re-render the
+    // still-mounted CheckoutLayout (whose own guard redirects to /cart
+    // the moment it sees an empty cart) before that transition actually
+    // commits — bouncing the customer to /cart instead of their own
+    // order. An effect here only ever runs after React has committed to
+    // this page, by which point CheckoutLayout is guaranteed unmounted.
+    if (freshOrder) {
+      clearCart();
+      resetCheckout();
+    }
+    // Deliberately mount-only — see the comment above for why.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!order) {
     return (

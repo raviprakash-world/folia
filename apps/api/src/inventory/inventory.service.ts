@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   BadRequestException,
@@ -70,7 +69,55 @@ export class InventoryService {
   async findItemOrThrow(id: string): Promise<InventoryItemRecord> {
     const item = await this.prisma.inventoryItem.findUnique({ where: { id } });
     if (!item) throw new NotFoundException('Inventory item not found');
-    return item as InventoryItemRecord;
+    return item;
+  }
+
+  /**
+   * Locks a single InventoryItem row for the rest of the enclosing
+   * transaction (Postgres `SELECT ... FOR UPDATE`) so a second, concurrent
+   * transaction touching the same row genuinely blocks until this one
+   * commits or rolls back. This matters because Postgres's default READ
+   * COMMITTED isolation does NOT do this on its own: wrapping a
+   * read-then-write in `$transaction` alone still lets two concurrent
+   * transactions both read the same "1 available" snapshot and both decide
+   * there's room, which is exactly the oversell race this project's
+   * concurrency requirements rule out (two customers, one unit left, both
+   * checkouts must not succeed). Every method here that reads
+   * quantityOnHand/quantityReserved and then writes a value derived from it
+   * (adjustStock, reserve, reserveForProduct, commitReservation,
+   * releaseReservation) goes through this instead of
+   * tx.inventoryItem.findUnique. Raw SQL (not the query builder) is the only
+   * way to express FOR UPDATE in Prisma; table/column names are quoted
+   * verbatim to match what Prisma itself generated for this model
+   * (@@map("inventory_items"), camelCase columns, no per-field @map).
+   */
+  private async lockItemForUpdate(
+    tx: Prisma.TransactionClient,
+    inventoryItemId: string,
+  ): Promise<InventoryItemRecord> {
+    const rows = await tx.$queryRaw<InventoryItemRecord[]>`
+      SELECT "id", "sku", "productId", "variantId", "warehouseId", "quantityOnHand", "quantityReserved", "reorderPoint"
+      FROM "inventory_items"
+      WHERE "id" = ${inventoryItemId}
+      FOR UPDATE
+    `;
+    const item = rows[0];
+    if (!item) throw new NotFoundException('Inventory item not found');
+    return item;
+  }
+
+  /** The StockReservation-row equivalent of lockItemForUpdate — closes the identical race on commitReservation/releaseReservation, where two concurrent calls for the same reservationId could otherwise both read status ACTIVE before either writes, double-committing (or double-releasing) the same hold. */
+  private async lockReservationForUpdate(
+    tx: Prisma.TransactionClient,
+    reservationId: string,
+  ): Promise<StockReservationRecord | null> {
+    const rows = await tx.$queryRaw<StockReservationRecord[]>`
+      SELECT "id", "inventoryItemId", "quantity", "referenceType", "referenceId", "status", "expiresAt"
+      FROM "stock_reservations"
+      WHERE "id" = ${reservationId}
+      FOR UPDATE
+    `;
+    return rows[0] ?? null;
   }
 
   /** Real, positive-or-negative stock adjustment (receiving new stock, correcting a count, recording damage/loss) — never lets on-hand go negative. */
@@ -80,10 +127,7 @@ export class InventoryService {
   ): Promise<InventoryItemRecord> {
     return await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
-        const item = await tx.inventoryItem.findUnique({
-          where: { id: inventoryItemId },
-        });
-        if (!item) throw new NotFoundException('Inventory item not found');
+        const item = await this.lockItemForUpdate(tx, inventoryItemId);
 
         const newQuantity = item.quantityOnHand + delta;
         if (newQuantity < 0) {
@@ -96,7 +140,6 @@ export class InventoryService {
           where: { id: inventoryItemId },
           data: { quantityOnHand: newQuantity },
         });
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- item.productId/variantId are `any` here only because Prisma.TransactionClient resolves to `any` in this pre-generation sandbox; resolves once real generation succeeds.
         await this.syncProductCache(tx, item.productId, item.variantId);
         return updated;
       },
@@ -121,47 +164,6 @@ export class InventoryService {
   }
 
   /**
-   * Decrements real stock for a product/variant at checkout time —
-   * simpler than the reserve→commit flow above (no separate hold period
-   * to manage), used when an order is placed directly rather than going
-   * through an explicit reservation first. Picks the first inventory item
-   * (across warehouses) with enough on-hand stock to fully cover the
-   * quantity; a real multi-warehouse fulfillment system would split a
-   * single line across warehouses and pick by proximity/cost, which is
-   * out of scope here — this project's warehouse model exists to prove
-   * SKU/stock tracking works, not to implement fulfillment optimization.
-   */
-  /** Returns the id of the inventory item actually decremented from, so a caller that might need to reverse this later (Phase 1 payments: an order whose payment fails or expires — see PaymentsService/the expire-stale-payments job) knows precisely which row to restore, rather than re-deriving "an" item for the product and risking restoring to a different warehouse row than the one actually decremented. */
-  async decrementForProduct(
-    productId: string,
-    variantId: string | null,
-    quantity: number,
-  ): Promise<string> {
-    const items = (await this.prisma.inventoryItem.findMany({
-      where: variantId
-        ? { productId, variantId }
-        : { productId, variantId: null },
-    })) as InventoryItemRecord[];
-
-    const sufficient = items.find(
-      (item) => item.quantityOnHand - item.quantityReserved >= quantity,
-    );
-    if (!sufficient) {
-      throw new BadRequestException(
-        `Not enough stock available for this item (requested ${quantity}).`,
-      );
-    }
-
-    await this.adjustStock(sufficient.id, -quantity);
-    return sufficient.id;
-  }
-
-  /** The precise inverse of decrementForProduct's effect on a single inventory item — gives stock back to the exact row it was taken from. Named separately from adjustStock (rather than calling adjustStock(id, +qty) directly at every call site) so a payment-expiry/failure code path reads as "restore this order line's stock," not an opaque signed-delta call. */
-  async restoreQuantity(inventoryItemId: string, quantity: number): Promise<void> {
-    await this.adjustStock(inventoryItemId, quantity);
-  }
-
-  /**
    * Holds stock against a cart/order without yet deducting it from
    * on-hand — rejects if the requested quantity exceeds what's actually
    * available (onHand - already-reserved), so two people can't both
@@ -179,10 +181,7 @@ export class InventoryService {
 
     return await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
-        const item = await tx.inventoryItem.findUnique({
-          where: { id: inventoryItemId },
-        });
-        if (!item) throw new NotFoundException('Inventory item not found');
+        const item = await this.lockItemForUpdate(tx, inventoryItemId);
 
         const available = item.quantityOnHand - item.quantityReserved;
         if (quantity > available) {
@@ -206,84 +205,174 @@ export class InventoryService {
           },
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- item.productId/variantId are `any` here only because Prisma.TransactionClient resolves to `any` in this pre-generation sandbox; resolves once real generation succeeds.
         await this.syncProductCache(tx, item.productId, item.variantId);
         return reservation;
       },
     );
   }
 
-  /** A reservation becomes a real deduction — called when an order is actually placed (Phase 5/6's job to call this, not this phase's to build that flow). */
-  async commitReservation(
-    reservationId: string,
+  /**
+   * Picks the first inventory item (across warehouses) with enough
+   * AVAILABLE stock (onHand - already-reserved) to cover the quantity,
+   * and reserves against it — this is the method checkout should call
+   * when it doesn't already know which specific InventoryItem row to
+   * reserve against.
+   * Candidates are locked one at a time, in ascending id order, inside a
+   * single transaction: consistent lock ordering across every concurrent
+   * call to this method is what prevents two checkouts from deadlocking
+   * each other when a product has several warehouse rows. A candidate
+   * that turns out to be insufficient once locked (another transaction
+   * got there first) is skipped in favor of the next one — its lock is
+   * still held until this transaction ends, which is fine, it just means
+   * that item is unavailable to other reservers until this one resolves.
+   */
+  async reserveForProduct(
+    productId: string,
+    variantId: string | null,
+    quantity: number,
+    referenceType: ReservationReferenceType,
+    referenceId: string,
+    ttlMinutes = DEFAULT_RESERVATION_TTL_MINUTES,
   ): Promise<StockReservationRecord> {
+    if (quantity <= 0)
+      throw new BadRequestException('Reservation quantity must be positive.');
+
+    const candidates = (await this.prisma.inventoryItem.findMany({
+      where: variantId
+        ? { productId, variantId }
+        : { productId, variantId: null },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    })) as { id: string }[];
+
+    if (candidates.length === 0) {
+      throw new BadRequestException(
+        'No inventory item exists for this product.',
+      );
+    }
+
     return await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
-        const reservation = await tx.stockReservation.findUnique({
-          where: { id: reservationId },
-        });
-        if (!reservation) throw new NotFoundException('Reservation not found');
-        if (reservation.status !== 'ACTIVE') {
-          throw new BadRequestException(
-            `Cannot commit a reservation with status ${reservation.status}.`,
-          );
-        }
+        for (const { id } of candidates) {
+          const item = await this.lockItemForUpdate(tx, id);
+          const available = item.quantityOnHand - item.quantityReserved;
+          if (available < quantity) continue;
 
-        const item = await tx.inventoryItem.findUniqueOrThrow({
-          where: { id: reservation.inventoryItemId },
-        });
-        await tx.inventoryItem.update({
-          where: { id: reservation.inventoryItemId },
-          data: {
-            quantityOnHand: item.quantityOnHand - reservation.quantity,
-            quantityReserved: item.quantityReserved - reservation.quantity,
-          },
-        });
-        const updated = await tx.stockReservation.update({
-          where: { id: reservationId },
-          data: { status: 'COMMITTED' },
-        });
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- item.productId/variantId are `any` here only because Prisma.TransactionClient resolves to `any` in this pre-generation sandbox; resolves once real generation succeeds.
-        await this.syncProductCache(tx, item.productId, item.variantId);
-        return updated;
+          await tx.inventoryItem.update({
+            where: { id: item.id },
+            data: { quantityReserved: item.quantityReserved + quantity },
+          });
+          const reservation = await tx.stockReservation.create({
+            data: {
+              inventoryItemId: item.id,
+              quantity,
+              referenceType,
+              referenceId,
+              expiresAt: new Date(Date.now() + ttlMinutes * 60 * 1000),
+            },
+          });
+          await this.syncProductCache(tx, item.productId, item.variantId);
+          return reservation;
+        }
+        throw new BadRequestException(
+          `Not enough stock available for this item (requested ${quantity}).`,
+        );
       },
     );
   }
 
-  /** Cancels a hold (cart abandoned, checkout failed) — the reserved quantity becomes available again without ever having touched on-hand. */
+  /**
+   * A reservation becomes a real deduction — called once a payment is
+   * confirmed (PaymentsService.confirmAndCreateOrder). Accepts an optional
+   * already-open `externalTx`: confirmAndCreateOrder commits every line's
+   * reservation AND creates the Order AND updates Payment.orderId inside
+   * one shared transaction, precisely so this system never reaches
+   * "inventory decremented but order missing" — a crash between two of
+   * those three steps must roll all of them back, which only works if
+   * they share one transaction rather than each committing independently.
+   */
+  async commitReservation(
+    reservationId: string,
+    externalTx?: Prisma.TransactionClient,
+  ): Promise<StockReservationRecord> {
+    const run = async (tx: Prisma.TransactionClient) => {
+      const reservation = await this.lockReservationForUpdate(
+        tx,
+        reservationId,
+      );
+      if (!reservation) throw new NotFoundException('Reservation not found');
+      if (reservation.status !== 'ACTIVE') {
+        throw new BadRequestException(
+          `Cannot commit a reservation with status ${reservation.status}.`,
+        );
+      }
+
+      const item = await this.lockItemForUpdate(
+        tx,
+        reservation.inventoryItemId,
+      );
+      await tx.inventoryItem.update({
+        where: { id: reservation.inventoryItemId },
+        data: {
+          quantityOnHand: item.quantityOnHand - reservation.quantity,
+          quantityReserved: item.quantityReserved - reservation.quantity,
+        },
+      });
+      const updated = await tx.stockReservation.update({
+        where: { id: reservationId },
+        data: { status: 'COMMITTED' },
+      });
+      await this.syncProductCache(tx, item.productId, item.variantId);
+      return updated;
+    };
+    return externalTx
+      ? await run(externalTx)
+      : await this.prisma.$transaction(run);
+  }
+
+  /**
+   * Cancels a hold (cart abandoned, checkout failed, payment expired) —
+   * the reserved quantity becomes available again without ever having
+   * touched on-hand. Same optional-`externalTx` shape as commitReservation,
+   * for the same reason: a caller marking a Payment FAILED/EXPIRED alongside
+   * releasing its reservations wants both to commit or roll back together.
+   */
   async releaseReservation(
     reservationId: string,
+    externalTx?: Prisma.TransactionClient,
   ): Promise<StockReservationRecord> {
-    return await this.prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        const reservation = await tx.stockReservation.findUnique({
-          where: { id: reservationId },
-        });
-        if (!reservation) throw new NotFoundException('Reservation not found');
-        if (reservation.status !== 'ACTIVE') {
-          throw new BadRequestException(
-            `Cannot release a reservation with status ${reservation.status}.`,
-          );
-        }
+    const run = async (tx: Prisma.TransactionClient) => {
+      const reservation = await this.lockReservationForUpdate(
+        tx,
+        reservationId,
+      );
+      if (!reservation) throw new NotFoundException('Reservation not found');
+      if (reservation.status !== 'ACTIVE') {
+        throw new BadRequestException(
+          `Cannot release a reservation with status ${reservation.status}.`,
+        );
+      }
 
-        const item = await tx.inventoryItem.findUniqueOrThrow({
-          where: { id: reservation.inventoryItemId },
-        });
-        await tx.inventoryItem.update({
-          where: { id: reservation.inventoryItemId },
-          data: {
-            quantityReserved: item.quantityReserved - reservation.quantity,
-          },
-        });
-        const updated = await tx.stockReservation.update({
-          where: { id: reservationId },
-          data: { status: 'RELEASED' },
-        });
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- item.productId/variantId are `any` here only because Prisma.TransactionClient resolves to `any` in this pre-generation sandbox; resolves once real generation succeeds.
-        await this.syncProductCache(tx, item.productId, item.variantId);
-        return updated;
-      },
-    );
+      const item = await this.lockItemForUpdate(
+        tx,
+        reservation.inventoryItemId,
+      );
+      await tx.inventoryItem.update({
+        where: { id: reservation.inventoryItemId },
+        data: {
+          quantityReserved: item.quantityReserved - reservation.quantity,
+        },
+      });
+      const updated = await tx.stockReservation.update({
+        where: { id: reservationId },
+        data: { status: 'RELEASED' },
+      });
+      await this.syncProductCache(tx, item.productId, item.variantId);
+      return updated;
+    };
+    return externalTx
+      ? await run(externalTx)
+      : await this.prisma.$transaction(run);
   }
 
   /** Sweeps reservations past their expiry (an abandoned cart that was never explicitly released) — meant to be called on a schedule once Phase 8's BullMQ background jobs exist; exposed here as a real, callable method rather than dead code waiting for that infrastructure. */

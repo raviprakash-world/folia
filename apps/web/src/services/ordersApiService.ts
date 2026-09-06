@@ -8,8 +8,17 @@ import type {
 } from '@/types/order';
 import type { CreatePaymentResult } from './paymentsApiService';
 
-/** Phase 1 (payments) — checkout() no longer returns a fully-paid order synchronously; it returns the order (in 'pending-payment' for a gateway method, 'processing' for COD) plus everything needed to actually resolve payment client-side. */
-export type CheckoutResponse = Order & { payment: CreatePaymentResult };
+/**
+ * Phase 2: an Order row only ever exists once payment has actually
+ * resolved — for COD that's immediate (`order` is populated), for a
+ * gateway method it isn't (`order` is null until paymentsApiService's
+ * verifyPayment succeeds, which is what actually creates it).
+ */
+export interface CheckoutResponse {
+  isIdempotentReplay: boolean;
+  payment: CreatePaymentResult;
+  order: Order | null;
+}
 
 export interface CheckoutRequest {
   shippingAddressId: string;

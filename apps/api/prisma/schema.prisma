@@ -397,6 +397,13 @@ enum ReservationStatus {
 enum ReservationReferenceType {
   CART
   ORDER
+  /// Phase 2 (inventory concurrency + atomic checkout) — a checkout
+  /// attempt's reservations are held against the Payment id from the
+  /// moment checkout starts until that payment is confirmed (committed)
+  /// or fails/expires (released). This is the reference type
+  /// OrdersService.checkout actually uses; CART/ORDER predate this
+  /// design and are kept for any other reservation caller, not removed.
+  PAYMENT
 }
 
 model StockReservation {
@@ -578,16 +585,12 @@ enum PaymentMethodType {
   WALLET
 }
 
-/// PENDING_PAYMENT is a new Phase-1 (payments) addition: an order created
-/// against a real gateway (Razorpay) exists in this state from the moment
-/// the customer starts checkout until PaymentsService confirms a capture
-/// (via the verify callback or, authoritatively, the webhook) and flips it
-/// to PROCESSING. COD orders skip it entirely — they go straight to
-/// PROCESSING with Payment.status = COD_PENDING, since no gateway
-/// authorization is ever awaited for COD. Deliberately not admin-settable
-/// (see order-status.util.ts) — only PaymentsService transitions out of it.
+/// No PENDING_PAYMENT state (Phase 1 briefly added one, Phase 2 removed
+/// it): an Order row is only ever created once payment is already
+/// confirmed (see OrdersService.confirmAndCreateOrder) — a gateway
+/// checkout that hasn't been paid for yet has a real Payment row, but no
+/// Order at all, so there's no "order, but unpaid" state to represent.
 enum OrderStatus {
-  PENDING_PAYMENT
   PROCESSING
   CONFIRMED
   SHIPPED
@@ -663,23 +666,6 @@ model Order {
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  /// Phase 11 hardening. Client-supplied (a UUID generated once per
-  /// checkout attempt, sent as an Idempotency-Key header) — a
-  /// double-submitted checkout (double-click, a network retry
-  /// resubmitting the same request) reuses the same key, and
-  /// OrdersService.checkout() checks for an existing order with this
-  /// (userId, idempotencyKey) pair BEFORE doing any real work, returning
-  /// the original order instead of creating a second one, charging
-  /// twice, or decrementing inventory twice. Nullable because it's
-  /// optional — a caller that doesn't send the header simply doesn't get
-  /// this protection, rather than checkout failing outright; a real
-  /// production frontend should always send one, but a missing header
-  /// shouldn't be a hard error for what's otherwise a valid request.
-  /// @@unique below is scoped to (userId, idempotencyKey) rather than
-  /// idempotencyKey alone — two different users independently generating
-  /// the same UUID (astronomically unlikely, but not architecturally
-  /// prevented) should never collide with each other.
-  idempotencyKey String?
   status    OrderStatus @default(PROCESSING)
 
   items OrderItem[]
@@ -706,12 +692,17 @@ model Order {
   estimatedDelivery  String
 
   paymentMethod        PaymentMethodType
-  /// Nullable as of Phase 1 (payments): both are unknown until Payment
-  /// actually resolves (PaymentsService.confirmCapture / COD's immediate
-  /// COD_PENDING assignment) — an order sitting in PENDING_PAYMENT genuinely
-  /// doesn't have either value yet. Populated the moment payment is real.
-  paymentDisplayLabel  String?
-  paymentTransactionId String?
+  /// Required again as of Phase 2 (inventory concurrency + atomic
+  /// checkout) — Phase 1 made these nullable because an order used to be
+  /// created before payment resolved. Phase 2's target checkout flow
+  /// (reserve -> pay -> confirm -> commit reservation -> create order)
+  /// means an Order row is now only ever created ONCE payment has
+  /// already been confirmed (see OrdersService.confirmAndCreateOrder),
+  /// so both are always known at creation time again — there is no
+  /// longer a "payment still pending" order state to represent (see
+  /// OrderStatus: PENDING_PAYMENT was removed for the same reason).
+  paymentDisplayLabel  String
+  paymentTransactionId String
   /// Real payment record — see the Payment model. Optional on this side
   /// only because Prisma requires the non-FK-owning side of a 1:1 relation
   /// to be nullable in its type even though every Order created after
@@ -732,7 +723,6 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, idempotencyKey])
   @@index([userId])
   @@map("orders")
 }
@@ -778,11 +768,31 @@ model OrderItem {
 /// filtering, not a cascade-relevant relationship (an order and its
 /// payment must survive exactly as long as each other, which the
 /// orderId → Order relation below already guarantees).
+/// Phase 2 (inventory concurrency + atomic checkout) changed WHEN this
+/// row's orderId gets set: checkout's target flow is now Reserve
+/// inventory -> Create payment -> Payment confirmation -> Commit
+/// reservation -> Create order -> Clear cart (this project's own Phase 2
+/// brief) — meaning a real Order does not exist yet when a gateway
+/// Payment is first created, only once that payment is actually
+/// confirmed. orderId is therefore nullable (Postgres allows more than
+/// one NULL under a unique constraint, so uniqueness once set is still
+/// enforced) and checkoutSnapshot carries everything
+/// OrdersService.confirmAndCreateOrder needs to create the real Order
+/// row at confirmation time, in the same transaction that commits this
+/// payment's reservations — see that method for why both must be atomic
+/// together.
 model Payment {
   id       String @id @default(uuid())
-  orderId  String @unique
-  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId  String? @unique
+  order    Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
   userId   String
+
+  /// Moved here from Order in Phase 2 — Payment, not Order, is now the
+  /// first thing created on checkout, so it's the natural idempotency
+  /// anchor. A repeated Idempotency-Key finds the existing Payment (and,
+  /// once confirmed, its Order) instead of ever starting a second
+  /// reservation/gateway-order attempt.
+  idempotencyKey String?
 
   provider PaymentProvider
   method   PaymentMethodType
@@ -801,12 +811,21 @@ model Payment {
   /// the payment DTO this replaces).
   displayLabel String?
 
+  /// Everything OrdersService.confirmAndCreateOrder needs to create the
+  /// real Order row once this payment is confirmed: the pre-generated
+  /// order id, line items (with which InventoryItem each was reserved
+  /// against), address snapshots, computed pricing, delivery/courier
+  /// assignment, and customer notes. Written once at checkout time,
+  /// read exactly once at confirmation time, never updated after.
+  checkoutSnapshot Json?
+
   attempts PaymentAttempt[]
   refunds  Refund[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([userId, idempotencyKey])
   @@index([userId])
   @@index([providerOrderId])
   @@map("payments")
