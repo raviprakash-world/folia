@@ -122,6 +122,7 @@ export default function CheckoutReview() {
     payment,
     courierId,
     trackingNumber: generateTrackingNumber(orderId, courierId),
+    trackingUrl: null,
     customerNotes: null,
     cancellation: null,
     returnRequest: null,

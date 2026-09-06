@@ -169,6 +169,15 @@ function createDeps() {
   const trackingService = { simulate: jest.fn() };
   const config = { razorpayKeyId: 'rzp_test_fake' };
   const eventEmitter = { emit: jest.fn() };
+  const shippingProvider = {
+    checkServiceability: jest.fn(),
+    createShipment: jest.fn().mockResolvedValue({
+      courierName: 'Delhivery Surface',
+      awbCode: 'AWB123456789',
+      trackingUrl: 'https://shiprocket.co/tracking/AWB123456789',
+    }),
+    trackShipment: jest.fn(),
+  };
 
   const service = new OrdersService(
     prisma as never,
@@ -180,6 +189,7 @@ function createDeps() {
     trackingService,
     config as never,
     eventEmitter,
+    shippingProvider,
   );
 
   return {
@@ -192,6 +202,7 @@ function createDeps() {
     eventEmitter,
     trackingService,
     config,
+    shippingProvider,
     service,
   };
 }
@@ -387,7 +398,7 @@ describe('OrdersService.checkout', () => {
     );
   });
 
-  it('generates a real FOL-format order id and assigns a courier + tracking number deterministically from it', async () => {
+  it('generates a real FOL-format order id, and does NOT assign a courier or tracking number — real fulfillment (Phase 5) only happens later, via the admin ship action', async () => {
     const { paymentsService, service } = createDeps();
 
     await service.checkout('user-1', BASE_DTO);
@@ -395,12 +406,13 @@ describe('OrdersService.checkout', () => {
     const call = paymentsService.createForOrder.mock.calls[0][0] as {
       checkoutSnapshot: {
         orderId: string;
-        courierId: string;
-        trackingNumber: string;
+        courierId?: string;
+        trackingNumber?: string;
       };
     };
     expect(call.checkoutSnapshot.orderId).toMatch(/^FOL-\d{8}-\d{4}$/);
-    expect(call.checkoutSnapshot.trackingNumber).toMatch(/^[A-Z]{2}\d{9}$/);
+    expect(call.checkoutSnapshot.courierId).toBeUndefined();
+    expect(call.checkoutSnapshot.trackingNumber).toBeUndefined();
   });
 
   it('snapshots the full address objects, not just a subset of fields', async () => {
@@ -708,6 +720,64 @@ describe('OrdersService.getTracking', () => {
       expect.objectContaining({ frozenAt: undefined }),
     );
   });
+
+  it('returns an honest "awaiting fulfillment" response — not a fabricated in-transit simulation — for an order with no courier assigned yet (Phase 5)', async () => {
+    const { prisma, trackingService, service } = createDeps();
+    const placedAt = new Date('2026-01-01T00:00:00Z');
+    prisma.order.findFirst = jest.fn().mockResolvedValue({
+      createdAt: placedAt,
+      deliveryMethod: 'STANDARD',
+      shippingAddressSnapshot: { city: 'Bengaluru' },
+      courierId: null,
+      trackingNumber: null,
+      trackingUrl: null,
+      shippedAt: null,
+      cancellation: null,
+      returnRequest: null,
+    });
+
+    const result = await service.getTracking('user-1', 'order-1');
+
+    expect(trackingService.simulate).not.toHaveBeenCalled();
+    expect(result.courierId).toBeNull();
+    expect(result.trackingNumber).toBeNull();
+    expect(result.proofOfDelivery).toBeNull();
+    expect(result.stages[0]).toEqual(
+      expect.objectContaining({
+        completed: true,
+        timestamp: placedAt.toISOString(),
+      }),
+    );
+    expect(result.stages[1]).toEqual(
+      expect.objectContaining({ completed: false }),
+    );
+  });
+
+  it('seeds the simulation from shippedAt, not order placement, once a real shipment exists', async () => {
+    const { prisma, trackingService, service } = createDeps();
+    const shippedAt = new Date('2026-01-05T00:00:00Z');
+    prisma.order.findFirst = jest.fn().mockResolvedValue({
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      deliveryMethod: 'STANDARD',
+      shippingAddressSnapshot: { city: 'Bengaluru' },
+      courierId: 'Delhivery Surface',
+      trackingNumber: 'AWB123456789',
+      trackingUrl: 'https://shiprocket.co/tracking/AWB123456789',
+      shippedAt,
+      cancellation: null,
+      returnRequest: null,
+    });
+
+    await service.getTracking('user-1', 'order-1');
+
+    expect(trackingService.simulate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        placedAt: shippedAt,
+        courierId: 'Delhivery Surface',
+        trackingNumber: 'AWB123456789',
+      }),
+    );
+  });
 });
 
 describe('OrdersService.getPurchasedProductIds', () => {
@@ -807,18 +877,102 @@ describe('OrdersService.adminUpdateStatus', () => {
     const { prisma, service, eventEmitter } = createDeps();
     prisma.order.findUnique.mockResolvedValue({
       id: 'order-1',
-      status: 'CONFIRMED',
+      status: 'SHIPPED',
       userId: 'user-42',
     });
     prisma.order.update.mockResolvedValue({});
     prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
 
-    await service.adminUpdateStatus('order-1', 'SHIPPED');
+    await service.adminUpdateStatus('order-1', 'DELIVERED');
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'notification.order_status_changed',
-      { orderId: 'order-1', userId: 'user-42', status: 'SHIPPED' },
+      { orderId: 'order-1', userId: 'user-42', status: 'DELIVERED' },
     );
+  });
+
+  it('rejects CONFIRMED -> SHIPPED through this generic endpoint (Phase 5) — that real fulfillment step now requires OrdersService.shipOrder', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: 'CONFIRMED',
+      userId: 'user-1',
+    });
+
+    await expect(
+      service.adminUpdateStatus('order-1', 'SHIPPED'),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrdersService.shipOrder', () => {
+  function makeConfirmedOrder(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'order-1',
+      status: 'CONFIRMED',
+      userId: 'user-1',
+      total: decimal(71.3),
+      paymentMethod: 'COD',
+      shippingAddressSnapshot: makeAddress({
+        fullName: 'Sam Rivera',
+        phone: '555-0100',
+        postalCode: '560001',
+      }),
+      items: [{ name: 'Monstera', quantity: 2, price: decimal(30) }],
+      ...overrides,
+    };
+  }
+
+  it('rejects shipping an order that is not CONFIRMED', async () => {
+    const { prisma, service, shippingProvider } = createDeps();
+    prisma.order.findUnique.mockResolvedValue(
+      makeConfirmedOrder({ status: 'PROCESSING' }),
+    );
+
+    await expect(service.shipOrder('order-1')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(shippingProvider.createShipment).not.toHaveBeenCalled();
+  });
+
+  it('creates a real shipment, persists the real courier/AWB/tracking link, and moves the order to SHIPPED', async () => {
+    const { prisma, service, shippingProvider } = createDeps();
+    prisma.order.findUnique.mockResolvedValue(makeConfirmedOrder());
+    prisma.order.update.mockResolvedValue({});
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.shipOrder('order-1');
+
+    expect(shippingProvider.createShipment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        isCod: true,
+        shippingAddress: expect.objectContaining({ pincode: '560001' }),
+      }),
+    );
+    expect(prisma.order.update).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: expect.objectContaining({
+        status: 'SHIPPED',
+        courierId: 'Delhivery Surface',
+        trackingNumber: 'AWB123456789',
+        trackingUrl: 'https://shiprocket.co/tracking/AWB123456789',
+      }),
+    });
+  });
+
+  it('propagates a real shipping-provider failure without marking the order shipped', async () => {
+    const { prisma, service, shippingProvider } = createDeps();
+    prisma.order.findUnique.mockResolvedValue(makeConfirmedOrder());
+    shippingProvider.createShipment.mockRejectedValue(
+      new Error('Shiprocket is not configured'),
+    );
+
+    await expect(service.shipOrder('order-1')).rejects.toThrow(
+      'Shiprocket is not configured',
+    );
+    expect(prisma.order.update).not.toHaveBeenCalled();
   });
 });
 

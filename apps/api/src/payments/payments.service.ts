@@ -407,8 +407,6 @@ export class PaymentsService {
           paymentMethod: payment.method,
           paymentDisplayLabel: payment.displayLabel ?? payment.method,
           paymentTransactionId: payment.providerPaymentId ?? payment.id,
-          courierId: snapshot.courierId,
-          trackingNumber: snapshot.trackingNumber,
           customerNotes: snapshot.customerNotes ?? undefined,
           items: {
             create: snapshot.items.map((item) => ({

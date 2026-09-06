@@ -47,8 +47,6 @@ export type OrderStatus =
   | 'CANCELLED'
   | 'RETURNED'
   | 'REFUNDED';
-export type CourierIdDb =
-  'SWIFTPOST' | 'CASCADE_EXPRESS' | 'TRAILRUNNER' | 'NORTHLINE' | 'QUICKHATCH';
 
 const statusToPublic: Record<OrderStatus, string> = {
   PROCESSING: 'processing',
@@ -75,19 +73,6 @@ const paymentMethodToPublic: Record<PaymentMethodType, string> = {
   COD: 'cod',
   WALLET: 'wallet',
 };
-
-const courierIdToPublic: Record<CourierIdDb, string> = {
-  SWIFTPOST: 'swiftpost',
-  CASCADE_EXPRESS: 'cascade-express',
-  TRAILRUNNER: 'trailrunner',
-  NORTHLINE: 'northline',
-  QUICKHATCH: 'quickhatch',
-};
-
-/** Exported for OrdersService.getTracking, which needs this same mapping outside of toPublicOrder. */
-export function courierIdToPublicName(id: CourierIdDb): string {
-  return courierIdToPublic[id];
-}
 
 export interface OrderItemRecord {
   productId: string;
@@ -119,8 +104,10 @@ export interface OrderRecord {
   /** Always known at creation time (Phase 2): an Order row is only ever created once PaymentsService.confirmAndCreateOrder runs, by which point payment has already resolved — see Order.paymentDisplayLabel's schema comment. */
   paymentDisplayLabel: string;
   paymentTransactionId: string;
-  courierId: CourierIdDb;
-  trackingNumber: string;
+  /** Null until an admin actually ships the order (Phase 5) — see the Order.courierId schema comment. */
+  courierId: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
   customerNotes: string | null;
   cancellation?: CancellationRequestRecord | null;
   returnRequest?: ReturnRequestRecord | null;
@@ -157,8 +144,9 @@ export function toPublicOrder(order: OrderRecord) {
       displayLabel: order.paymentDisplayLabel,
       transactionId: order.paymentTransactionId,
     },
-    courierId: courierIdToPublic[order.courierId],
+    courierId: order.courierId,
     trackingNumber: order.trackingNumber,
+    trackingUrl: order.trackingUrl,
     customerNotes: order.customerNotes,
     cancellation: order.cancellation
       ? toPublicCancellation(order.cancellation)
@@ -265,19 +253,21 @@ export interface CheckoutSnapshotItem {
 /**
  * Everything PaymentsService.confirmAndCreateOrder needs to create the real
  * Order row once a Payment is confirmed — computed once at checkout time
- * (prices, coupon, shipping, the pre-generated order id/courier/tracking
- * number, address snapshots) and persisted verbatim on
- * Payment.checkoutSnapshot until confirmation reads it back. See that
- * field's own schema.prisma comment for why this exists at all: Phase 2
- * moves Order creation to AFTER payment confirms, so nothing about the
- * order can be computed fresh at confirmation time — cart contents, prices,
- * and address selections a customer made at checkout could all have
- * changed by then.
+ * (prices, coupon, shipping, the pre-generated order id, address
+ * snapshots) and persisted verbatim on Payment.checkoutSnapshot until
+ * confirmation reads it back. See that field's own schema.prisma comment
+ * for why this exists at all: Phase 2 moves Order creation to AFTER
+ * payment confirms, so nothing about the order can be computed fresh at
+ * confirmation time — cart contents, prices, and address selections a
+ * customer made at checkout could all have changed by then.
+ *
+ * No courierId/trackingNumber here (Phase 2 had them, deterministically
+ * pre-assigned) — Phase 5 moves real courier assignment to actual ship
+ * time (see Order.courierId's schema comment), which is necessarily
+ * after this snapshot is taken.
  */
 export interface CheckoutSnapshot {
   orderId: string;
-  courierId: CourierIdDb;
-  trackingNumber: string;
   subtotal: number;
   discount: number;
   couponCode: string | null;

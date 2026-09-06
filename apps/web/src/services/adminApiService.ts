@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { apiClient } from './apiClient';
 import type { Order, OrderStatus } from '@/types/order';
 import type { User } from '@/types/auth';
@@ -82,14 +83,32 @@ export async function fetchAdminOrders(status?: string): Promise<Order[]> {
   return data;
 }
 
-/** Forward fulfillment transitions only (confirmed/shipped/delivered) — matches the backend's own canTransitionStatus, which deliberately excludes cancel/return (those have their own dedicated customer-facing endpoints). */
+/**
+ * Bare status flips only — confirmed/delivered. Deliberately excludes
+ * 'shipped' (Phase 5): confirmed -> shipped now has a real side effect
+ * (an actual courier shipment gets created) and goes through
+ * shipAdminOrder below instead, matching the backend's own
+ * order-status.util.ts, which no longer allows that transition through
+ * this generic endpoint.
+ */
 export async function updateAdminOrderStatus(
   id: string,
-  status: Extract<OrderStatus, 'confirmed' | 'shipped' | 'delivered'>
+  status: Extract<OrderStatus, 'confirmed' | 'delivered'>
 ): Promise<Order> {
   const dbStatus = status.toUpperCase();
   const { data } = await apiClient.put<Order>(`/admin/orders/${id}/status`, { status: dbStatus });
   return data;
+}
+
+/** The real fulfillment action (Phase 5) — creates an actual shipment via the configured courier provider and only then moves the order to SHIPPED. See admin-orders.controller.ts's POST :id/ship. */
+export async function shipAdminOrder(id: string): Promise<Order> {
+  try {
+    const { data } = await apiClient.post<Order>(`/admin/orders/${id}/ship`);
+    return data;
+  } catch (error) {
+    const axiosError = error as AxiosError<{ message?: string }>;
+    throw new Error(axiosError.response?.data?.message ?? 'Shipment failed.', { cause: error });
+  }
 }
 
 // --- Product management (apps/api/src/admin/admin-products.controller.ts) ---

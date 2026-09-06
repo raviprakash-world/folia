@@ -9,14 +9,13 @@ import { DateRangeFilter } from '@/components/admin/DateRangeFilter';
 import { ExportButton } from '@/components/admin/ExportButton';
 import { TableWidget } from '@/components/admin/TableWidget';
 import { useOrdersAnalytics, useRealAdminApi } from '@/hooks/useAdminAnalytics';
-import { fetchAdminOrders, updateAdminOrderStatus } from '@/services/adminApiService';
+import { fetchAdminOrders, updateAdminOrderStatus, shipAdminOrder } from '@/services/adminApiService';
 import { formatCurrency } from '@/utils/currency';
 import type { Order, OrderStatus } from '@/types/order';
 
-/** Forward fulfillment steps only — matches the backend's own canTransitionStatus, which deliberately excludes cancel/return (those stay customer-initiated). */
-const nextForwardStatus: Partial<Record<OrderStatus, Extract<OrderStatus, 'confirmed' | 'shipped' | 'delivered'>>> = {
+/** Bare status flips only. Deliberately excludes confirmed -> shipped (Phase 5): that transition now creates a real shipment via shipAdminOrder, not a status PUT — see order-status.util.ts's doc comment on the backend. */
+const nextForwardStatus: Partial<Record<OrderStatus, Extract<OrderStatus, 'confirmed' | 'delivered'>>> = {
   processing: 'confirmed',
-  confirmed: 'shipped',
   shipped: 'delivered',
 };
 
@@ -43,8 +42,12 @@ export default function AdminOrders() {
     enabled: useRealAdminApi,
   });
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: Extract<OrderStatus, 'confirmed' | 'shipped' | 'delivered'> }) =>
+    mutationFn: ({ id, status }: { id: string; status: Extract<OrderStatus, 'confirmed' | 'delivered'> }) =>
       updateAdminOrderStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY }),
+  });
+  const shipMutation = useMutation({
+    mutationFn: (id: string) => shipAdminOrder(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY }),
   });
 
@@ -106,6 +109,25 @@ export default function AdminOrders() {
                 key: 'action',
                 label: 'Action',
                 render: (o: Order) => {
+                  if (o.status === 'confirmed') {
+                    return (
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => shipMutation.mutate(o.id)}
+                          disabled={shipMutation.isPending}
+                          className="text-xs px-2.5 py-1 rounded-full border border-stone-dark hover:border-fern disabled:opacity-50"
+                        >
+                          Ship via courier
+                        </button>
+                        {shipMutation.isError && shipMutation.variables === o.id && (
+                          <span className="text-[11px] text-rust text-right max-w-[16rem]">
+                            {shipMutation.error instanceof Error ? shipMutation.error.message : 'Shipment failed.'}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  }
                   const next = nextForwardStatus[o.status];
                   if (!next) return <span className="text-ink-soft text-xs">—</span>;
                   return (

@@ -36,6 +36,7 @@ export type TrackingStage =
   | 'out-for-delivery'
   | 'delivered';
 
+/** The 5 fictional couriers used by the local/mock checkout path only (apps/web/src/utils/orderId.ts, apps/web/src/data/couriers.ts). A real order's Order.courierId (below) is plain free text — any real courier name a real aggregator returns — since Phase 5. */
 export type CourierId = 'swiftpost' | 'cascade-express' | 'trailrunner' | 'northline' | 'quickhatch';
 
 export type ReturnReason =
@@ -101,8 +102,11 @@ export interface Order {
   estimatedDelivery: string;
 
   payment: PaymentSummary;
-  courierId: CourierId;
-  trackingNumber: string;
+  /** Null until an admin actually ships the order (Phase 5) — real fulfillment now happens after checkout, not at it. */
+  courierId: string | null;
+  trackingNumber: string | null;
+  /** A real, direct link to the shipment's tracking page on the courier/aggregator's own site, when the provider returns one. Always null in mock mode. */
+  trackingUrl: string | null;
 
   customerNotes: string | null;
   cancellation: CancellationRequest | null;

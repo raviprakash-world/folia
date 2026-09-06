@@ -58,6 +58,14 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Folia <onboarding@resend.dev>}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # Same no-:?-guard reasoning as Razorpay/Resend above — the app boots
+      # fine with no Shiprocket account configured; the cart-page shipping
+      # estimate just falls back to a flat-rate heuristic, and the admin
+      # "ship this order" action fails loudly until these are real values.
+      SHIPROCKET_EMAIL: ${SHIPROCKET_EMAIL:-}
+      SHIPROCKET_PASSWORD: ${SHIPROCKET_PASSWORD:-}
+      SHIPROCKET_PICKUP_LOCATION: ${SHIPROCKET_PICKUP_LOCATION:-}
+      SHIPROCKET_PICKUP_PINCODE: ${SHIPROCKET_PICKUP_PINCODE:-}
     depends_on:
       postgres:
         condition: service_healthy

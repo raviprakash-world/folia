@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Put, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { OrdersService } from '../orders/orders.service';
@@ -37,6 +46,34 @@ export class AdminOrdersController {
       resource: 'order',
       resourceId: id,
       metadata: { newStatus: dto.status },
+      ipAddress: req.ip,
+    });
+    return order;
+  }
+
+  /**
+   * Real fulfillment (Phase 5) — creates an actual shipment via the
+   * configured courier provider (see ShippingProviderClient) and only
+   * then moves the order to SHIPPED. See order-status.util.ts's doc
+   * comment for why this is a dedicated endpoint rather than a value
+   * PUT :id/status accepts.
+   */
+  @Post(':id/ship')
+  async ship(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const order = await this.ordersService.shipOrder(id);
+    await this.auditService.log({
+      actorId: admin.id,
+      action: 'ORDER_SHIP',
+      resource: 'order',
+      resourceId: id,
+      metadata: {
+        courierId: order.courierId,
+        trackingNumber: order.trackingNumber,
+      },
       ipAddress: req.ip,
     });
     return order;

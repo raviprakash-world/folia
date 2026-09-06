@@ -25,6 +25,24 @@ export const couriers: Courier[] = [
   { id: 'quickhatch', name: 'QuickHatch Delivery', monogram: 'QH', color: '#395A44', supportPhone: '(800) 555-0165', supportEmail: 'support@quickhatch.example' },
 ];
 
-export function getCourier(id: CourierId): Courier {
-  return couriers.find((c) => c.id === id) ?? couriers[0]!;
+/**
+ * A real order's courierId (Phase 5) is free text — any real courier name
+ * a real aggregator returns, not one of these 5 fictional ids — so an
+ * unrecognized id is expected, not a bug. Falling back to couriers[0]
+ * would silently mislabel a real courier (e.g. "Delhivery") as
+ * "SwiftPost" with the wrong contact info; a synthesized generic entry
+ * (real name, neutral styling, no fictional contact details) is honest
+ * about what's actually known.
+ */
+export function getCourier(id: string): Courier {
+  const known = couriers.find((c) => c.id === id);
+  if (known) return known;
+  return {
+    id: id as CourierId,
+    name: id,
+    monogram: id.slice(0, 2).toUpperCase(),
+    color: '#5B5B52',
+    supportPhone: '',
+    supportEmail: '',
+  };
 }

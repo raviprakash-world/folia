@@ -39,7 +39,7 @@ export function CartSummary({ showCheckoutButton = true }: CartSummaryProps) {
         )}
         <div className="flex justify-between">
           <dt className="text-ink-soft">Shipping</dt>
-          <dd className="text-ink">{shippingZip ? formatCurrency(shipping) : 'Enter ZIP'}</dd>
+          <dd className="text-ink">{shippingZip ? formatCurrency(shipping) : 'Enter PIN'}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-ink-soft">Tax</dt>

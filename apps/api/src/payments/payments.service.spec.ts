@@ -17,8 +17,6 @@ function makeSnapshot(
 ): CheckoutSnapshot {
   return {
     orderId: 'FOL-1',
-    courierId: 'SWIFTPOST',
-    trackingNumber: 'SW123456789',
     subtotal: 65,
     discount: 0,
     couponCode: null,

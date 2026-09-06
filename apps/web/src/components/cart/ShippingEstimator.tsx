@@ -26,10 +26,10 @@ export function ShippingEstimator() {
           inputMode="numeric"
           value={zip}
           onChange={(e) => setZip(e.target.value)}
-          placeholder={shippingZip ?? 'ZIP code'}
-          aria-label="ZIP code for shipping estimate"
+          placeholder={shippingZip ?? 'PIN code'}
+          aria-label="PIN code for shipping estimate"
           aria-invalid={status === 'error'}
-          maxLength={5}
+          maxLength={6}
           className="flex-1 min-w-0 rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3 py-2 text-sm font-mono focus:border-fern transition-colors"
         />
         <button
