@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 // See users/users.service.ts's top-of-file comment for why this exemption
 // exists — this file's PasswordResetToken/EmailVerificationToken queries
 // go through PrismaService directly (there's no dedicated repository
 // service for them; they're simple enough not to need one yet).
 import {
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -16,6 +16,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
+import { EMAIL_SERVICE } from '../email/email.interface';
+import type { EmailService } from '../email/email.interface';
+import {
+  passwordResetEmail,
+  emailVerificationEmail,
+} from '../email/email-templates';
 import { hashPassword, verifyPassword } from './password.util';
 import { generateSecureToken, hashToken } from './token.util';
 import { toAuthenticatedUser, toPublicUser } from '../users/user.types';
@@ -57,7 +63,24 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly rolesService: RolesService,
     private readonly sessionsService: SessionsService,
+    @Inject(EMAIL_SERVICE) private readonly emailService: EmailService,
   ) {}
+
+  /** Never throws, never blocks the caller — an unconfigured/down email provider must not break registration, password reset, or anything else upstream of it. Logged, not silently swallowed. */
+  private async sendEmailSafely(
+    to: string,
+    build: () => { subject: string; html: string; text: string },
+    context: string,
+  ): Promise<void> {
+    try {
+      const { subject, html, text } = build();
+      await this.emailService.send({ to, subject, html, text });
+    } catch (err) {
+      this.logger.warn(
+        `Could not send ${context} email to ${to}: ${(err as Error).message}`,
+      );
+    }
+  }
 
   // --- Registration & login ---
 
@@ -92,6 +115,7 @@ export class AuthService {
     );
     const emailVerificationDevToken = await this.createEmailVerificationToken(
       user.id,
+      user.email,
     );
 
     this.logger.log(`New account registered: ${user.email}`);
@@ -199,7 +223,16 @@ export class AuthService {
 
   // --- Password reset ---
 
-  /** Always returns the same shape regardless of whether the email exists — prevents account enumeration via this endpoint. devToken is only ever populated outside production (see this method's real return below). */
+  /**
+   * Always returns the same shape regardless of whether the email exists
+   * — prevents account enumeration via this endpoint. devToken is only
+   * ever populated outside production (unchanged dev convenience — lets
+   * this flow be tested locally with no email provider configured at
+   * all). The real email is now sent regardless of environment (Phase 3)
+   * — this is the fix for the gap docs/SECURITY_STATUS.md flagged as
+   * "production password reset does not work at all right now": the
+   * token was always created correctly, nothing ever delivered it.
+   */
   async forgotPassword(email: string): Promise<{ devToken?: string }> {
     const user = await this.usersService.findByEmail(email);
     if (!user) return {};
@@ -215,16 +248,14 @@ export class AuthService {
       },
     });
 
-    if (this.config.isProduction) {
-      // No email-sending infrastructure exists yet (Phase 8's "Notifications:
-      // Email" deliverable) — until then there is nothing further to do here
-      // in production; the token exists but nothing can deliver it.
-      this.logger.warn(
-        `Password reset requested for ${user.email} but no email provider is configured yet.`,
-      );
-      return {};
-    }
-    return { devToken: raw };
+    const resetUrl = `${this.config.frontendUrl}/account/reset-password?token=${raw}`;
+    await this.sendEmailSafely(
+      user.email,
+      () => passwordResetEmail(resetUrl),
+      'password-reset',
+    );
+
+    return this.config.isProduction ? {} : { devToken: raw };
   }
 
   async resetPassword(rawToken: string, newPassword: string): Promise<void> {
@@ -281,8 +312,10 @@ export class AuthService {
 
   // --- Email verification ---
 
+  /** Same real-email-now-sent-regardless-of-environment fix as forgotPassword — see that method's comment. */
   private async createEmailVerificationToken(
     userId: string,
+    email: string,
   ): Promise<string | undefined> {
     const { raw, hash } = generateSecureToken();
     await this.prisma.emailVerificationToken.create({
@@ -294,13 +327,27 @@ export class AuthService {
         ),
       },
     });
+
+    const verifyUrl = `${this.config.frontendUrl}/account/verify-email?token=${raw}`;
+    await this.sendEmailSafely(
+      email,
+      () => emailVerificationEmail(verifyUrl),
+      'email-verification',
+    );
+
     return this.config.isProduction ? undefined : raw;
   }
 
   async resendEmailVerification(
     userId: string,
   ): Promise<{ devToken?: string }> {
-    const devToken = await this.createEmailVerificationToken(userId);
+    const user = await this.usersService.findById(userId);
+    if (!user)
+      throw new UnauthorizedException('This account no longer exists.');
+    const devToken = await this.createEmailVerificationToken(
+      userId,
+      user.email,
+    );
     return { devToken };
   }
 

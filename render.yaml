@@ -49,3 +49,12 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
+      # Same sync: false / boots-without-it treatment as Razorpay above —
+      # real password-reset/verification/order emails just fail to send
+      # (logged, non-fatal) until this is a real Resend key.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: 'Folia <onboarding@resend.dev>'
+      - key: FRONTEND_URL
+        value: https://web-drab-mu-24.vercel.app

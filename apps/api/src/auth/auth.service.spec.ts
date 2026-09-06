@@ -88,6 +88,7 @@ function createDeps(overrides: { isProduction?: boolean } = {}) {
     isProduction: overrides.isProduction ?? false,
     jwtAccessSecret: 'access-secret',
     jwtAccessExpiry: '15m',
+    frontendUrl: 'http://localhost:5173',
   };
   const usersService = {
     findByEmail: jest.fn(),
@@ -104,6 +105,7 @@ function createDeps(overrides: { isProduction?: boolean } = {}) {
     revoke: jest.fn(),
     revokeAllForUser: jest.fn(),
   };
+  const emailService = { send: jest.fn().mockResolvedValue(undefined) };
 
   const service = new AuthService(
     prisma as never,
@@ -112,6 +114,7 @@ function createDeps(overrides: { isProduction?: boolean } = {}) {
     usersService as never,
     rolesService as never,
     sessionsService as never,
+    emailService,
   );
 
   return {
@@ -122,6 +125,7 @@ function createDeps(overrides: { isProduction?: boolean } = {}) {
     usersService,
     rolesService,
     sessionsService,
+    emailService,
   };
 }
 
@@ -305,6 +309,37 @@ describe('AuthService', () => {
 
       const result = await service.forgotPassword('sam@example.com');
       expect(result.devToken).toBeUndefined();
+    });
+
+    it('sends a real reset email regardless of environment — the actual production fix (Phase 3): the token existed before, nothing ever delivered it', async () => {
+      const { service, usersService, prisma, emailService } = createDeps({
+        isProduction: true,
+      });
+      usersService.findByEmail.mockResolvedValue(
+        makeUser({ email: 'sam@example.com' }),
+      );
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      await service.forgotPassword('sam@example.com');
+
+      expect(emailService.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'sam@example.com',
+          subject: expect.stringContaining('password'),
+        }),
+      );
+    });
+
+    it('does not let a failing email provider break the request — devToken is still returned outside production', async () => {
+      const { service, usersService, prisma, emailService } = createDeps({
+        isProduction: false,
+      });
+      usersService.findByEmail.mockResolvedValue(makeUser());
+      prisma.passwordResetToken.create.mockResolvedValue({});
+      emailService.send.mockRejectedValue(new Error('Resend is down'));
+
+      const result = await service.forgotPassword('sam@example.com');
+      expect(result.devToken).toBeDefined();
     });
   });
 

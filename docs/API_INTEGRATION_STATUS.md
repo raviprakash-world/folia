@@ -10,7 +10,7 @@ repo root for why that discipline is enforced here specifically.
 |---|---|---|---|
 | Payment gateway (Razorpay) | **CODE COMPLETE, NOT LIVE-VERIFIED** | Business owner must supply real sandbox keys | Real SDK integration (Orders API, signature verification, webhooks, refunds) built and unit-tested in Phases 1–2. **No real Razorpay sandbox credentials have ever been configured in this environment** — `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`/`RAZORPAY_WEBHOOK_SECRET` are unset both locally and on the live Render deployment (`render.yaml` declares them `sync: false`). Live-verified: COD end-to-end, and the "gateway not configured" failure path (real 400 response, reservation correctly released). **Not live-verified: an actual captured card/UPI/net-banking charge.** Do not upgrade this row to VERIFIED without running a real Checkout.js flow against real test keys. |
 | Courier / logistics (Shiprocket/Delhivery candidate) | **NOT STARTED** | Business owner must create the account | No SDK, no keys, no code. Needed before Phase 5. |
-| Transactional email (SendGrid/Postmark/SES candidate) | **NOT STARTED** | Business owner must create the account | No SDK, no keys, no code. Needed before Phase 3. |
+| Transactional email (Resend) | **CODE COMPLETE, NOT LIVE-VERIFIED** | Business owner must supply a real Resend API key | Real SDK integration (`ResendProvider`, behind an `EmailService` interface) built and unit-tested in Phase 3, wired into password reset, email verification, and order/payment lifecycle events. **No real Resend API key has ever been configured in this environment** — `RESEND_API_KEY` is unset both locally and on the live Render deployment (`render.yaml` declares it `sync: false`). Live-verified: the send *attempt* on every wired trigger (registration, password reset, checkout, cancellation) against the real backend, each failing gracefully with a clear logged warning and never breaking the request that triggered it. **Not live-verified: an actual delivered email.** Do not upgrade this row to VERIFIED without a real key and a real received email. |
 | SMS / WhatsApp | **NOT STARTED** | Business owner, if pursued | Explicitly optional for initial launch per the roadmap brief. |
 | Object storage (S3-compatible: AWS S3 / Cloudflare R2) | **NOT STARTED** | Business owner must create the account/bucket | `StorageService` interface already exists in the backend specifically to make this swap contained — see `apps/api/src/storage/storage.interface.ts`. Needed before Phase 7. |
 | Error tracking (Sentry candidate) | **NOT STARTED** | Whoever administers the Render/Vercel account | Free tier likely sufficient at current scale. Needed for Phase 8. |
@@ -28,16 +28,20 @@ owner creates the account and hands over **sandbox/test-mode** credentials;
 implementation and verification then proceed the same way DB credential
 rotation and the Render Blueprint deploy did earlier in this project's history.
 
-**Update (Phases 1–2):** the payments code itself was NOT left blocked on this —
-Phase 1 built the full Razorpay integration (real SDK, signature verification,
-webhooks, refunds) and Phase 2 rearchitected checkout around it, both without
-real credentials, by unit-testing every gateway-dependent path against a mocked
-provider client and live-verifying every path that doesn't require a real
-charge (COD, the "not configured" failure, concurrency, idempotency). This is a
-deliberate, honest middle ground: real, tested code exists and is genuinely
-ready to take a real charge, but "ready to verify" is not "verified" — the row
-above stays CODE COMPLETE, NOT LIVE-VERIFIED, not VERIFIED, until real sandbox
-keys are added and a real Checkout.js charge is actually captured.
+**Update (Phases 1–3):** the payments and email code itself was NOT left
+blocked on this — Phase 1 built the full Razorpay integration and Phase 2
+rearchitected checkout around it; Phase 3 built the full Resend integration
+and wired it into every real trigger point (password reset, verification,
+order/payment lifecycle) — all without real credentials, by unit-testing
+every provider-dependent path against a mock and live-verifying everything
+that doesn't require the real third party to actually succeed (for Razorpay:
+COD, the "not configured" failure, concurrency, idempotency; for Resend: the
+send attempt itself on every wired trigger, failing gracefully every time).
+This is a deliberate, honest middle ground: real, tested code exists and is
+genuinely ready to take a real charge or send a real email, but "ready to
+verify" is not "verified" — both rows above stay CODE COMPLETE, NOT
+LIVE-VERIFIED, not VERIFIED, until real credentials exist and a real charge
+is captured / a real email is received.
 
 Nothing in Phases 1, 3, 5, or 7 should be marked VERIFIED — or even attempted
 beyond abstraction-layer scaffolding — without a real sandbox credential to test

@@ -44,8 +44,8 @@ export default function ForgotPassword() {
         {devToken && (
           <div className="mt-6 p-4 rounded-[var(--radius-control)] bg-stone-dark/40 text-left">
             <p className="text-xs text-ink-soft mb-2">
-              This is a portfolio project with no real email delivery — here's a demo link
-              standing in for the one that would normally arrive by email:
+              A real reset email was sent. This dev-only link is shown here too since local
+              development doesn't always have a real inbox to check:
             </p>
             <Link
               to={`/account/reset-password?token=${devToken}`}

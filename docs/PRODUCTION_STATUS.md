@@ -1,7 +1,7 @@
 # Folia — Production Status
 
 **Baseline established:** 2026-09-06 · Phase 0
-**Last updated:** 2026-09-06 · after Phase 2 gate passed
+**Last updated:** 2026-09-06 · after Phase 3 gate passed
 **Rollback checkpoint (Phase 0 baseline):** `b617b9a` (origin/main, clean working tree at time of baseline)
 
 This document is the single source of truth for "does it actually work right now."
@@ -15,8 +15,8 @@ out not to exist).
 
 | Workspace | Build | Typecheck | Lint | Test |
 |---|---|---|---|---|
-| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`), unchanged since Phase 0, not touched by Phases 1/2 | ✅ 422/422 pass (unit, mocked Prisma; up from 375 at Phase 0 — Phases 1/2 added payments, inventory-locking, and checkout-flow tests) |
-| `apps/api` (e2e) | — | — | — | ❌ **FAIL** — same Jest config bug as Phase 0, still not fixed (out of scope for Phases 1/2) |
+| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`) in pre-existing files, unchanged since Phase 0; every file Phases 1–3 touched is separately confirmed lint-clean | ✅ 437/437 pass (unit, mocked Prisma; up from 375 at Phase 0 — Phases 1–3 added payments, inventory-locking, checkout-flow, and email tests) |
+| `apps/api` (e2e) | — | — | — | ❌ **FAIL** — same Jest config bug as Phase 0, still not fixed (out of scope for Phases 1–3) |
 | `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged since Phase 0) |
 | `packages/*` | n/a | ⚠️ only `shared-types` has a `typecheck` script; `api-client`/`shared-utils` have none | — | — |
 | root (`turbo run *`) | ❌ **FAILS TO RESOLVE** — root `package.json` has no `packageManager` field, so Turbo can't resolve the workspace at all | — | — | — |
@@ -42,6 +42,31 @@ effect on the "does it actually work" picture below:
   create order → clear cart), closing the "stock gone, no order" and "order
   exists, never paid" gaps the original Phase 0 audit flagged.
 
+## Phase 3 (Customer communications) — what changed
+
+Gate passed — full report in `PRODUCTION_ROADMAP.md`.
+
+- **Email is no longer nonexistent.** Real Resend integration exists behind
+  an `EmailService` interface, unit-tested, and live-verified for the
+  *attempt* to send on every wired trigger (registration, password reset,
+  checkout, cancellation) — every one succeeds normally and logs a clear
+  warning with no real key configured, never breaking the request that
+  triggered it. **No email has actually been delivered** — see
+  `API_INTEGRATION_STATUS.md`.
+- **Production password reset — previously completely broken, now fixed.**
+  This was this project's single most concrete "does not work at all in
+  production" finding (see the prior `SECURITY_STATUS.md` entry, now
+  updated). The token was always generated correctly; nothing ever
+  delivered it. It's delivered now.
+- **Email verification** gets the identical backend fix, plus a frontend
+  page (`/account/verify-email`) that didn't exist before — the backend
+  endpoint was real but nothing on the frontend could ever complete a
+  verification link.
+- **Order lifecycle notifications gained email**, and the previously
+  dead-code confirmed/shipped/delivered notification path (real code,
+  explicitly documented as never invoked because nothing fired its event)
+  is now wired to a real trigger — `OrdersService.adminUpdateStatus`.
+
 ### New findings this session (not in the prior audit)
 
 1. **Turbo can't run.** `npx turbo run build` fails immediately with `Could not resolve workspace: Missing devEngines.packageManager or legacy packageManager field`. Every `npm run <script>` at the root that delegates to Turbo (`build`, `dev`, `lint`, `test`, `test:e2e`, `typecheck`) is currently broken. Every verification in this document was run per-workspace directly instead. **Fix:** add a `packageManager` field to root `package.json` (e.g. `"packageManager": "npm@10.x.x"`). Trivial, not yet applied — deferred to whichever phase touches root tooling (candidate: Phase 8).
@@ -54,7 +79,7 @@ effect on the "does it actually work" picture below:
 - Payments: **no longer mocked as of Phase 1** — real Razorpay integration exists; see the Phase 1/2 summary above and `API_INTEGRATION_STATUS.md` for exactly what is and isn't live-verified. Shipping, tracking, delivery-availability remain **mocked**, by explicit design, both frontend and backend (Phase 5).
 - Inventory: **the race condition is fixed as of Phase 2** — real `SELECT ... FOR UPDATE` row locking, live-proven against concurrent checkouts. See the Phase 1/2 summary above.
 - Admin frontend: fully disconnected from the real, RBAC-guarded admin API — reads a client-side mock baseline instead.
-- Notifications: real in-app records, zero outbound delivery channel (no email/SMS provider anywhere).
+- Notifications: real in-app records, plus a real email channel as of Phase 3 (code complete, not live-delivery-verified — see the Phase 3 summary above). SMS still has no provider anywhere.
 - Reviews: read-only API, no submission endpoint, all seed data.
 - CI/CD: **does not exist** despite `PRODUCTION_READINESS.md` and `apps/api/CHANGELOG.md` both describing a working GitHub Actions pipeline.
 - Backup/DR: no plan exists; the live production Postgres (Render free tier) auto-deletes ~30 days after creation.

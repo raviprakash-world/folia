@@ -37,13 +37,16 @@ tracks status at a glance and layers in what that document doesn't cover
   `Razorpay.validateWebhookSignature`), and webhook idempotency is enforced
   at the database level (`providerEventId` unique constraint), not an
   in-memory guard.
-- **Password-reset tokens are returned directly in the API response body**
-  outside production (`devToken` pattern) because no email provider exists.
-  This is gated behind `isProduction` today and is not itself exploitable in
-  the current production deployment (production returns `{}` and only logs a
-  warning) — but it also means production password reset **does not work at
-  all** right now, which is a functional gap tracked in `PRODUCTION_STATUS.md`,
-  not merely a security one.
+- **Password-reset tokens (Phase 3 update): the production-breaking gap is
+  fixed.** A real email is now sent regardless of environment
+  (`AuthService.forgotPassword`/`createEmailVerificationToken`) — this was
+  the one flagged as "production password reset does not work at all right
+  now"; it now does, modulo Resend actually having a real key configured
+  (see `API_INTEGRATION_STATUS.md`). The `devToken` pattern itself is
+  unchanged and still gated behind `isProduction` — a dev convenience for
+  testing this flow with no email provider configured locally, never
+  returned outside development, and never itself exploitable in production
+  (production returns `{}`, same as before).
 
 ## Not yet assessed in this pass (deferred to Phase 9)
 

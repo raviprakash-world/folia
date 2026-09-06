@@ -29,6 +29,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { AdminModule } from './admin/admin.module';
 import { JobsModule } from './jobs/jobs.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { EmailModule } from './email/email.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -88,6 +89,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AdminModule,
     JobsModule,
     NotificationsModule,
+    EmailModule,
   ],
   providers: [
     // Order matters: ThrottlerGuard first (rate-limit before doing any

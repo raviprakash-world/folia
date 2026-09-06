@@ -68,4 +68,23 @@ export class AppConfigService {
   get razorpayWebhookSecret(): string | undefined {
     return this.configService.get<string>('RAZORPAY_WEBHOOK_SECRET');
   }
+
+  /** Undefined, not thrown, when unset — see env.validation.ts's comment on why. ResendProvider throws its own clear error at the point a real send is actually attempted. */
+  get resendApiKey(): string | undefined {
+    return this.configService.get<string>('RESEND_API_KEY');
+  }
+
+  get resendFromEmail(): string {
+    return this.configService.get<string>(
+      'RESEND_FROM_EMAIL',
+      'Folia <onboarding@resend.dev>',
+    );
+  }
+
+  get frontendUrl(): string {
+    return this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+  }
 }

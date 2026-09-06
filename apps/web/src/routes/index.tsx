@@ -26,6 +26,7 @@ const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
 const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
+const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 // Account dashboard
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
       { path: 'account/register', element: withSuspense(<Register />) },
       { path: 'account/forgot-password', element: withSuspense(<ForgotPassword />) },
       { path: 'account/reset-password', element: withSuspense(<ResetPassword />) },
+      { path: 'account/verify-email', element: withSuspense(<VerifyEmail />) },
       {
         element: <ProtectedRoute />,
         children: [

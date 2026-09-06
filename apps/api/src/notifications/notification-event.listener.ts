@@ -5,6 +5,7 @@ import { NOTIFICATION_EVENTS } from './notification.events';
 import type {
   OrderCancelledPayload,
   OrderReturnRequestedPayload,
+  OrderStatusChangedPayload,
   ProfileUpdatedPayload,
   PasswordChangedPayload,
 } from './notification.events';
@@ -16,12 +17,12 @@ import type { OrderCreatedPayload } from '../analytics/analytics.events';
  * shape as AnalyticsEventListener. Reuses ANALYTICS_EVENTS.ORDER_CREATED
  * directly (a real, already-emitted occurrence — Phase 8) rather than
  * having OrdersController emit a second, redundant event for the same
- * checkout. Scoped to exactly the real trigger points found in the
- * frontend audit (Phase 15A) — order placed/cancelled/return-requested
- * — not the full order-status lifecycle the original spec sketched
- * (confirmed/shipped/delivered have no real trigger anywhere in this
- * system to fire them from, so listening for them here would mean
- * dead code, never invoked).
+ * checkout. Originally scoped to only order placed/cancelled/return-
+ * requested, with confirmed/shipped/delivered left out as "no real
+ * trigger anywhere in this system to fire them from" — Phase 3 closes
+ * that gap by emitting NOTIFICATION_EVENTS.ORDER_STATUS_CHANGED from
+ * OrdersService.adminUpdateStatus, the real trigger point that already
+ * existed but nothing was listening to.
  */
 @Injectable()
 export class NotificationEventListener {
@@ -58,6 +59,21 @@ export class NotificationEventListener {
       type: 'ORDER',
       title: 'Return Requested',
       message: `A return was requested for order ${payload.orderId}.`,
+      href: `/account/orders/${payload.orderId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.ORDER_STATUS_CHANGED)
+  async handleOrderStatusChanged(
+    payload: OrderStatusChangedPayload,
+  ): Promise<void> {
+    const label =
+      payload.status.charAt(0) + payload.status.slice(1).toLowerCase();
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'ORDER',
+      title: `Order ${label}`,
+      message: `Order ${payload.orderId} is now ${label.toLowerCase()}.`,
       href: `/account/orders/${payload.orderId}`,
     });
   }

@@ -168,6 +168,7 @@ function createDeps() {
   };
   const trackingService = { simulate: jest.fn() };
   const config = { razorpayKeyId: 'rzp_test_fake' };
+  const eventEmitter = { emit: jest.fn() };
 
   const service = new OrdersService(
     prisma as never,
@@ -178,6 +179,7 @@ function createDeps() {
     inventoryService as never,
     trackingService,
     config as never,
+    eventEmitter,
   );
 
   return {
@@ -187,6 +189,7 @@ function createDeps() {
     couponsService,
     paymentsService,
     inventoryService,
+    eventEmitter,
     trackingService,
     config,
     service,
@@ -798,6 +801,24 @@ describe('OrdersService.adminUpdateStatus', () => {
       where: { id: 'order-1' },
       data: { status: 'CONFIRMED' },
     });
+  });
+
+  it("emits NOTIFICATION_EVENTS.ORDER_STATUS_CHANGED with the real order id/userId/new status — Phase 3's real trigger point for the previously-dead-code confirmed/shipped/delivered notifications and emails", async () => {
+    const { prisma, service, eventEmitter } = createDeps();
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: 'CONFIRMED',
+      userId: 'user-42',
+    });
+    prisma.order.update.mockResolvedValue({});
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.adminUpdateStatus('order-1', 'SHIPPED');
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'notification.order_status_changed',
+      { orderId: 'order-1', userId: 'user-42', status: 'SHIPPED' },
+    );
   });
 });
 
