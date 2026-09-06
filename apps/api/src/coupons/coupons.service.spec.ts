@@ -75,7 +75,7 @@ describe('CouponsService.validate', () => {
           code: 'WELCOME5',
           type: 'FIXED',
           value: decimal(5),
-          description: '$5 off orders over $25',
+          description: '₹5 off orders over ₹25',
           minSubtotal: decimal(25),
           isActive: true,
           expiresAt: null,
@@ -84,7 +84,7 @@ describe('CouponsService.validate', () => {
     };
     const service = new CouponsService(prisma as never);
     await expect(service.validate('WELCOME5', 20)).rejects.toThrow(
-      'This code needs a $25 subtotal — add $5.00 more.',
+      'This code needs a ₹25 subtotal — add ₹5.00 more.',
     );
   });
 

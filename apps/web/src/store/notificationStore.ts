@@ -66,7 +66,7 @@ export const useNotificationStore = create<NotificationState>()(
             id: makeId(),
             type: 'promotion',
             title: 'Free shipping this week',
-            message: 'Orders over $75 ship free — no code needed.',
+            message: 'Orders over ₹75 ship free — no code needed.',
             createdAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
             read: false,
             archived: false,

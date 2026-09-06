@@ -1587,7 +1587,7 @@ async function main() {
       code: 'WELCOME5',
       type: 'FIXED',
       value: 5,
-      description: '$5 off orders over $25',
+      description: '₹5 off orders over ₹25',
       minSubtotal: 25,
     },
   });
@@ -1625,7 +1625,7 @@ async function main() {
           userId: demoUser.id,
           type: 'PROMOTION',
           title: 'Free shipping this week',
-          message: 'Orders over $75 ship free — no code needed.',
+          message: 'Orders over ₹75 ship free — no code needed.',
           href: '/shop',
           read: false,
           createdAt: new Date(now - 2 * DAY_MS),

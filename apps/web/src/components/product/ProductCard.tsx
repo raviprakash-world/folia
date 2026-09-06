@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
 import { cn } from '@/utils/cn';
 import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
+import { formatCurrency } from '@/utils/currency';
 import type { Product } from '@/types/product';
 
 interface ProductCardProps {
@@ -55,10 +56,10 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
         <div className="mt-1.5 flex items-center justify-between">
           <div className="flex items-baseline gap-2 font-mono text-sm">
-            <span className={onSale ? 'text-rust' : 'text-ink-soft'}>${product.price}</span>
+            <span className={onSale ? 'text-rust' : 'text-ink-soft'}>{formatCurrency(product.price)}</span>
             {onSale && (
               <span className="text-ink-soft/50 line-through text-xs">
-                ${product.compareAtPrice}
+                {formatCurrency(product.compareAtPrice!)}
               </span>
             )}
           </div>
