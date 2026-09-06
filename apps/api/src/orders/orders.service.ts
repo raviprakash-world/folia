@@ -422,10 +422,20 @@ export class OrdersService {
     return this.findOneForUser(userId, orderId);
   }
 
+  /**
+   * Phase 6D-1 note: this whole-order, always-auto-approved endpoint is
+   * being replaced by a proper per-item, admin-reviewed ReturnsService in
+   * Phase 6D-3 (see docs/PHASE_6D_MIGRATION_DESIGN.md) — it is
+   * deliberately NOT extended with new behavior here. The only change in
+   * this subphase is supplying the newly-required `claimType`, derived
+   * honestly (the same "does this order contain a plants-category item"
+   * signal the migration's own backfill used for existing rows) rather
+   * than a placeholder, since this endpoint still runs until 6D-3 lands.
+   */
   async requestReturn(userId: string, orderId: string, dto: ReturnOrderDto) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-      include: { returnRequest: true },
+      include: { returnRequest: true, items: true },
     });
     if (!order) throw new NotFoundException('Order not found.');
 
@@ -433,6 +443,7 @@ export class OrdersService {
       status: string;
       returnRequest: unknown;
       createdAt: Date;
+      items: { categorySlug: string }[];
     };
     if (
       !canReturnOrder(
@@ -444,10 +455,15 @@ export class OrdersService {
       throw new BadRequestException('This order is not eligible for a return.');
     }
 
+    const claimType = typedOrder.items.some((i) => i.categorySlug === 'plants')
+      ? 'DOA_CLAIM'
+      : 'STANDARD_RETURN';
+
     await this.prisma.$transaction([
       this.prisma.returnRequest.create({
         data: {
           orderId,
+          claimType,
           reason: RETURN_REASON_TO_DB[dto.reason],
           note: dto.note,
         },

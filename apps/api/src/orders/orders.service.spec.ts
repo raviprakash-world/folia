@@ -711,7 +711,7 @@ describe('OrdersService.requestReturn', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('succeeds for a recently delivered order with no existing return', async () => {
+  it('succeeds for a recently delivered order with no existing return, deriving claimType STANDARD_RETURN for a non-plant order', async () => {
     const { prisma, service } = createDeps();
     prisma.order.findFirst = jest
       .fn()
@@ -719,6 +719,7 @@ describe('OrdersService.requestReturn', () => {
         status: 'DELIVERED',
         returnRequest: null,
         createdAt: new Date(),
+        items: [{ categorySlug: 'vessels' }],
       })
       .mockResolvedValueOnce(makeCreatedOrder());
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
@@ -728,7 +729,34 @@ describe('OrdersService.requestReturn', () => {
     ).resolves.toBeDefined();
     expect(prisma.returnRequest.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ reason: 'WRONG_ITEM' }),
+        data: expect.objectContaining({
+          reason: 'WRONG_ITEM',
+          claimType: 'STANDARD_RETURN',
+        }),
+      }),
+    );
+  });
+
+  it('derives claimType DOA_CLAIM when the order contains any plants-category item', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst = jest
+      .fn()
+      .mockResolvedValueOnce({
+        status: 'DELIVERED',
+        returnRequest: null,
+        createdAt: new Date(),
+        items: [{ categorySlug: 'vessels' }, { categorySlug: 'plants' }],
+      })
+      .mockResolvedValueOnce(makeCreatedOrder());
+    prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
+
+    await service.requestReturn('user-1', 'order-1', {
+      reason: 'damaged-in-transit',
+    });
+
+    expect(prisma.returnRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ claimType: 'DOA_CLAIM' }),
       }),
     );
   });

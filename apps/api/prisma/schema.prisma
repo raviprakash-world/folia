@@ -41,6 +41,7 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   notifications           Notification[]
+  storeCreditEntries      StoreCreditEntry[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -583,6 +584,13 @@ enum PaymentMethodType {
   NET_BANKING
   COD
   WALLET
+  /// Phase 6D — a $0 replacement order (DOA/damaged/incorrect-plant
+  /// resolution). Deliberately its own value rather than reusing COD: COD
+  /// genuinely means "cash is owed on delivery," which is false here.
+  /// provider stays COD on these Payments (accurately "no real gateway was
+  /// involved"), but method must say REPLACEMENT so nothing ever mistakes
+  /// this for money changing hands.
+  REPLACEMENT
 }
 
 /// No PENDING_PAYMENT state (Phase 1 briefly added one, Phase 2 removed
@@ -633,6 +641,16 @@ enum PaymentStatus {
   COD_COLLECTED
   REFUNDED
   PARTIALLY_REFUNDED
+  /// Phase 6D — the terminal status for a REPLACEMENT-method Payment.
+  /// Deliberately NOT CAPTURED (no real gateway settlement occurred) and
+  /// NOT COD_COLLECTED (no cash was ever collected) — both would falsely
+  /// imply real money moved, which would corrupt any future finance
+  /// reconciliation or "amount collected" reporting keyed on those
+  /// statuses. PaymentsService.refund()'s existing guard
+  /// (`status !== 'CAPTURED' && status !== 'PARTIALLY_REFUNDED'` → reject)
+  /// already safely refuses to refund a NO_CHARGE payment with zero
+  /// changes to that method.
+  NO_CHARGE
 }
 
 enum RefundStatus {
@@ -728,10 +746,24 @@ model Order {
   /// takes the package, not when the order was placed.
   shippedAt      DateTime?
 
+  /// Phase 6D — set exactly once, in OrdersService.adminUpdateStatus, the
+  /// moment status actually transitions to DELIVERED. Nothing else
+  /// captures this immutably: `updatedAt` changes on ANY write to this row
+  /// (e.g. a customerNotes edit), so relying on it for a return/DOA
+  /// eligibility window (14 days / 24 hours from delivery) would let an
+  /// unrelated later edit silently reset the clock. Null for every order
+  /// that hasn't been delivered yet, and for orders delivered before this
+  /// column existed until the one-time backfill migration below runs.
+  deliveredAt DateTime?
+
   customerNotes String?
 
-  cancellation  CancellationRequest?
-  returnRequest ReturnRequest?
+  cancellation   CancellationRequest?
+  returnRequest  ReturnRequest?
+  /// Phase 6D — reverse side of ReturnRequest.replacementOrderId: set only
+  /// on the $0 replacement Order a DOA/damage claim resolution created,
+  /// never on a normally-checked-out order.
+  replacementFor ReturnRequest?       @relation("ReturnReplacementOrder")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -768,6 +800,14 @@ model OrderItem {
   /// inventory item being reorganized/deleted. Nullable because orders
   /// created before this column existed have no value here.
   inventoryItemId String?
+
+  /// Phase 6D — which return/DOA claim(s), if any, have claimed some
+  /// quantity of this line. An OrderItem can appear in at most one
+  /// ReturnRequestItem today (ReturnRequest.orderId stays @unique — see
+  /// that model's comment for why multiple claims per order aren't
+  /// supported yet), but the relation is still array-shaped on this side
+  /// since Prisma requires it for the reverse of a to-many relation.
+  returnClaims ReturnRequestItem[]
 
   @@index([orderId])
   @@index([productId])
@@ -883,6 +923,13 @@ model Refund {
   providerRefundId String?
   reason           String?
 
+  /// Phase 6D — reverse side of ReturnRequest.refundId. The pointer lives
+  /// on ReturnRequest, not here: PaymentsService.refund() (which creates
+  /// this row) has no reason to know about returns at all, and stamping
+  /// the link onto ReturnRequest right after refund() resolves needs zero
+  /// changes to that already-built, already-tested method.
+  returnRequest ReturnRequest?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -929,6 +976,45 @@ enum ReturnReason {
   NOT_AS_DESCRIBED
   CHANGED_MIND
   OTHER
+  /// Phase 6D — "arrived dead/dying," a distinct failure mode from
+  /// DAMAGED_IN_TRANSIT (which implies physical shipping damage to
+  /// packaging/the item) — plant-claim-only, never valid for a non-plant
+  /// STANDARD_RETURN (enforced in application logic, not the enum itself).
+  DOA
+}
+
+/// Phase 6D — derived server-side from the claim's line items'
+/// categorySlug, never accepted from the client (same "don't trust the
+/// client" convention every payment endpoint already follows). Drives
+/// which eligibility window/evidence/reason rules apply — see
+/// return-policy.util.ts (Phase 6D-2).
+enum ReturnClaimType {
+  STANDARD_RETURN
+  DOA_CLAIM
+}
+
+/// Phase 6D. PENDING/APPROVED/REJECTED are the admin-decision states;
+/// REFUND_ISSUED/STORE_CREDIT_ISSUED/REPLACEMENT_ISSUED are the three
+/// possible terminal resolutions, kept as distinct values (not one
+/// generic RESOLVED + a resolutionType lookup) specifically so a
+/// STORE_CREDIT_ISSUED claim can never be displayed as "Refunded" by a
+/// future caller that forgets to also check resolutionType — the status
+/// itself already says which happened.
+enum ReturnRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUND_ISSUED
+  STORE_CREDIT_ISSUED
+  REPLACEMENT_ISSUED
+}
+
+enum ReturnResolutionType {
+  REFUND
+  REPLACEMENT
+  /// COD orders only — PaymentsService.refund() is never called for these
+  /// (Razorpay never captured anything to refund). See StoreCreditEntry.
+  FOLIA_STORE_CREDIT
 }
 
 /// Matches apps/web/src/types/order.ts's CancellationRequest. Deliberately
@@ -954,19 +1040,170 @@ model CancellationRequest {
   @@map("cancellation_requests")
 }
 
-/// Matches apps/web's ReturnRequest — always has a real refund to derive
-/// (a return only happens post-delivery, so payment — including COD
-/// cash collected on delivery — has always already happened by then),
-/// unlike CancellationRequest's hasRefund flag.
+/// Phase 6D rewrite of the original whole-order, always-auto-approved
+/// ReturnRequest — see docs/PHASE_6D_MIGRATION_DESIGN.md for the full
+/// design discussion. `orderId` stays @unique (a Phase 6C-Design draft of
+/// this model proposed dropping it to allow multiple claims per order
+/// over time; reconsidered before this migration — nothing in the locked
+/// business rules actually requires that, partial/multi-item claims are
+/// already fully covered by ReturnRequestItem within ONE ReturnRequest,
+/// and keeping this unique constraint means a second concurrent claim
+/// attempt on the same order loses a plain unique-constraint race — the
+/// exact same P2002-to-clean-400 idiom CancellationRequest already uses —
+/// instead of needing new cross-claim aggregate-locking logic).
 model ReturnRequest {
-  id          String       @id @default(uuid())
-  orderId     String       @unique
-  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id          String          @id @default(uuid())
+  orderId     String          @unique
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Derived server-side at creation time from the claimed items'
+  /// categorySlug — see ReturnClaimType's own comment.
+  claimType   ReturnClaimType
   reason      ReturnReason
   note        String?
-  requestedAt DateTime     @default(now())
+  requestedAt DateTime        @default(now())
 
+  status ReturnRequestStatus @default(PENDING)
+
+  /// Photo/video evidence — a related table (ReturnEvidence), not a
+  /// scalar Postgres array column, matching this schema's existing
+  /// one-to-many-for-attachments convention (see ProductImage, the same
+  /// shape for a product's photos) rather than introducing this schema's
+  /// first scalar array column for a need an ordinary table already
+  /// covers just as well, with room to add per-item metadata later
+  /// (caption, contentType) with no further migration.
+  evidence ReturnEvidence[]
+  items    ReturnRequestItem[]
+
+  /// Set together at admin approval time; both null until then.
+  resolutionType           ReturnResolutionType?
+  /// Defaults applied by the service layer, not the schema, per claimType
+  /// (false for DOA_CLAIM, true for STANDARD_RETURN) — admin can override
+  /// either way at approval, so this stays a plain nullable boolean here.
+  requiresReverseLogistics Boolean?
+  /// Set by the admin "mark item received" action — only meaningful when
+  /// requiresReverseLogistics is true. Its presence (not a separate
+  /// status) is what gates executing the resolution once reverse
+  /// logistics applies — see ReturnRequestStatus's own comment for why
+  /// this isn't a named status instead.
+  itemReceivedAt           DateTime?
+
+  decidedBy    String?
+  decidedAt    DateTime?
+  decisionNote String?
+
+  /// The eligible amount computed from the order's real pricing snapshot
+  /// (see docs/PHASE_6D_MIGRATION_DESIGN.md's refund-calculation section),
+  /// frozen at the moment the admin approves — never silently recomputed
+  /// later if pricing logic changes, so a historical claim's record stays
+  /// accurate to what was actually decided. Meaningful for both
+  /// REFUND and FOLIA_STORE_CREDIT resolutions (REPLACEMENT has none —
+  /// stays null).
+  refundAmount Decimal? @db.Decimal(10, 2)
+
+  /// Set once PaymentsService.refund() resolves successfully (REFUND
+  /// resolutions only) — the pointer lives here, not on Refund, so that
+  /// method needs zero changes to support returns (see Refund.returnRequest's
+  /// own comment).
+  refundId String? @unique
+  refund   Refund? @relation(fields: [refundId], references: [id], onDelete: Restrict)
+
+  /// Set once a StoreCreditEntry is issued (FOLIA_STORE_CREDIT
+  /// resolutions only). @unique enforces "at most one store-credit issuance
+  /// per claim" at the database level — the real idempotency guarantee a
+  /// duplicate approval/retry can't get around (see StoreCreditEntry's
+  /// own comment).
+  storeCreditEntry StoreCreditEntry?
+
+  /// Set once a $0 replacement Order is created (REPLACEMENT resolutions
+  /// only). @unique both prevents two claims pointing at the same
+  /// replacement order and, combined with only ever setting this via a
+  /// conditional "if still null" update, prevents a retried approval from
+  /// creating a second replacement order for the same claim.
+  replacementOrderId String? @unique
+  replacementOrder   Order?  @relation("ReturnReplacementOrder", fields: [replacementOrderId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
   @@map("return_requests")
+}
+
+/// Phase 6D. One row per (claim, order line), carrying the quantity being
+/// claimed from that line — the only way to represent "return 1 of the 2
+/// units on this line" at all; nothing on OrderItem or the old
+/// whole-order ReturnRequest could express partial-quantity claims.
+model ReturnRequestItem {
+  id              String        @id @default(uuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItemId     String
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  quantity        Int
+
+  createdAt DateTime @default(now())
+
+  /// One row per (claim, line) — a claim can't list the same order line
+  /// twice; that's a data-entry bug, not a real scenario.
+  @@unique([returnRequestId, orderItemId])
+  @@index([orderItemId])
+  @@map("return_request_items")
+}
+
+/// Phase 6D. Photo/video evidence for a claim — see ReturnRequest.evidence's
+/// comment for why this is a table, not a scalar array column.
+model ReturnEvidence {
+  id              String        @id @default(uuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  /// The StorageService-returned public URL (see storage/storage.interface.ts)
+  /// — the same reused upload infrastructure this session's Phase 6C-Design
+  /// recon confirmed already exists for avatars.
+  url             String
+  createdAt       DateTime      @default(now())
+
+  @@index([returnRequestId])
+  @@map("return_evidence")
+}
+
+/// Phase 6D. The smallest safe additive model for a real, persisted,
+/// auditable store-credit ledger — built because a COD return/DOA claim
+/// has no Razorpay transaction to refund at all (COD's Payment.providerPaymentId
+/// is always null), so PaymentsService.refund() can never be called for
+/// one; a fabricated "refunded" status was explicitly ruled out. A
+/// balance is always SUM(amount) for a user, computed on read — no
+/// separate cached balance column to keep in sync or let drift, the same
+/// "derive, don't cache" convention this codebase already uses for a
+/// Payment's remaining-refundable amount (PaymentsService.refund()'s own
+/// aggregate query). amount is always positive in Phase 6D (an issuance);
+/// the model is intentionally ledger-shaped (signed amounts sum to a
+/// balance) so a future redemption-at-checkout feature is just a
+/// negative-amount row here, needing no further migration — not built now,
+/// nothing in the locked rules asks for it yet.
+model StoreCreditEntry {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  amount Decimal @db.Decimal(10, 2)
+  /// Free text, matching Refund.reason's own existing convention — there
+  /// is exactly one issuing reason today (a return/DOA resolution), not
+  /// worth an enum for.
+  reason String
+
+  /// @unique is the real idempotency guarantee: a duplicate approval or
+  /// retry attempting to issue store credit for the same claim a second
+  /// time hits a genuine database unique-constraint violation (P2002),
+  /// caught and treated as "already issued" — the exact same idiom
+  /// OrdersService.requestCancellation already uses for its own
+  /// concurrent-cancellation race.
+  returnRequestId String?        @unique
+  returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("store_credit_entries")
 }
 
 // --- Phase 7: Search ---
