@@ -4,9 +4,11 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma } from '@prisma/client';
 import type { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
@@ -74,6 +76,8 @@ const PAYMENT_METHOD_TO_DB: Record<
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cartService: CartService,
@@ -292,7 +296,12 @@ export class OrdersService {
   async findAllForUser(userId: string) {
     const orders = await this.prisma.order.findMany({
       where: { userId },
-      include: { items: true, cancellation: true, returnRequest: true },
+      include: {
+        items: true,
+        cancellation: true,
+        returnRequest: true,
+        payment: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
     return orders.map((order: unknown) => toPublicOrder(order as never));
@@ -311,7 +320,12 @@ export class OrdersService {
   async findOneForUser(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-      include: { items: true, cancellation: true, returnRequest: true },
+      include: {
+        items: true,
+        cancellation: true,
+        returnRequest: true,
+        payment: true,
+      },
     });
     if (!order) throw new NotFoundException('Order not found.');
     return toPublicOrder(order as never);
@@ -324,7 +338,7 @@ export class OrdersService {
   ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
-      include: { cancellation: true },
+      include: { cancellation: true, payment: true },
     });
     if (!order) throw new NotFoundException('Order not found.');
 
@@ -332,10 +346,13 @@ export class OrdersService {
       status: string;
       cancellation: unknown;
       paymentMethod: string;
+      payment: { id: string } | null;
     };
     if (!canCancelOrder(typedOrder.status, !!typedOrder.cancellation)) {
       throw new BadRequestException('This order can no longer be cancelled.');
     }
+
+    const hasRefund = typedOrder.paymentMethod !== 'COD';
 
     // No "was this never paid" branch (Phase 1 had one): an Order row
     // only exists once PaymentsService.confirmAndCreateOrder has already
@@ -346,20 +363,59 @@ export class OrdersService {
     // cancellation at all now — there's no Order yet to cancel — it's
     // just an unconfirmed Payment whose reservation expires on its own
     // (PaymentsService.expireStalePayments / the reservation's own TTL).
-    await this.prisma.$transaction([
-      this.prisma.cancellationRequest.create({
-        data: {
-          orderId,
-          reason: CANCELLATION_REASON_TO_DB[dto.reason],
-          note: dto.note,
-          hasRefund: typedOrder.paymentMethod !== 'COD',
-        },
-      }),
-      this.prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'CANCELLED' },
-      }),
-    ]);
+    try {
+      await this.prisma.$transaction([
+        this.prisma.cancellationRequest.create({
+          data: {
+            orderId,
+            reason: CANCELLATION_REASON_TO_DB[dto.reason],
+            note: dto.note,
+            hasRefund,
+          },
+        }),
+        this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: 'CANCELLED' },
+        }),
+      ]);
+    } catch (err) {
+      // The CancellationRequest.orderId @unique constraint is the last
+      // line of defense against two concurrent cancellation requests for
+      // the same order both passing the canCancelOrder check above before
+      // either commits — without this catch, the loser gets an uncaught
+      // Prisma P2002 (a raw 500) instead of the same clean rejection the
+      // sequential path already returns.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new BadRequestException('This order can no longer be cancelled.');
+      }
+      throw err;
+    }
+
+    // Attempted synchronously, immediately after the cancellation itself
+    // commits — matching this system's existing auto-approve behavior
+    // (there is no admin review gate for cancellation, before or after
+    // this change; that's a real, separately-flagged Phase 6 business
+    // decision — see docs/PRODUCTION_ROADMAP.md). Deliberately never lets
+    // a failed refund attempt fail the cancellation itself: the order is
+    // genuinely cancelled either way, and toPublicCancellation's
+    // refundStatus honestly reflects whatever Payment.status actually is
+    // afterward ('processing', not a lie, if this attempt didn't pan
+    // out) — same non-fatal-side-effect philosophy Phase 3 established
+    // for email sends never breaking their triggering request.
+    if (hasRefund && typedOrder.payment) {
+      try {
+        await this.paymentsService.refund(typedOrder.payment.id, {
+          reason: `Order cancelled: ${dto.reason}`,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Refund attempt failed for cancelled order ${orderId} (payment ${typedOrder.payment.id}): ${err instanceof Error ? err.message : 'unknown error'} — needs manual follow-up.`,
+        );
+      }
+    }
 
     return this.findOneForUser(userId, orderId);
   }
@@ -644,7 +700,12 @@ export class OrdersService {
   async adminFindAll(filters: { status?: string } = {}) {
     const orders = await this.prisma.order.findMany({
       where: filters.status ? { status: filters.status as OrderStatus } : {},
-      include: { items: true, cancellation: true, returnRequest: true },
+      include: {
+        items: true,
+        cancellation: true,
+        returnRequest: true,
+        payment: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
     return orders.map((order: unknown) => toPublicOrder(order as never));

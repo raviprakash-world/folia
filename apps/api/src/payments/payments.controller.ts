@@ -19,12 +19,16 @@ import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../users/user.types';
 
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @ApiBearerAuth()
   @Post(':id/verify')
@@ -71,10 +75,28 @@ export class PaymentsController {
   @Post(':id/refund')
   @ApiOperation({
     summary:
-      'Admin-triggered refund against the real gateway. Not yet wired to the customer-facing return/cancellation flow — Phase 6 connects the two; this endpoint exists so the gateway-facing half is real and tested first.',
+      'Admin-triggered refund against the real gateway. Phase 6 wires cancellation to this same method automatically; this endpoint remains for a manual admin-triggered refund outside that flow.',
   })
-  refund(@Param('id') id: string, @Body() dto: RefundPaymentDto) {
-    return this.paymentsService.refund(id, dto);
+  async refund(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: RefundPaymentDto,
+    @Req() req: Request,
+  ) {
+    const result = await this.paymentsService.refund(id, dto);
+    // Real money movement, triggered directly by an admin request — every
+    // other consequential admin action in this codebase is audited
+    // (AdminOrdersController's status/ship endpoints); this was the one
+    // exception until Phase 6 closed it.
+    await this.auditService.log({
+      actorId: admin.id,
+      action: 'PAYMENT_REFUND',
+      resource: 'payment',
+      resourceId: id,
+      metadata: { amount: dto.amount, reason: dto.reason, refundId: result.id },
+      ipAddress: req.ip,
+    });
+    return result;
   }
 
   /**

@@ -11,6 +11,8 @@ import type {
 } from './notification.events';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
 import type { OrderCreatedPayload } from '../analytics/analytics.events';
+import { PAYMENT_EVENTS } from '../payments/payments.events';
+import type { PaymentRefundedPayload } from '../payments/payments.events';
 
 /**
  * The listening half of the event-driven notification pattern — same
@@ -75,6 +77,17 @@ export class NotificationEventListener {
       title: `Order ${label}`,
       message: `Order ${payload.orderId} is now ${label.toLowerCase()}.`,
       href: `/account/orders/${payload.orderId}`,
+    });
+  }
+
+  @OnEvent(PAYMENT_EVENTS.REFUNDED)
+  async handlePaymentRefunded(payload: PaymentRefundedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'ORDER',
+      title: 'Refund Processed',
+      message: `₹${payload.amount.toFixed(2)} was refunded${payload.orderId ? ` for order ${payload.orderId}` : ''}.`,
+      href: payload.orderId ? `/account/orders/${payload.orderId}` : undefined,
     });
   }
 

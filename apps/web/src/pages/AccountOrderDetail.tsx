@@ -78,7 +78,7 @@ export default function AccountOrderDetail() {
     );
   }
 
-  const status = getEffectiveOrderStatus(order);
+  const status = getEffectiveOrderStatus(order, useRealOrdersApi);
 
   async function handleDownloadInvoice() {
     setGeneratingInvoice(true);
@@ -214,8 +214,20 @@ export default function AccountOrderDetail() {
     });
   }
 
+  // Phase 6: in real mode, order.cancellation.refundStatus is the server's
+  // own real value (derived from actual Payment/Refund state, since
+  // OrdersService.requestCancellation now attempts a real refund) — trust
+  // it verbatim rather than re-deriving a second, client-side opinion from
+  // elapsed time, which would show "refunded" on a fixed timer regardless
+  // of whether the real refund actually succeeded. Mock mode has no
+  // server recomputing this over time (the local store sets it once, at
+  // request time — see orderStore.ts), so it keeps the elapsed-time
+  // simulation to still show forward progress in a demo. Returns aren't
+  // wired to a real refund yet either way, so they always simulate.
   const refundStatus = order.cancellation?.refundStatus
-    ? deriveRefundStatus(order.cancellation.requestedAt)
+    ? useRealOrdersApi
+      ? order.cancellation.refundStatus
+      : deriveRefundStatus(order.cancellation.requestedAt)
     : order.returnRequest
       ? deriveRefundStatus(order.returnRequest.requestedAt)
       : null;
@@ -228,7 +240,13 @@ export default function AccountOrderDetail() {
         action={<Tag tone={orderStatusTone[status]}>{status.replace('-', ' ')}</Tag>}
       />
 
-      {(order.cancellation ?? order.returnRequest) && refundStatus && (
+      {(order.cancellation ?? order.returnRequest) && (
+        // Deliberately NOT also gated on `refundStatus` — a COD
+        // cancellation has refundStatus: null (nothing was ever charged),
+        // and that's exactly the case this alert needs to explain, not
+        // hide. A real, previously-unnoticed bug: this alert never
+        // rendered for a COD cancellation before this fix, silently
+        // dropping the "nothing was charged" message it exists to show.
         <Alert tone={refundStatus === 'refunded' ? 'success' : 'info'} className="mb-6">
           {order.cancellation ? 'Cancellation' : 'Return'} reason:{' '}
           {(order.cancellation

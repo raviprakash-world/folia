@@ -7,6 +7,7 @@ import {
   orderCancelledEmail,
   orderReturnRequestedEmail,
   orderStatusChangedEmail,
+  orderRefundedEmail,
   paymentFailedEmail,
 } from './email-templates';
 import { UsersService } from '../users/users.service';
@@ -20,7 +21,10 @@ import type {
   OrderStatusChangedPayload,
 } from '../notifications/notification.events';
 import { PAYMENT_EVENTS } from '../payments/payments.events';
-import type { PaymentFailedPayload } from '../payments/payments.events';
+import type {
+  PaymentFailedPayload,
+  PaymentRefundedPayload,
+} from '../payments/payments.events';
 
 /**
  * The email half of this codebase's event-driven pattern — same shape as
@@ -113,6 +117,29 @@ export class EmailEventListener {
           this.orderUrl(payload.orderId),
         ),
       'order-status-changed',
+    );
+  }
+
+  @OnEvent(PAYMENT_EVENTS.REFUNDED)
+  async handlePaymentRefunded(payload: PaymentRefundedPayload): Promise<void> {
+    if (!payload.orderId) {
+      // Never actually reachable today (see PaymentRefundedPayload's own
+      // doc comment) — logged rather than silently skipped so a future
+      // real occurrence isn't invisible.
+      this.logger.warn(
+        `PAYMENT_EVENTS.REFUNDED fired with no orderId for payment ${payload.paymentId} — skipping the refund email, nothing sensible to link to.`,
+      );
+      return;
+    }
+    await this.sendTo(
+      payload.userId,
+      () =>
+        orderRefundedEmail(
+          payload.orderId!,
+          payload.amount,
+          this.orderUrl(payload.orderId!),
+        ),
+      'order-refunded',
     );
   }
 

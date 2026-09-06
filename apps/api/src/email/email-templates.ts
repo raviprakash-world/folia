@@ -149,6 +149,24 @@ export function orderStatusChangedEmail(
   };
 }
 
+export function orderRefundedEmail(
+  orderId: string,
+  amount: number,
+  orderUrl: string,
+): RenderedEmail {
+  const formatted = `₹${amount.toFixed(2)}`;
+  return {
+    subject: `Refund processed for order ${orderId}`,
+    html: renderLayout({
+      heading: 'Your refund has been processed',
+      bodyHtml: `${formatted} has been refunded for order <strong>${orderId}</strong> to your original payment method. It may take a few business days to appear on your statement.`,
+      ctaLabel: 'View order',
+      ctaUrl: orderUrl,
+    }),
+    text: `Your refund has been processed\n\n${formatted} has been refunded for order ${orderId} to your original payment method. It may take a few business days to appear on your statement.\n\n${orderUrl}`,
+  };
+}
+
 export function paymentFailedEmail(
   retryUrl: string,
   errorDescription?: string,

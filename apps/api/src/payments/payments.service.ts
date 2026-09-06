@@ -18,6 +18,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { RazorpayProvider } from './providers/razorpay.provider';
 import { PAYMENT_EVENTS } from './payments.events';
+import type { PaymentRefundedPayload } from './payments.events';
 import { toPublicOrder } from '../orders/order.types';
 import type { CheckoutSnapshot } from '../orders/order.types';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
@@ -620,7 +621,7 @@ export class PaymentsService {
         reason: input.reason,
       });
 
-      return await this.prisma.$transaction(async (tx) => {
+      const outcome = await this.prisma.$transaction(async (tx) => {
         await this.lockPaymentForUpdate(tx, paymentId);
 
         const refund = await tx.refund.update({
@@ -648,6 +649,17 @@ export class PaymentsService {
           providerRefundId: result.providerRefundId,
         };
       });
+
+      const payload: PaymentRefundedPayload = {
+        orderId: payment.orderId,
+        userId: payment.userId,
+        paymentId: payment.id,
+        amount: requestedAmount,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+      this.eventEmitter.emit(PAYMENT_EVENTS.REFUNDED, payload);
+
+      return outcome;
     } catch (err) {
       // The claim didn't pan out (gateway rejected it, network failure,
       // etc.) — release it so it stops occupying refundable headroom on

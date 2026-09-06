@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { Pagination } from '@/components/common/Pagination';
 import { OrderRow } from '@/components/order/OrderRow';
 import { Button } from '@/components/ui/Button';
-import { useOrders } from '@/hooks/useOrders';
+import { useOrders, useRealOrdersApi } from '@/hooks/useOrders';
 import { getEffectiveOrderStatus } from '@/utils/refund';
 import { cn } from '@/utils/cn';
 import type { OrderStatus } from '@/types/order';
@@ -40,9 +40,9 @@ export default function AccountOrders() {
     let result = orders;
 
     if (filter === 'active') {
-      result = result.filter((o) => ACTIVE_STATUSES.includes(getEffectiveOrderStatus(o)));
+      result = result.filter((o) => ACTIVE_STATUSES.includes(getEffectiveOrderStatus(o, useRealOrdersApi)));
     } else if (filter !== 'all') {
-      result = result.filter((o) => getEffectiveOrderStatus(o) === filter);
+      result = result.filter((o) => getEffectiveOrderStatus(o, useRealOrdersApi) === filter);
     }
 
     const q = search.trim().toLowerCase();
