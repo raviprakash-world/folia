@@ -543,16 +543,68 @@ export class OrdersService {
    * shipped with no real shipment behind it.
    */
   async shipOrder(orderId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
+    // Marketplace Phase 12 — an order can now genuinely have more than
+    // one seller's own fulfillment group (Phase 5). Creating ONE shipment
+    // that silently claimed to cover every seller's items would be
+    // factually wrong (a real Shiprocket shipment/AWB tied to a single
+    // pickup location) the moment a real multi-seller order reaches this
+    // endpoint — refuse loudly and point at the real per-group action
+    // instead of ever letting that happen. The trivial, still-common
+    // single-group case (a Folia-only or single-seller cart) delegates to
+    // the exact same real mechanism unchanged.
+    const groups = await this.prisma.orderSellerGroup.findMany({
+      where: { orderId },
+      select: { id: true },
     });
-    if (!order) throw new NotFoundException('Order not found.');
+    if (groups.length === 0) throw new NotFoundException('Order not found.');
+    if (groups.length > 1) {
+      throw new BadRequestException(
+        "This order has multiple sellers' items — ship each seller's portion individually via the per-seller ship action, not this whole-order one.",
+      );
+    }
 
-    const typedOrder = order as unknown as {
-      status: string;
+    const order = await this.prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { userId: true },
+    });
+    await this.shipOrderSellerGroup(groups[0].id);
+    return this.findOneForUser(order.userId, orderId);
+  }
+
+  /**
+   * Marketplace Phase 12 — the real per-seller fulfillment action
+   * OrderSellerGroup's own Phase 5 doc comment deferred here. Reuses the
+   * exact same ShippingProviderClient.createShipment this codebase's
+   * whole-order shipOrder already called, scoped to just this group's own
+   * items, with a group-unique reference id so two different sellers'
+   * shipments for the same order never collide on the courier's own
+   * side. `sellerId` scopes ownership when a seller is shipping their own
+   * group (a mismatched/nonexistent group 404s, matching this whole
+   * initiative's ownership-scoping-in-the-query convention); omit it for
+   * an admin shipping any group, including Folia's own (sellerId: null).
+   */
+  async shipOrderSellerGroup(groupId: string, sellerId?: string) {
+    const group = await this.prisma.orderSellerGroup.findFirst({
+      where: { id: groupId, ...(sellerId ? { sellerId } : {}) },
+      include: {
+        items: true,
+        order: {
+          select: {
+            id: true,
+            userId: true,
+            status: true,
+            paymentMethod: true,
+            shippingAddressSnapshot: true,
+          },
+        },
+      },
+    });
+    if (!group) throw new NotFoundException('Order not found.');
+
+    const typedOrder = group.order as unknown as {
+      id: string;
       userId: string;
-      total: { toNumber(): number };
+      status: string;
       paymentMethod: string;
       shippingAddressSnapshot: {
         fullName: string;
@@ -565,11 +617,6 @@ export class OrdersService {
         phone: string;
         email?: string;
       };
-      items: {
-        name: string;
-        quantity: number;
-        price: { toNumber(): number };
-      }[];
     };
 
     if (typedOrder.status !== 'CONFIRMED') {
@@ -577,9 +624,19 @@ export class OrdersService {
         `Cannot ship an order in ${typedOrder.status} status — it must be CONFIRMED first.`,
       );
     }
+    if (group.status !== 'PROCESSING') {
+      throw new BadRequestException(
+        `This seller's portion is already ${group.status.toLowerCase()}.`,
+      );
+    }
 
     const shipment = await this.shippingProvider.createShipment({
-      orderId,
+      // A group-unique reference — two different sellers' real shipments
+      // for the SAME order must never collide on the courier's own side.
+      // The trivial single-group case keeps using the bare orderId
+      // (shipOrder's own delegation), matching this system's pre-existing
+      // Shiprocket order_id exactly for that still-common case.
+      orderId: `${typedOrder.id}-${group.id.slice(0, 8)}`,
       orderDate: new Date(),
       shippingAddress: {
         fullName: typedOrder.shippingAddressSnapshot.fullName,
@@ -592,25 +649,27 @@ export class OrdersService {
         phone: typedOrder.shippingAddressSnapshot.phone,
         email: typedOrder.shippingAddressSnapshot.email,
       },
-      items: typedOrder.items.map((item) => ({
+      items: group.items.map((item) => ({
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.price.toNumber(),
       })),
-      subtotal: typedOrder.total.toNumber(),
+      subtotal: group.items.reduce(
+        (sum, item) => sum + item.price.toNumber() * item.quantity,
+        0,
+      ),
       isCod: typedOrder.paymentMethod === 'COD',
-      // No real per-product weight catalog exists (see
-      // apps/web/src/utils/packageDetails.ts's own disclaimer) — a
-      // reasonable flat estimate scaled by item count, same honesty
-      // posture as ShiprocketProvider's placeholder parcel dimensions.
+      // Same honest per-item weight estimate as the whole-order path
+      // this replaces for the multi-group case — scoped to just this
+      // group's own items now, not the whole order's.
       weightKg: Math.max(
         0.5,
-        typedOrder.items.reduce((sum, item) => sum + item.quantity, 0) * 0.5,
+        group.items.reduce((sum, item) => sum + item.quantity, 0) * 0.5,
       ),
     });
 
-    await this.prisma.order.update({
-      where: { id: orderId },
+    await this.prisma.orderSellerGroup.update({
+      where: { id: groupId },
       data: {
         status: 'SHIPPED',
         courierId: shipment.courierName,
@@ -620,15 +679,117 @@ export class OrdersService {
       },
     });
 
+    await this.rollUpOrderStatusIfAllGroupsReached(
+      typedOrder.id,
+      typedOrder.userId,
+      'SHIPPED',
+    );
+
+    return this.prisma.orderSellerGroup.findUniqueOrThrow({
+      where: { id: groupId },
+    });
+  }
+
+  /**
+   * Marketplace Phase 12 — the admin-only counterpart to
+   * OrdersService.adminUpdateStatus's own DELIVERED transition, scoped to
+   * one seller's group. No real delivery webhook exists (same honesty
+   * posture as Order.deliveredAt itself), so this stays an explicit admin
+   * action, never automatic.
+   */
+  async markGroupDelivered(groupId: string) {
+    const group = await this.prisma.orderSellerGroup.findUnique({
+      where: { id: groupId },
+      select: {
+        id: true,
+        orderId: true,
+        status: true,
+        order: { select: { userId: true } },
+      },
+    });
+    if (!group) throw new NotFoundException('Order not found.');
+    if (group.status !== 'SHIPPED') {
+      throw new BadRequestException(
+        `Cannot mark delivered — this seller's portion is ${group.status.toLowerCase()}, it must be shipped first.`,
+      );
+    }
+
+    await this.prisma.orderSellerGroup.update({
+      where: { id: groupId },
+      data: { status: 'DELIVERED', deliveredAt: new Date() },
+    });
+
+    await this.rollUpOrderStatusIfAllGroupsReached(
+      group.orderId,
+      group.order.userId,
+      'DELIVERED',
+    );
+
+    return this.prisma.orderSellerGroup.findUniqueOrThrow({
+      where: { id: groupId },
+    });
+  }
+
+  /**
+   * Marketplace Phase 12 — Order.status stays the real "is this whole
+   * order done" fact, rolled up only once every one of its
+   * OrderSellerGroups has independently reached the same milestone
+   * (trivial and immediate for the still-common single-group case).
+   * Order.courierId/trackingNumber/trackingUrl are single-value columns
+   * that genuinely cannot represent "two different couriers for two
+   * different sellers" — they're only ever copied up from the group
+   * alongside the roll-up when there is exactly one group, preserving
+   * OrdersService.getTracking's existing single-shipment simulation
+   * unchanged for that case. A real multi-seller order's Order.status
+   * still correctly reflects SHIPPED/DELIVERED once every group gets
+   * there — only the single courier/tracking display, and getTracking's
+   * per-shipment simulation, stay a known, honestly-scoped gap for that
+   * case (see this phase's own gate report).
+   */
+  private async rollUpOrderStatusIfAllGroupsReached(
+    orderId: string,
+    userId: string,
+    target: 'SHIPPED' | 'DELIVERED',
+  ): Promise<void> {
+    const groups = await this.prisma.orderSellerGroup.findMany({
+      where: { orderId },
+      select: {
+        status: true,
+        courierId: true,
+        trackingNumber: true,
+        trackingUrl: true,
+      },
+    });
+    const reached = (status: string) =>
+      target === 'SHIPPED'
+        ? status === 'SHIPPED' || status === 'DELIVERED'
+        : status === 'DELIVERED';
+    if (!groups.every((g) => reached(g.status))) return;
+
+    const single = groups.length === 1 ? groups[0] : null;
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: target,
+        ...(target === 'SHIPPED' ? { shippedAt: new Date() } : {}),
+        ...(target === 'DELIVERED' ? { deliveredAt: new Date() } : {}),
+        ...(single
+          ? {
+              courierId: single.courierId,
+              trackingNumber: single.trackingNumber,
+              trackingUrl: single.trackingUrl,
+            }
+          : {}),
+      },
+    });
+
     const payload: OrderStatusChangedPayload = {
       orderId,
-      userId: typedOrder.userId,
-      status: 'SHIPPED',
+      userId,
+      status: target,
     };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
     this.eventEmitter.emit(NOTIFICATION_EVENTS.ORDER_STATUS_CHANGED, payload);
-
-    return this.findOneForUser(typedOrder.userId, orderId);
   }
 
   /** Real admin visibility across every customer's orders — genuinely new; every prior method in this service is scoped to a single user's own orders. */
@@ -716,6 +877,36 @@ export class OrdersService {
       throw new BadRequestException(
         `Cannot move an order from ${currentStatus} to ${newStatus}.`,
       );
+    }
+
+    // Marketplace Phase 12 — DELIVERED must stay consistent with each
+    // OrderSellerGroup's own independently-tracked status (Phase 12's
+    // real per-seller fulfillment). Delegating to markGroupDelivered for
+    // the trivial, still-common single-group case keeps that group in
+    // sync automatically; a genuine multi-seller order is refused here,
+    // the same way shipOrder refuses SHIPPED for one, since a bare
+    // whole-order override would mark the order delivered while some
+    // seller's own portion may still only be SHIPPED, not yet actually
+    // confirmed delivered.
+    if (newStatus === 'DELIVERED') {
+      const groups = await this.prisma.orderSellerGroup.findMany({
+        where: { orderId },
+        select: { id: true },
+      });
+      if (groups.length > 1) {
+        throw new BadRequestException(
+          "This order has multiple sellers' items — mark each seller's portion delivered individually, not this whole-order status.",
+        );
+      }
+      if (groups.length === 1) {
+        await this.markGroupDelivered(groups[0].id);
+        return this.findOneForUser(
+          (order as { userId: string }).userId,
+          orderId,
+        );
+      }
+      // No groups at all (a pre-Phase-5 order somehow never backfilled)
+      // — fall through to the plain update below exactly as before.
     }
 
     await this.prisma.order.update({

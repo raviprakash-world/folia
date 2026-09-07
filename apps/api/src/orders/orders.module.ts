@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { ReturnsService } from './returns.service';
+import { SellerFulfillmentController } from './seller-fulfillment.controller';
 import { CartModule } from '../cart/cart.module';
 import { AddressesModule } from '../addresses/addresses.module';
 import { CouponsModule } from '../coupons/coupons.module';
@@ -28,7 +29,7 @@ import { PayoutsModule } from '../payouts/payouts.module';
     AuditModule,
     PayoutsModule,
   ],
-  controllers: [OrdersController],
+  controllers: [OrdersController, SellerFulfillmentController],
   providers: [OrdersService, ReturnsService],
   exports: [OrdersService, ReturnsService],
 })

@@ -921,10 +921,12 @@ model OrderItem {
 /// what every order already looked like, just represented through this
 /// table instead of scalar fields directly on Order. See
 /// docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md §6 for the full
-/// design. Deliberately has NO courierId/trackingNumber/shipment fields
-/// yet — real per-group shipment assignment is Marketplace Phase 12's own
-/// job; Order's existing courierId/trackingNumber/etc. remain the sole
-/// real shipping mechanism, covering the whole order, until then.
+/// design. Marketplace Phase 12 added the real per-group shipment fields
+/// below — Order's own courierId/trackingNumber/etc. now only ever get
+/// written for the trivial, still-common single-group case (see
+/// OrdersService.shipOrder, which delegates to the same real per-group
+/// mechanism this model backs and rolls the parent Order's own fields up
+/// only once every group is done).
 model OrderSellerGroup {
   id      String @id @default(uuid())
   orderId String
@@ -933,11 +935,27 @@ model OrderSellerGroup {
   sellerId String?
   seller   Seller? @relation(fields: [sellerId], references: [id], onDelete: Restrict)
 
-  /// Mirrors the parent Order's status at creation time. Not yet
-  /// independently transitioned by anything — that begins in Marketplace
-  /// Phase 12, once a real per-seller shipment action exists to actually
-  /// change it; until then this is informational, not yet load-bearing.
+  /// Marketplace Phase 12 — now independently transitioned by
+  /// OrdersService.shipOrderSellerGroup/markGroupDelivered, the real
+  /// per-seller fulfillment actions this field's own original comment
+  /// deferred to this phase.
   status OrderStatus @default(PROCESSING)
+
+  /// Marketplace Phase 12 — mirrors Order's own courierId/trackingNumber/
+  /// trackingUrl/shippedAt exactly, scoped to just this seller's own
+  /// shipment. All null until this group is actually shipped (see
+  /// OrdersService.shipOrderSellerGroup, backed by the same
+  /// ShippingProviderClient.createShipment this codebase's whole-order
+  /// shipping already used).
+  courierId      String?
+  trackingNumber String?
+  trackingUrl    String?
+  shippedAt      DateTime?
+  /// Marketplace Phase 12 — mirrors Order.deliveredAt exactly, scoped to
+  /// this group. Set exactly once, by OrdersService.markGroupDelivered
+  /// (admin-only, matching Order.deliveredAt's own "no real delivery
+  /// webhook exists yet" honesty).
+  deliveredAt DateTime?
 
   /// SUM(price * quantity) across just this group's own OrderItems,
   /// frozen at order-creation time — same "never silently recompute a

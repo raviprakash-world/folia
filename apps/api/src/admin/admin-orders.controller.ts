@@ -56,7 +56,9 @@ export class AdminOrdersController {
    * configured courier provider (see ShippingProviderClient) and only
    * then moves the order to SHIPPED. See order-status.util.ts's doc
    * comment for why this is a dedicated endpoint rather than a value
-   * PUT :id/status accepts.
+   * PUT :id/status accepts. Marketplace Phase 12 — refuses a genuine
+   * multi-seller order now; use POST :id/order-groups/:groupId/ship for
+   * each seller's own portion instead.
    */
   @Post(':id/ship')
   async ship(
@@ -77,5 +79,54 @@ export class AdminOrdersController {
       ipAddress: req.ip,
     });
     return order;
+  }
+
+  /**
+   * Marketplace Phase 12 — admin can ship any seller's own group,
+   * including Folia's own (sellerId: null), which has no seller account
+   * to self-serve it. See SellerFulfillmentController for the
+   * seller-facing equivalent, scoped to their own groups only.
+   */
+  @Post('groups/:groupId/ship')
+  async shipGroup(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('groupId') groupId: string,
+    @Req() req: Request,
+  ) {
+    const group = await this.ordersService.shipOrderSellerGroup(groupId);
+    await this.auditService.log({
+      actorId: admin.id,
+      action: 'ORDER_GROUP_SHIP',
+      resource: 'order_seller_group',
+      resourceId: groupId,
+      metadata: {
+        courierId: group.courierId,
+        trackingNumber: group.trackingNumber,
+      },
+      ipAddress: req.ip,
+    });
+    return group;
+  }
+
+  /**
+   * Marketplace Phase 12 — no real delivery webhook exists (same honesty
+   * posture as the whole-order Order.deliveredAt field), so this stays an
+   * explicit admin action, never automatic.
+   */
+  @Post('groups/:groupId/mark-delivered')
+  async markGroupDelivered(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('groupId') groupId: string,
+    @Req() req: Request,
+  ) {
+    const group = await this.ordersService.markGroupDelivered(groupId);
+    await this.auditService.log({
+      actorId: admin.id,
+      action: 'ORDER_GROUP_DELIVERED',
+      resource: 'order_seller_group',
+      resourceId: groupId,
+      ipAddress: req.ip,
+    });
+    return group;
   }
 }
