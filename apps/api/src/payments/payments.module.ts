@@ -7,6 +7,7 @@ import { AppConfigModule } from '../config/config.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { AuditModule } from '../audit/audit.module';
 import { SellersModule } from '../sellers/sellers.module';
+import { PayoutsModule } from '../payouts/payouts.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { SellersModule } from '../sellers/sellers.module';
     InventoryModule,
     AuditModule,
     SellersModule,
+    PayoutsModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, RazorpayProvider],

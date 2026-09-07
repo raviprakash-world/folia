@@ -18,6 +18,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { RazorpayProvider } from './providers/razorpay.provider';
 import { SellerCommissionService } from '../sellers/seller-commission.service';
+import { SellerLedgerService } from '../payouts/seller-ledger.service';
 import { PAYMENT_EVENTS } from './payments.events';
 import type { PaymentRefundedPayload } from './payments.events';
 import { toPublicOrder } from '../orders/order.types';
@@ -129,6 +130,7 @@ export class PaymentsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
     private readonly commissionService: SellerCommissionService,
+    private readonly ledgerService: SellerLedgerService,
   ) {}
 
   async createForOrder(
@@ -508,6 +510,22 @@ export class PaymentsService {
           },
         });
         groupIdBySeller.set(sellerId, group.id);
+
+        // Marketplace Phase 9 — the seller's real, persisted ledger entry
+        // for this order, written inside this same transaction (never a
+        // separate step that could commit independently of the order
+        // itself existing). Skipped for the Folia-owned group (sellerId
+        // null): SellerLedgerEntry.sellerId is required — there is no
+        // ledger for sales Folia makes to itself.
+        if (sellerId !== null) {
+          await this.ledgerService.recordOrderProceeds(
+            tx,
+            sellerId,
+            group.id,
+            groupSubtotal,
+            groupCommissionTotal,
+          );
+        }
       }
 
       await tx.orderItem.createMany({

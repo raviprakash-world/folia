@@ -31,6 +31,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EmailModule } from './email/email.module';
 import { SellersModule } from './sellers/sellers.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { SellerGuard } from './sellers/guards/seller.guard';
@@ -93,6 +94,7 @@ import { SellerGuard } from './sellers/guards/seller.guard';
     NotificationsModule,
     EmailModule,
     SellersModule,
+    PayoutsModule,
   ],
   providers: [
     // Order matters: ThrottlerGuard first (rate-limit before doing any

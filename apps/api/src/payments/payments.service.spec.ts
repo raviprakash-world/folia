@@ -177,6 +177,11 @@ function createDeps() {
       }),
     ),
   };
+  // Marketplace Phase 9 — a no-op by default; tests that care about the
+  // ledger assert on this mock's calls directly.
+  const ledgerService = {
+    recordOrderProceeds: jest.fn().mockResolvedValue(undefined),
+  };
 
   const service = new PaymentsService(
     prisma as never,
@@ -187,6 +192,7 @@ function createDeps() {
     eventEmitter,
     auditService as never,
     commissionService as never,
+    ledgerService as never,
   );
 
   return {
@@ -195,6 +201,7 @@ function createDeps() {
     cartService,
     config,
     razorpay,
+    ledgerService,
     inventoryService,
     eventEmitter,
     auditService,
@@ -593,6 +600,80 @@ describe('PaymentsService.createForOrder — COD', () => {
           checkoutSnapshot: snapshot,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Marketplace Phase 9 — seller ledger', () => {
+    it('records SALE + COMMISSION proceeds for each real seller group, but never for the Folia-owned group', async () => {
+      const { prisma, orderTx, commissionService, ledgerService, service } =
+        createDeps();
+      commissionService.resolveEffectiveRate.mockImplementation(
+        (sellerId: string) =>
+          Promise.resolve({
+            sellerId,
+            ratePercent: 10,
+            isMarketplaceDefault: true,
+          }),
+      );
+      const snapshot = makeSnapshot({
+        items: [
+          {
+            productId: 'prod-folia',
+            slug: 'folia-pot',
+            name: 'Folia Pot',
+            categorySlug: 'vessels',
+            variantId: null,
+            variantLabel: null,
+            price: 20,
+            quantity: 1,
+            inventoryItemId: 'inv-folia',
+            reservationId: 'res-folia',
+            sellerId: null,
+          },
+          {
+            productId: 'prod-a1',
+            slug: 'seller-a-plant',
+            name: 'Seller A Plant',
+            categorySlug: 'plants',
+            variantId: null,
+            variantLabel: null,
+            price: 50,
+            quantity: 1,
+            inventoryItemId: 'inv-a1',
+            reservationId: 'res-a1',
+            sellerId: 'seller-a',
+          },
+        ],
+      });
+      prisma.payment.create.mockResolvedValue(
+        makePayment({
+          id: 'pay-ledger',
+          provider: 'COD',
+          checkoutSnapshot: snapshot,
+        }),
+      );
+      orderTx.orderSellerGroup.create.mockImplementation(
+        (args: { data: { sellerId: string | null } }) =>
+          Promise.resolve({ id: `group-${args.data.sellerId ?? 'folia'}` }),
+      );
+
+      await service.createForOrder({
+        paymentId: 'pay-ledger',
+        userId: 'user-1',
+        method: 'COD',
+        amount: 70,
+        displayLabel: 'Pay on delivery',
+        checkoutSnapshot: snapshot,
+      });
+
+      expect(ledgerService.recordOrderProceeds).toHaveBeenCalledTimes(1);
+      expect(ledgerService.recordOrderProceeds).toHaveBeenCalledWith(
+        orderTx,
+        'seller-a',
+        'group-seller-a',
+        50,
+        5, // 50 * 10%
+      );
     });
   });
 

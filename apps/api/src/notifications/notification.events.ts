@@ -90,6 +90,13 @@ export const NOTIFICATION_EVENTS = {
   PRODUCT_APPROVED: 'notification.product_approved',
   PRODUCT_REJECTED: 'notification.product_rejected',
   PRODUCT_DEACTIVATED: 'notification.product_deactivated',
+  /**
+   * Marketplace Phase 9 — same "emit now, listener deferred" precedent as
+   * every SELLER_ and PRODUCT_ event above. Fired only from
+   * SellerPayoutService.adminMarkPaid — the one real, admin-confirmed
+   * transition, never from PENDING/PROCESSING/FAILED/CANCELLED.
+   */
+  SELLER_PAYOUT_PAID: 'notification.seller_payout_paid',
 } as const;
 
 export interface OrderCancelledPayload {
@@ -149,6 +156,13 @@ export interface ProductRejectedPayload {
 export interface ProductDeactivatedPayload {
   productId: string;
   sellerId: string;
+}
+
+export interface SellerPayoutPaidPayload {
+  sellerId: string;
+  userId: string;
+  payoutId: string;
+  amount: number;
 }
 
 export interface OrderReturnRequestedPayload {

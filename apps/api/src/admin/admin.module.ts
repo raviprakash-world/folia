@@ -7,12 +7,14 @@ import { AdminUsersController } from './admin-users.controller';
 import { AdminSellersController } from './admin-sellers.controller';
 import { AdminSellerProductsController } from './admin-seller-products.controller';
 import { AdminCommissionsController } from './admin-commissions.controller';
+import { AdminPayoutsController } from './admin-payouts.controller';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { UsersModule } from '../users/users.module';
 import { AuditModule } from '../audit/audit.module';
 import { SellersModule } from '../sellers/sellers.module';
+import { PayoutsModule } from '../payouts/payouts.module';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { SellersModule } from '../sellers/sellers.module';
     UsersModule,
     AuditModule,
     SellersModule,
+    PayoutsModule,
   ],
   controllers: [
     AdminProductsController,
@@ -32,6 +35,7 @@ import { SellersModule } from '../sellers/sellers.module';
     AdminSellersController,
     AdminSellerProductsController,
     AdminCommissionsController,
+    AdminPayoutsController,
   ],
 })
 export class AdminModule {}
