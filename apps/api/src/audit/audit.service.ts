@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents */
 // See users/users.service.ts's top-of-file comment for why this exemption exists. Widened (Phase 13, real prisma generate) to also cover no-unsafe-assignment/no-redundant-type-constituents — Prisma.InputJsonValue doesn't exist in this sandbox's minimal pre-generation stub, a real, correctly-named export once real generation succeeds.
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
-// See users/users.service.ts's top-of-file comment for why this exemption exists.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -55,7 +53,7 @@ export class NotificationsService {
       }),
       this.prisma.notification.count({ where: { userId } }),
     ]);
-    return { items: items as NotificationRecord[], total };
+    return { items: items, total };
   }
 
   getUnreadCount(userId: string): Promise<number> {

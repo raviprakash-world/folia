@@ -943,7 +943,9 @@ describe('OrdersService.getPurchasedProductIds', () => {
 describe('OrdersService.findOneForUser', () => {
   it('Marketplace Phase 16 — includes sellerGroups (with items and the seller displayName) in the query', async () => {
     const { prisma, service } = createDeps();
-    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder({ sellerGroups: [] }));
+    prisma.order.findFirst.mockResolvedValue(
+      makeCreatedOrder({ sellerGroups: [] }),
+    );
 
     await service.findOneForUser('user-1', 'FOL-20260829-1234');
 

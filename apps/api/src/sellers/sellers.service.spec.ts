@@ -221,10 +221,14 @@ describe('SellersService.listPublic', () => {
     await service.listPublic({});
 
     expect(prisma.seller.count).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ status: 'ACTIVE' }) }),
+      expect.objectContaining<Record<string, unknown>>({
+        where: expect.objectContaining({ status: 'ACTIVE' }),
+      }),
     );
     expect(prisma.seller.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ status: 'ACTIVE' }) }),
+      expect.objectContaining<Record<string, unknown>>({
+        where: expect.objectContaining({ status: 'ACTIVE' }),
+      }),
     );
   });
 
@@ -236,7 +240,7 @@ describe('SellersService.listPublic', () => {
     await service.listPublic({ search: 'fern' });
 
     expect(prisma.seller.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
+      expect.objectContaining<Record<string, unknown>>({
         where: expect.objectContaining({
           displayName: { contains: 'fern', mode: 'insensitive' },
         }),

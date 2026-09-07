@@ -1,14 +1,14 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-// KNOWN ENVIRONMENT-SPECIFIC EXEMPTION, not a blanket "trust me": every
-// `this.prisma.<model>.<method>()` call below is flagged as unsafe
-// because @prisma/client's pre-generation stub types PrismaClient as
-// `any` — see prisma.service.ts's top-of-file comment and the root
-// README's "Known Issues" for the full explanation (this note is
-// intentionally short so it doesn't repeat that explanation in every
-// Prisma-touching file). Each return is cast to this file's own
-// hand-written UserWithRole type (see user.types.ts) immediately, so
-// type safety resumes at the service boundary even though it's absent
-// for the one line making the actual Prisma call.
+// P0-B — the manual `as Promise<UserWithRole...>` casts this file used
+// to carry on every Prisma call (and the matching top-of-file
+// eslint-disable) are gone: they existed only for the original
+// development sandbox's pre-generation PrismaClient stub (typed `any`
+// until `prisma generate` runs — see the root README's "Known Issues").
+// In any environment where `prisma generate` has actually run — true
+// for this one, and required in CI before lint/typecheck/build — the
+// real generated types already match this file's declared return
+// types, so `@typescript-eslint/no-unnecessary-type-assertion` is
+// correct that the casts add nothing. UserWithRole (user.types.ts)
+// stays as the service boundary's own hand-written contract regardless.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -31,14 +31,14 @@ export class UsersService {
     return this.prisma.user.findFirst({
       where: { email: email.toLowerCase(), deletedAt: null },
       include: USER_WITH_ROLE_INCLUDE,
-    }) as Promise<UserWithRole | null>;
+    });
   }
 
   async findById(id: string): Promise<UserWithRole | null> {
     return this.prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: USER_WITH_ROLE_INCLUDE,
-    }) as Promise<UserWithRole | null>;
+    });
   }
 
   async create(input: {
@@ -52,7 +52,7 @@ export class UsersService {
     return this.prisma.user.create({
       data: { ...input, email: input.email.toLowerCase() },
       include: USER_WITH_ROLE_INCLUDE,
-    }) as Promise<UserWithRole>;
+    });
   }
 
   async updateProfile(
@@ -69,7 +69,7 @@ export class UsersService {
       where: { id },
       data: { ...input, email: input.email.toLowerCase() },
       include: USER_WITH_ROLE_INCLUDE,
-    }) as Promise<UserWithRole>;
+    });
   }
 
   async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
@@ -89,7 +89,7 @@ export class UsersService {
       where: { deletedAt: null },
       include: USER_WITH_ROLE_INCLUDE,
       orderBy: { createdAt: 'desc' },
-    }) as Promise<UserWithRole[]>;
+    });
   }
 
   /**
@@ -123,6 +123,6 @@ export class UsersService {
       where: { id },
       data: { roleId: role.id },
       include: USER_WITH_ROLE_INCLUDE,
-    }) as Promise<UserWithRole>;
+    });
   }
 }

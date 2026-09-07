@@ -11,6 +11,26 @@ import { AppModule } from '../src/app.module';
  * Requires DATABASE_URL/REDIS_URL pointing at reachable instances and a
  * successfully generated Prisma client (see the root README's "Known
  * issues" if this fails with a PrismaClient initialization error).
+ *
+ * P0-B (tooling) note — why test/jest-e2e.json sets `forceExit: true`:
+ * booting the real AppModule pulls in JobsModule, whose
+ * `BullModule.forRootAsync` factory creates its own bare `new
+ * Redis(...)` connection for BullMQ (jobs.module.ts) rather than an
+ * injected, Nest-lifecycle-managed provider — nothing ever calls
+ * `.quit()`/`.disconnect()` on it, on this test's own `app.close()` or
+ * on a real SIGTERM. Confirmed by direct code inspection, not
+ * `--detectOpenHandles` (that diagnostic printed inconsistently across
+ * runs — a timing artifact of ioBusy which handle happens to still be
+ * open when Jest's post-run scan fires — but the underlying leak itself
+ * reproduced on every run). This is a real, narrow connection-lifecycle
+ * defect — the same category as the rest of graceful shutdown
+ * (`enableShutdownHooks()` is never called in main.ts either) — and is
+ * explicitly out of scope for the P0-B tooling phase; `forceExit` here
+ * only lets the TEST RUNNER exit once real test results are already in,
+ * it does not affect what those results are. Fix belongs to the
+ * graceful-shutdown phase: give JobsModule's BullMQ connection its own
+ * injectable provider with a real `onModuleDestroy`, matching
+ * PrismaService/RedisService's existing pattern.
  */
 describe('Health (e2e)', () => {
   let app: INestApplication;

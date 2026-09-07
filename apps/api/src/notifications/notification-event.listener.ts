@@ -203,7 +203,8 @@ export class NotificationEventListener {
       userId: payload.userId,
       type: 'SELLER',
       title: 'Application Received',
-      message: "We've received your seller application and will review it shortly.",
+      message:
+        "We've received your seller application and will review it shortly.",
       href: '/seller/profile',
     });
   }
@@ -214,7 +215,8 @@ export class NotificationEventListener {
       userId: payload.userId,
       type: 'SELLER',
       title: 'Seller Application Approved',
-      message: "You're approved to sell on Folia — your storefront is now live.",
+      message:
+        "You're approved to sell on Folia — your storefront is now live.",
       href: '/seller/profile',
     });
   }
@@ -251,7 +253,8 @@ export class NotificationEventListener {
       userId: payload.userId,
       type: 'SELLER',
       title: 'Seller Account Reactivated',
-      message: 'Your seller account is active again — your storefront is back online.',
+      message:
+        'Your seller account is active again — your storefront is back online.',
       href: '/seller/profile',
     });
   }
@@ -286,9 +289,7 @@ export class NotificationEventListener {
   }
 
   @OnEvent(NOTIFICATION_EVENTS.PRODUCT_APPROVED)
-  async handleProductApproved(
-    payload: ProductApprovedPayload,
-  ): Promise<void> {
+  async handleProductApproved(payload: ProductApprovedPayload): Promise<void> {
     const userId = await this.resolveSellerUserId(payload.sellerId);
     await this.notificationsService.create({
       userId,
@@ -300,9 +301,7 @@ export class NotificationEventListener {
   }
 
   @OnEvent(NOTIFICATION_EVENTS.PRODUCT_REJECTED)
-  async handleProductRejected(
-    payload: ProductRejectedPayload,
-  ): Promise<void> {
+  async handleProductRejected(payload: ProductRejectedPayload): Promise<void> {
     const userId = await this.resolveSellerUserId(payload.sellerId);
     await this.notificationsService.create({
       userId,

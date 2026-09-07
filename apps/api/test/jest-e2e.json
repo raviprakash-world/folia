@@ -6,5 +6,9 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
-  "setupFiles": ["<rootDir>/jest.setup.ts"]
+  "transformIgnorePatterns": [
+    "node_modules/(?!(@nestjs/bullmq|@nestjs/bull-shared|@nestjs/event-emitter)/)"
+  ],
+  "setupFiles": ["<rootDir>/jest.setup.ts"],
+  "forceExit": true
 }

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
-// See users/users.service.ts's top-of-file comment for why this exemption exists.
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashToken } from '../auth/token.util';
@@ -28,16 +26,16 @@ export class SessionsService {
         deviceName: input.deviceName,
         expiresAt: input.expiresAt,
       },
-    }) as Promise<SessionRecord>;
+    });
   }
 
   /** Looks up an active (not revoked, not expired) session by its raw refresh token — the core of the refresh-token flow. */
   async findActiveByRawToken(
     refreshTokenRaw: string,
   ): Promise<SessionRecord | null> {
-    const session = (await this.prisma.session.findUnique({
+    const session = await this.prisma.session.findUnique({
       where: { refreshTokenHash: hashToken(refreshTokenRaw) },
-    })) as SessionRecord | null;
+    });
 
     if (!session) return null;
     if (session.revokedAt) return null;
@@ -80,7 +78,7 @@ export class SessionsService {
         },
       }),
     ]);
-    return newSession as SessionRecord;
+    return newSession;
   }
 
   async revoke(id: string, userId: string): Promise<void> {
@@ -101,6 +99,6 @@ export class SessionsService {
     return this.prisma.session.findMany({
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { lastUsedAt: 'desc' },
-    }) as Promise<SessionRecord[]>;
+    });
   }
 }

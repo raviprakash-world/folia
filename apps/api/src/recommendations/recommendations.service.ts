@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 // See users/users.service.ts's top-of-file comment for why this exemption exists. Widened (Phase 13, real prisma generate) to also cover no-unsafe-return — this.prisma.orderItem.groupBy() still resolves to `any` in this sandbox's minimal pre-generation stub, cascading into its consumers; resolves once real generation succeeds.
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';

@@ -91,7 +91,11 @@ describe('toPublicProduct', () => {
   it('Marketplace Phase 16 — surfaces id/slug/displayName for a seller-owned product', () => {
     const result = toPublicProduct(
       makeProduct({
-        seller: { id: 'seller-1', slug: 'terracotta-fern', displayName: 'Terracotta & Fern' },
+        seller: {
+          id: 'seller-1',
+          slug: 'terracotta-fern',
+          displayName: 'Terracotta & Fern',
+        },
       }),
     );
     expect(result.seller).toEqual({

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-// See users/users.service.ts's top-of-file comment for why this exemption exists.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RoleWithPermissions } from './role.types';
@@ -14,7 +12,7 @@ export class RolesService {
     return this.prisma.role.findUnique({
       where: { name },
       include: { permissions: true },
-    }) as Promise<RoleWithPermissions | null>;
+    });
   }
 
   /** Used at registration — every new account gets the default "customer" role. Throws if the role hasn't been seeded (a real configuration error, not a normal runtime state). */

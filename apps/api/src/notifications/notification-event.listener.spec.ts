@@ -173,13 +173,17 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
   it('handleSellerApplied creates a SELLER notification linking to the seller profile', async () => {
     const { listener, notificationsService } = createDeps();
 
-    await listener.handleSellerApplied({ sellerId: 'seller-1', userId: 'user-1' });
+    await listener.handleSellerApplied({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+    });
 
     expect(notificationsService.create).toHaveBeenCalledWith({
       userId: 'user-1',
       type: 'SELLER',
       title: 'Application Received',
-      message: "We've received your seller application and will review it shortly.",
+      message:
+        "We've received your seller application and will review it shortly.",
       href: '/seller/profile',
     });
   });
@@ -187,7 +191,10 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
   it('handleSellerApproved creates a SELLER notification', async () => {
     const { listener, notificationsService } = createDeps();
 
-    await listener.handleSellerApproved({ sellerId: 'seller-1', userId: 'user-1' });
+    await listener.handleSellerApproved({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+    });
 
     expect(notificationsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -229,7 +236,8 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
 
     expect(notificationsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: 'Your seller account was suspended: Multiple customer complaints under review.',
+        message:
+          'Your seller account was suspended: Multiple customer complaints under review.',
       }),
     );
   });
@@ -237,20 +245,32 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
   it('handleSellerSuspended omits the note clause when none was given', async () => {
     const { listener, notificationsService } = createDeps();
 
-    await listener.handleSellerSuspended({ sellerId: 'seller-1', userId: 'user-1' });
+    await listener.handleSellerSuspended({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+    });
 
     expect(notificationsService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Your seller account was suspended.' }),
+      expect.objectContaining({
+        message: 'Your seller account was suspended.',
+      }),
     );
   });
 
   it('handleSellerReactivated creates a SELLER notification', async () => {
     const { listener, notificationsService } = createDeps();
 
-    await listener.handleSellerReactivated({ sellerId: 'seller-1', userId: 'user-1' });
+    await listener.handleSellerReactivated({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+    });
 
     expect(notificationsService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1', type: 'SELLER', title: 'Seller Account Reactivated' }),
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'SELLER',
+        title: 'Seller Account Reactivated',
+      }),
     );
   });
 
@@ -264,14 +284,20 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
     });
 
     expect(notificationsService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Your seller account was deactivated: Requested by the seller.' }),
+      expect.objectContaining({
+        message:
+          'Your seller account was deactivated: Requested by the seller.',
+      }),
     );
   });
 
   it('handleProductSubmitted resolves the userId from the sellerId (the payload only carries sellerId)', async () => {
     const { listener, notificationsService, prisma } = createDeps();
 
-    await listener.handleProductSubmitted({ productId: 'prod-1', sellerId: 'seller-1' });
+    await listener.handleProductSubmitted({
+      productId: 'prod-1',
+      sellerId: 'seller-1',
+    });
 
     expect(prisma.seller.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: 'seller-1' },
@@ -289,7 +315,10 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
   it('handleProductApproved resolves the userId and links to the product', async () => {
     const { listener, notificationsService } = createDeps();
 
-    await listener.handleProductApproved({ productId: 'prod-1', sellerId: 'seller-1' });
+    await listener.handleProductApproved({
+      productId: 'prod-1',
+      sellerId: 'seller-1',
+    });
 
     expect(notificationsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -312,7 +341,8 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
 
     expect(notificationsService.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: 'Your product listing was not approved: Photos do not match the description.',
+        message:
+          'Your product listing was not approved: Photos do not match the description.',
       }),
     );
   });
@@ -320,10 +350,17 @@ describe('NotificationEventListener — Marketplace Phase 18', () => {
   it('handleProductDeactivated creates a SELLER notification', async () => {
     const { listener, notificationsService } = createDeps();
 
-    await listener.handleProductDeactivated({ productId: 'prod-1', sellerId: 'seller-1' });
+    await listener.handleProductDeactivated({
+      productId: 'prod-1',
+      sellerId: 'seller-1',
+    });
 
     expect(notificationsService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1', type: 'SELLER', title: 'Product Archived' }),
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'SELLER',
+        title: 'Product Archived',
+      }),
     );
   });
 

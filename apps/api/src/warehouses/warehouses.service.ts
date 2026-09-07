@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
-// See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   ConflictException,
   Injectable,
@@ -16,7 +14,7 @@ export class WarehousesService {
   async findAll(): Promise<WarehouseRecord[]> {
     return this.prisma.warehouse.findMany({
       orderBy: { name: 'asc' },
-    }) as Promise<WarehouseRecord[]>;
+    });
   }
 
   async findByCodeOrThrow(code: string): Promise<WarehouseRecord> {
@@ -24,7 +22,7 @@ export class WarehousesService {
       where: { code },
     });
     if (!warehouse) throw new NotFoundException('Warehouse not found');
-    return warehouse as WarehouseRecord;
+    return warehouse;
   }
 
   /**
@@ -76,6 +74,6 @@ export class WarehousesService {
     }
     return this.prisma.warehouse.create({
       data: input,
-    }) as Promise<WarehouseRecord>;
+    });
   }
 }
