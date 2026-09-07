@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AccountLayout } from '@/components/account/AccountLayout';
 import { CheckoutLayout } from '@/components/checkout/CheckoutLayout';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { SellerLayout } from '@/components/seller/SellerLayout';
 
 // Every route component is lazy-loaded so the initial bundle only pays for
 // the layout shell + whichever page was requested (route-level code splitting).
@@ -46,6 +47,17 @@ const CheckoutDelivery = lazy(() => import('@/pages/CheckoutDelivery'));
 const CheckoutPayment = lazy(() => import('@/pages/CheckoutPayment'));
 const CheckoutReview = lazy(() => import('@/pages/CheckoutReview'));
 const OrderConfirmation = lazy(() => import('@/pages/OrderConfirmation'));
+
+// Seller dashboard
+const SellerLogin = lazy(() => import('@/pages/SellerLogin'));
+const SellerApply = lazy(() => import('@/pages/SellerApply'));
+const SellerOverview = lazy(() => import('@/pages/SellerOverview'));
+const SellerProfile = lazy(() => import('@/pages/SellerProfile'));
+const SellerProducts = lazy(() => import('@/pages/SellerProducts'));
+const SellerProductEditor = lazy(() => import('@/pages/SellerProductEditor'));
+const SellerOrders = lazy(() => import('@/pages/SellerOrders'));
+const SellerOrderDetail = lazy(() => import('@/pages/SellerOrderDetail'));
+const SellerEarnings = lazy(() => import('@/pages/SellerEarnings'));
 
 // Admin
 const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
@@ -115,6 +127,31 @@ export const router = createBrowserRouter([
             ],
           },
           { path: 'checkout/confirmation/:orderId', element: withSuspense(<OrderConfirmation />) },
+          // Marketplace Phase 15 — any logged-in customer can apply; this
+          // is deliberately NOT inside the requireRole="seller" block
+          // below, since applying is what assigns that role in the first
+          // place (see SellerApply.tsx's own doc comment).
+          { path: 'seller/apply', element: withSuspense(<SellerApply />) },
+        ],
+      },
+      { path: 'seller/login', element: withSuspense(<SellerLogin />) },
+      {
+        element: <ProtectedRoute requireRole="seller" redirectTo="/seller/login" />,
+        children: [
+          {
+            path: 'seller',
+            element: <SellerLayout />,
+            children: [
+              { index: true, element: withSuspense(<SellerOverview />) },
+              { path: 'profile', element: withSuspense(<SellerProfile />) },
+              { path: 'products', element: withSuspense(<SellerProducts />) },
+              { path: 'products/new', element: withSuspense(<SellerProductEditor />) },
+              { path: 'products/:id', element: withSuspense(<SellerProductEditor />) },
+              { path: 'orders', element: withSuspense(<SellerOrders />) },
+              { path: 'orders/:id', element: withSuspense(<SellerOrderDetail />) },
+              { path: 'earnings', element: withSuspense(<SellerEarnings />) },
+            ],
+          },
         ],
       },
       { path: 'admin/login', element: withSuspense(<AdminLogin />) },

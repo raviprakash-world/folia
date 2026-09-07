@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { PageLoader } from '@/components/common/PageLoader';
 
 interface ProtectedRouteProps {
-  requireRole?: 'admin';
+  requireRole?: 'admin' | 'seller';
   redirectTo?: string;
 }
 
