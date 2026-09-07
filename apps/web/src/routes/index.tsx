@@ -68,6 +68,12 @@ const AdminOrders = lazy(() => import('@/pages/AdminOrders'));
 const AdminReturns = lazy(() => import('@/pages/AdminReturns'));
 const AdminReturnDetail = lazy(() => import('@/pages/AdminReturnDetail'));
 const AdminProducts = lazy(() => import('@/pages/AdminProducts'));
+const AdminMarketplace = lazy(() => import('@/pages/AdminMarketplace'));
+const AdminSellers = lazy(() => import('@/pages/AdminSellers'));
+const AdminSellerDetail = lazy(() => import('@/pages/AdminSellerDetail'));
+const AdminSellerProducts = lazy(() => import('@/pages/AdminSellerProducts'));
+const AdminCommissions = lazy(() => import('@/pages/AdminCommissions'));
+const AdminPayouts = lazy(() => import('@/pages/AdminPayouts'));
 const AdminCustomers = lazy(() => import('@/pages/AdminCustomers'));
 const AdminSearch = lazy(() => import('@/pages/AdminSearch'));
 
@@ -170,6 +176,12 @@ export const router = createBrowserRouter([
               { path: 'returns', element: withSuspense(<AdminReturns />) },
               { path: 'returns/:id', element: withSuspense(<AdminReturnDetail />) },
               { path: 'products', element: withSuspense(<AdminProducts />) },
+              { path: 'marketplace', element: withSuspense(<AdminMarketplace />) },
+              { path: 'marketplace/sellers', element: withSuspense(<AdminSellers />) },
+              { path: 'marketplace/sellers/:id', element: withSuspense(<AdminSellerDetail />) },
+              { path: 'marketplace/products', element: withSuspense(<AdminSellerProducts />) },
+              { path: 'marketplace/commissions', element: withSuspense(<AdminCommissions />) },
+              { path: 'marketplace/payouts', element: withSuspense(<AdminPayouts />) },
               { path: 'customers', element: withSuspense(<AdminCustomers />) },
               { path: 'search', element: withSuspense(<AdminSearch />) },
             ],
