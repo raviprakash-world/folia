@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   BadRequestException,
@@ -63,10 +62,10 @@ export class CartService {
             where: { id: userCart.id },
             include: CART_INCLUDE,
           });
-          return { cart: refreshed as CartRecord, clearGuestCookie: true };
+          return { cart: refreshed, clearGuestCookie: true };
         }
       }
-      return { cart: userCart as CartRecord, clearGuestCookie: !!guestToken };
+      return { cart: userCart, clearGuestCookie: !!guestToken };
     }
 
     if (guestToken) {
@@ -74,7 +73,7 @@ export class CartService {
         where: { guestToken },
         include: CART_INCLUDE,
       });
-      if (existing) return { cart: existing as CartRecord };
+      if (existing) return { cart: existing };
     }
 
     const newToken = generateSecureToken().raw;
@@ -82,7 +81,7 @@ export class CartService {
       data: { guestToken: newToken },
       include: CART_INCLUDE,
     });
-    return { cart: created as CartRecord, newGuestToken: newToken };
+    return { cart: created, newGuestToken: newToken };
   }
 
   /** Returns true if a guest cart actually existed and was merged; false if there was nothing to merge (no error either way — a missing/expired guest cookie is a normal, common case). */
@@ -164,8 +163,13 @@ export class CartService {
     if (quantity <= 0)
       throw new BadRequestException('Quantity must be positive.');
 
+    // Marketplace Phase 3/5 — a real gap closed here: this lookup never
+    // filtered by approvalStatus, so a seller's own DRAFT/SUBMITTED/
+    // ARCHIVED/REJECTED product could be added to a cart at all (nothing
+    // about "not deletedAt" implies "approved"). Matches the same filter
+    // ProductsService's every customer-facing read already applies.
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, deletedAt: null },
+      where: { id: productId, deletedAt: null, approvalStatus: 'ACTIVE' },
     });
     if (!product) throw new NotFoundException('Product not found');
     const unitPrice = (
@@ -199,7 +203,7 @@ export class CartService {
     return this.prisma.cart.findUniqueOrThrow({
       where: { id: cartId },
       include: CART_INCLUDE,
-    }) as Promise<CartRecord>;
+    });
   }
 
   async updateItemQuantity(
@@ -232,7 +236,7 @@ export class CartService {
     return this.prisma.cart.findUniqueOrThrow({
       where: { id: cartId },
       include: CART_INCLUDE,
-    }) as Promise<CartRecord>;
+    });
   }
 
   async removeItem(
@@ -246,7 +250,7 @@ export class CartService {
     return this.prisma.cart.findUniqueOrThrow({
       where: { id: cartId },
       include: CART_INCLUDE,
-    }) as Promise<CartRecord>;
+    });
   }
 
   async clearCart(cartId: string): Promise<CartRecord> {
@@ -254,6 +258,6 @@ export class CartService {
     return this.prisma.cart.findUniqueOrThrow({
       where: { id: cartId },
       include: CART_INCLUDE,
-    }) as Promise<CartRecord>;
+    });
   }
 }

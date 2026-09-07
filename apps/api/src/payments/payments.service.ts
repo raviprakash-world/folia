@@ -430,21 +430,57 @@ export class PaymentsService {
           paymentDisplayLabel: payment.displayLabel ?? payment.method,
           paymentTransactionId: payment.providerPaymentId ?? payment.id,
           customerNotes: snapshot.customerNotes ?? undefined,
-          items: {
-            create: snapshot.items.map((item) => ({
-              productId: item.productId,
-              slug: item.slug,
-              name: item.name,
-              categorySlug: item.categorySlug,
-              variantId: item.variantId,
-              variantLabel: item.variantLabel,
-              price: item.price,
-              quantity: item.quantity,
-              inventoryItemId: item.inventoryItemId,
-            })),
-          },
         },
-        include: { items: true },
+      });
+
+      // Marketplace Phase 5 — group this order's items by seller (null =
+      // Folia-owned) into real OrderSellerGroup rows before creating the
+      // OrderItems themselves, so each item can be created already
+      // pointing at its group in one createMany rather than a nested
+      // create this grouping can't express. A single-seller-cart order
+      // (still the common case) produces exactly one group here — no
+      // special case, just this same grouping logic given input that
+      // happens to have one bucket.
+      const bySeller = new Map<string | null, typeof snapshot.items>();
+      for (const item of snapshot.items) {
+        const key = item.sellerId;
+        const bucket = bySeller.get(key);
+        if (bucket) bucket.push(item);
+        else bySeller.set(key, [item]);
+      }
+
+      const groupIdBySeller = new Map<string | null, string>();
+      for (const [sellerId, items] of bySeller) {
+        const groupSubtotal = items.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+        const group = await tx.orderSellerGroup.create({
+          data: {
+            orderId: order.id,
+            sellerId,
+            status: 'PROCESSING',
+            subtotal: groupSubtotal,
+          },
+        });
+        groupIdBySeller.set(sellerId, group.id);
+      }
+
+      await tx.orderItem.createMany({
+        data: snapshot.items.map((item) => ({
+          orderId: order.id,
+
+          orderSellerGroupId: groupIdBySeller.get(item.sellerId)!,
+          productId: item.productId,
+          slug: item.slug,
+          name: item.name,
+          categorySlug: item.categorySlug,
+          variantId: item.variantId,
+          variantLabel: item.variantLabel,
+          price: item.price,
+          quantity: item.quantity,
+          inventoryItemId: item.inventoryItemId,
+        })),
       });
 
       await tx.payment.update({
@@ -452,7 +488,10 @@ export class PaymentsService {
         data: { orderId: order.id },
       });
 
-      return order;
+      return tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: { items: true },
+      });
     });
 
     await this.clearCartFor(payment.userId);

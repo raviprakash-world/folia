@@ -94,6 +94,17 @@ function createDeps() {
       findFirst: jest.fn(),
       create: jest.fn<Promise<unknown>, [CreateOrderArgs]>(),
     },
+    // Marketplace Phase 5 — resolveReplacement now creates the
+    // replacement order's OrderSellerGroup(s)/OrderItems as separate
+    // writes inside the same transaction, rather than one nested create.
+    orderSellerGroup: {
+      create: jest.fn().mockResolvedValue({ id: 'replacement-group-1' }),
+    },
+    orderItem: {
+      createMany: jest
+        .fn<Promise<{ count: number }>, [{ data: Record<string, unknown>[] }]>()
+        .mockResolvedValue({ count: 1 }),
+    },
     returnRequest: {
       create: jest.fn<Promise<unknown>, [CreateReturnRequestArgs]>(),
       updateMany: jest.fn<
@@ -1641,6 +1652,9 @@ function makeResolutionRow(overrides: Record<string, unknown> = {}) {
           categorySlug: 'plants',
           variantId: null,
           variantLabel: null,
+          // Marketplace Phase 5 — a replacement order's items keep the
+          // same seller attribution as the line being replaced.
+          orderSellerGroup: { sellerId: null },
         },
       },
     ],
@@ -2409,8 +2423,14 @@ describe('ReturnsService.resolveClaim — replacement', () => {
       deliveryMethod: 'STANDARD',
       estimatedDelivery: '3-5 business days',
     });
-    expect(createCall.data.items.create).toEqual([
+    // Marketplace Phase 5 — replacement order items are created via a
+    // separate orderItem.createMany call (after the order's own
+    // OrderSellerGroup is created), not a nested items.create.
+    const [[itemsCall]] = prisma.orderItem.createMany.mock.calls;
+    expect(itemsCall.data).toEqual([
       expect.objectContaining({
+        orderId: createCall.data.id,
+        orderSellerGroupId: 'replacement-group-1',
         productId: 'prod-1',
         slug: 'monstera',
         name: 'Monstera',
@@ -2419,6 +2439,14 @@ describe('ReturnsService.resolveClaim — replacement', () => {
         quantity: 1,
       }),
     ]);
+    expect(prisma.orderSellerGroup.create).toHaveBeenCalledWith({
+      data: {
+        orderId: createCall.data.id,
+        sellerId: null,
+        status: 'PROCESSING',
+        subtotal: 0,
+      },
+    });
     expect(createCall.data.payment.create).toMatchObject({
       userId: 'user-1',
       provider: 'COD',
@@ -2515,6 +2543,7 @@ describe('ReturnsService.resolveClaim — replacement', () => {
               categorySlug: 'plants',
               variantId: null,
               variantLabel: null,
+              orderSellerGroup: { sellerId: null },
             },
           },
           {
@@ -2529,6 +2558,7 @@ describe('ReturnsService.resolveClaim — replacement', () => {
               categorySlug: 'plants',
               variantId: null,
               variantLabel: null,
+              orderSellerGroup: { sellerId: null },
             },
           },
         ],

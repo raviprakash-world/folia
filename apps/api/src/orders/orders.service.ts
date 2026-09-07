@@ -154,6 +154,40 @@ export class OrdersService {
       throw new BadRequestException('Your cart is empty.');
     }
 
+    // Marketplace Phase 5 — defense in depth, re-checked here rather than
+    // trusted from add-to-cart time: a product's approvalStatus (or its
+    // seller's own status) can change at any point between "added to
+    // cart" and "checkout completes," and InventoryService.reserveForProduct
+    // itself has no concept of approval status at all — only real stock.
+    // Never lets an unapproved product or a non-selling seller's item
+    // reach a real reservation/payment.
+    for (const item of cart.items) {
+      if (item.product.approvalStatus !== 'ACTIVE') {
+        throw new BadRequestException(
+          `"${item.product.name}" is no longer available for purchase.`,
+        );
+      }
+    }
+    const cartSellerIds = [
+      ...new Set(
+        cart.items
+          .map((item) => item.product.sellerId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    if (cartSellerIds.length > 0) {
+      const sellers = await this.prisma.seller.findMany({
+        where: { id: { in: cartSellerIds } },
+        select: { id: true, status: true },
+      });
+      const inactiveSeller = sellers.find((s) => s.status !== 'ACTIVE');
+      if (inactiveSeller || sellers.length !== cartSellerIds.length) {
+        throw new BadRequestException(
+          'One or more items in your cart are no longer available for purchase.',
+        );
+      }
+    }
+
     const shippingAddress = await this.addressesService.findOwnedOrThrow(
       userId,
       dto.shippingAddressId,
@@ -254,6 +288,7 @@ export class OrdersService {
         quantity: item.quantity,
         inventoryItemId: reservations[index].inventoryItemId,
         reservationId: reservations[index].reservationId,
+        sellerId: item.product.sellerId,
       })),
     };
 

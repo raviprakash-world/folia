@@ -41,6 +41,7 @@ function makeSnapshot(
         quantity: 1,
         inventoryItemId: 'inv-1',
         reservationId: 'res-1',
+        sellerId: null,
       },
     ],
     ...overrides,
@@ -96,7 +97,18 @@ function makeOrderRow(overrides: Record<string, unknown> = {}) {
 
 function createDeps() {
   const orderTx = {
-    order: { create: jest.fn().mockResolvedValue(makeOrderRow()) },
+    order: {
+      create: jest.fn().mockResolvedValue(makeOrderRow()),
+      // Marketplace Phase 5 — confirmAndCreateOrder now re-fetches the
+      // order (with items) after creating its OrderSellerGroup(s)/
+      // OrderItems separately, rather than one nested create returning
+      // everything at once.
+      findUniqueOrThrow: jest.fn().mockResolvedValue(makeOrderRow()),
+    },
+    orderSellerGroup: {
+      create: jest.fn().mockResolvedValue({ id: 'group-1' }),
+    },
+    orderItem: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
     payment: { update: jest.fn(), findUnique: jest.fn() },
     refund: {
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
@@ -232,6 +244,169 @@ describe('PaymentsService.createForOrder — COD', () => {
       data: { orderId: snapshot.orderId },
     });
     expect(result.order?.id).toBe(snapshot.orderId);
+  });
+
+  describe('Marketplace Phase 5 — multi-seller order splitting', () => {
+    it('a cart of Folia + two sellers produces exactly three OrderSellerGroup rows, one per distinct seller', async () => {
+      const { prisma, orderTx, service } = createDeps();
+      const snapshot = makeSnapshot({
+        items: [
+          {
+            productId: 'prod-folia',
+            slug: 'folia-pot',
+            name: 'Folia Pot',
+            categorySlug: 'vessels',
+            variantId: null,
+            variantLabel: null,
+            price: 20,
+            quantity: 1,
+            inventoryItemId: 'inv-folia',
+            reservationId: 'res-folia',
+            sellerId: null,
+          },
+          {
+            productId: 'prod-a1',
+            slug: 'seller-a-plant',
+            name: 'Seller A Plant',
+            categorySlug: 'plants',
+            variantId: null,
+            variantLabel: null,
+            price: 30,
+            quantity: 1,
+            inventoryItemId: 'inv-a1',
+            reservationId: 'res-a1',
+            sellerId: 'seller-a',
+          },
+          {
+            productId: 'prod-a2',
+            slug: 'seller-a-vase',
+            name: 'Seller A Vase',
+            categorySlug: 'vessels',
+            variantId: null,
+            variantLabel: null,
+            price: 15,
+            quantity: 1,
+            inventoryItemId: 'inv-a2',
+            reservationId: 'res-a2',
+            sellerId: 'seller-a',
+          },
+          {
+            productId: 'prod-b1',
+            slug: 'seller-b-tool',
+            name: 'Seller B Tool',
+            categorySlug: 'tools',
+            variantId: null,
+            variantLabel: null,
+            price: 10,
+            quantity: 2,
+            inventoryItemId: 'inv-b1',
+            reservationId: 'res-b1',
+            sellerId: 'seller-b',
+          },
+        ],
+      });
+      prisma.payment.create.mockResolvedValue(
+        makePayment({
+          id: 'pay-multi',
+          provider: 'COD',
+          checkoutSnapshot: snapshot,
+        }),
+      );
+      let groupCounter = 0;
+      orderTx.orderSellerGroup.create.mockImplementation(() =>
+        Promise.resolve({ id: `group-${++groupCounter}` }),
+      );
+
+      await service.createForOrder({
+        paymentId: 'pay-multi',
+        userId: 'user-1',
+        method: 'COD',
+        amount: 75,
+        displayLabel: 'Pay on delivery',
+        checkoutSnapshot: snapshot,
+      });
+
+      expect(orderTx.orderSellerGroup.create).toHaveBeenCalledTimes(3);
+      const groupCalls = orderTx.orderSellerGroup.create.mock.calls.map(
+        (c: [{ data: Record<string, unknown> }]) => c[0].data,
+      );
+      expect(groupCalls).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ sellerId: null, subtotal: 20 }),
+          expect.objectContaining({ sellerId: 'seller-a', subtotal: 45 }),
+          expect.objectContaining({ sellerId: 'seller-b', subtotal: 20 }),
+        ]),
+      );
+    });
+
+    it('every OrderItem is created pointing at its own seller group, via one createMany call — not a nested items.create', async () => {
+      const { prisma, orderTx, service } = createDeps();
+      const snapshot = makeSnapshot({
+        items: [
+          {
+            productId: 'prod-folia',
+            slug: 'folia-pot',
+            name: 'Folia Pot',
+            categorySlug: 'vessels',
+            variantId: null,
+            variantLabel: null,
+            price: 20,
+            quantity: 1,
+            inventoryItemId: 'inv-folia',
+            reservationId: 'res-folia',
+            sellerId: null,
+          },
+          {
+            productId: 'prod-a1',
+            slug: 'seller-a-plant',
+            name: 'Seller A Plant',
+            categorySlug: 'plants',
+            variantId: null,
+            variantLabel: null,
+            price: 30,
+            quantity: 1,
+            inventoryItemId: 'inv-a1',
+            reservationId: 'res-a1',
+            sellerId: 'seller-a',
+          },
+        ],
+      });
+      prisma.payment.create.mockResolvedValue(
+        makePayment({
+          id: 'pay-multi-2',
+          provider: 'COD',
+          checkoutSnapshot: snapshot,
+        }),
+      );
+      orderTx.orderSellerGroup.create.mockImplementation(
+        (args: { data: { sellerId: string | null } }) =>
+          Promise.resolve({
+            id: args.data.sellerId ? 'group-seller-a' : 'group-folia',
+          }),
+      );
+
+      await service.createForOrder({
+        paymentId: 'pay-multi-2',
+        userId: 'user-1',
+        method: 'COD',
+        amount: 50,
+        displayLabel: 'Pay on delivery',
+        checkoutSnapshot: snapshot,
+      });
+
+      expect(orderTx.orderItem.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            productId: 'prod-folia',
+            orderSellerGroupId: 'group-folia',
+          }),
+          expect.objectContaining({
+            productId: 'prod-a1',
+            orderSellerGroupId: 'group-seller-a',
+          }),
+        ],
+      });
+    });
   });
 
   it('clears the cart once the order is created for COD, since there is nothing asynchronous to wait for', async () => {
@@ -1245,6 +1420,7 @@ describe('PaymentsService.expireStalePayments', () => {
             quantity: 1,
             inventoryItemId: 'inv-1',
             reservationId: 'res-a',
+            sellerId: null,
           },
           {
             productId: 'prod-2',
@@ -1257,6 +1433,7 @@ describe('PaymentsService.expireStalePayments', () => {
             quantity: 1,
             inventoryItemId: 'inv-2',
             reservationId: 'res-b',
+            sellerId: null,
           },
         ],
       }),

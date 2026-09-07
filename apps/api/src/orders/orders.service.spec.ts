@@ -20,6 +20,11 @@ function makeCartItem(overrides: Record<string, unknown> = {}) {
       slug: 'monstera',
       name: 'Monstera',
       category: { slug: 'plants' },
+      // Marketplace Phase 5 — every existing test's cart item is a real,
+      // purchasable Folia-owned product by default; tests that need an
+      // unapproved/seller-owned line override these explicitly.
+      approvalStatus: 'ACTIVE',
+      sellerId: null,
     },
     variant: null,
     ...overrides,
@@ -136,6 +141,11 @@ function createDeps() {
     cancellationRequest: { create: jest.fn() },
     returnRequest: { create: jest.fn() },
     orderItem: { findMany: jest.fn() },
+    // Marketplace Phase 5 — checkout's own defense-in-depth seller-status
+    // re-check. Only ever queried when the cart has at least one
+    // SELLER_OWNED line, which the default single Folia cart item never
+    // triggers — most existing tests never need this mocked at all.
+    seller: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),
   };
   const cartService = {
@@ -255,6 +265,98 @@ describe('OrdersService.checkout', () => {
       BadRequestException,
     );
     expect(paymentsService.createForOrder).not.toHaveBeenCalled();
+  });
+
+  describe('Marketplace Phase 5 — defense-in-depth revalidation', () => {
+    it('rejects checkout when a cart item is no longer ACTIVE — even though it was addable at add-to-cart time', async () => {
+      const { cartService, inventoryService, paymentsService, service } =
+        createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [
+            makeCartItem({
+              product: {
+                slug: 'monstera',
+                name: 'Monstera',
+                category: { slug: 'plants' },
+                approvalStatus: 'ARCHIVED',
+                sellerId: null,
+              },
+            }),
+          ],
+        },
+      });
+
+      await expect(service.checkout('user-1', BASE_DTO)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(inventoryService.reserveForProduct).not.toHaveBeenCalled();
+      expect(paymentsService.createForOrder).not.toHaveBeenCalled();
+    });
+
+    it('rejects checkout when a cart item belongs to a seller who is no longer ACTIVE', async () => {
+      const { prisma, cartService, inventoryService, service } = createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [
+            makeCartItem({
+              product: {
+                slug: 'seller-plant',
+                name: 'Seller Plant',
+                category: { slug: 'plants' },
+                approvalStatus: 'ACTIVE',
+                sellerId: 'seller-1',
+              },
+            }),
+          ],
+        },
+      });
+      prisma.seller.findMany.mockResolvedValue([
+        { id: 'seller-1', status: 'SUSPENDED' },
+      ]);
+
+      await expect(service.checkout('user-1', BASE_DTO)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(inventoryService.reserveForProduct).not.toHaveBeenCalled();
+    });
+
+    it('never queries sellers at all for an all-Folia cart', async () => {
+      const { prisma, service } = createDeps();
+
+      await service.checkout('user-1', BASE_DTO);
+
+      expect(prisma.seller.findMany).not.toHaveBeenCalled();
+    });
+
+    it('allows checkout through when every seller referenced is ACTIVE', async () => {
+      const { prisma, cartService, paymentsService, service } = createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [
+            makeCartItem({
+              product: {
+                slug: 'seller-plant',
+                name: 'Seller Plant',
+                category: { slug: 'plants' },
+                approvalStatus: 'ACTIVE',
+                sellerId: 'seller-1',
+              },
+            }),
+          ],
+        },
+      });
+      prisma.seller.findMany.mockResolvedValue([
+        { id: 'seller-1', status: 'ACTIVE' },
+      ]);
+
+      await service.checkout('user-1', BASE_DTO);
+
+      expect(paymentsService.createForOrder).toHaveBeenCalled();
+    });
   });
 
   it('computes subtotal, tax (8%), and total correctly with no coupon, in the checkout snapshot handed to PaymentsService', async () => {

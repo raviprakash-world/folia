@@ -207,6 +207,18 @@ describe('CartService.addItem', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it("Marketplace Phase 3/5: only looks up products that are ACTIVE — a seller's own DRAFT/SUBMITTED/ARCHIVED/REJECTED product can never be added to a cart at all", async () => {
+    const { prisma, service } = createDeps();
+    prisma.product.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.addItem('cart-1', 'draft-product', null, 1),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.product.findFirst).toHaveBeenCalledWith({
+      where: { id: 'draft-product', deletedAt: null, approvalStatus: 'ACTIVE' },
+    });
+  });
+
   it('looks up the real product price server-side rather than trusting any caller-supplied value — there is no unitPrice parameter to even pass', async () => {
     const { prisma, inventoryService, service } = createDeps();
     prisma.product.findFirst.mockResolvedValue({

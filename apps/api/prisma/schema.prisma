@@ -833,6 +833,11 @@ model Order {
   /// never on a normally-checked-out order.
   replacementFor ReturnRequest?       @relation("ReturnReplacementOrder")
 
+  /// Marketplace Phase 5 — this order's seller-fulfillment breakdown.
+  /// Always at least one row (Folia-only orders get a single sellerId:
+  /// null group) — see OrderSellerGroup's own comment.
+  sellerGroups OrderSellerGroup[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -877,9 +882,63 @@ model OrderItem {
   /// since Prisma requires it for the reverse of a to-many relation.
   returnClaims ReturnRequestItem[]
 
+  /// Marketplace Phase 5 — which seller-fulfillment bucket this line
+  /// belongs to (a group with sellerId: null for Folia-owned items).
+  /// REQUIRED, not nullable — unlike Product.sellerId (which stays null
+  /// forever for a genuinely Folia-owned product), every OrderItem gets a
+  /// real group either way; there is no "no group" state for an order
+  /// line. Existing pre-Phase-5 rows are backfilled to a single
+  /// Folia-only group per order in this same migration — see that
+  /// migration's own comment. No direct sellerId snapshot on this model:
+  /// ownership is derived through this relation
+  /// (orderSellerGroup.sellerId), not duplicated as a second column.
+  orderSellerGroupId String
+  orderSellerGroup   OrderSellerGroup @relation(fields: [orderSellerGroupId], references: [id], onDelete: Cascade)
+
   @@index([orderId])
   @@index([productId])
+  @@index([orderSellerGroupId])
   @@map("order_items")
+}
+
+/// Marketplace Phase 5 — one row per (Order, seller) pair; sellerId null
+/// is the Folia-fulfilled portion of the order. A single-seller-cart
+/// order (the only kind that existed before this phase, and still the
+/// common case) produces exactly one group — structurally identical to
+/// what every order already looked like, just represented through this
+/// table instead of scalar fields directly on Order. See
+/// docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md §6 for the full
+/// design. Deliberately has NO courierId/trackingNumber/shipment fields
+/// yet — real per-group shipment assignment is Marketplace Phase 12's own
+/// job; Order's existing courierId/trackingNumber/etc. remain the sole
+/// real shipping mechanism, covering the whole order, until then.
+model OrderSellerGroup {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  sellerId String?
+  seller   Seller? @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  /// Mirrors the parent Order's status at creation time. Not yet
+  /// independently transitioned by anything — that begins in Marketplace
+  /// Phase 12, once a real per-seller shipment action exists to actually
+  /// change it; until then this is informational, not yet load-bearing.
+  status OrderStatus @default(PROCESSING)
+
+  /// SUM(price * quantity) across just this group's own OrderItems,
+  /// frozen at order-creation time — same "never silently recompute a
+  /// historical figure" discipline as every other pricing field on Order.
+  subtotal Decimal @db.Decimal(10, 2)
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([sellerId])
+  @@map("order_seller_groups")
 }
 
 /// One row per order, created the moment checkout starts (before the
@@ -1533,6 +1592,9 @@ model Seller {
   ledgerEntries SellerLedgerEntry[]
   payouts       SellerPayout[]
   products      Product[]
+  /// Marketplace Phase 5 — this seller's own fulfillment bucket on every
+  /// multi-seller order they appear in.
+  orderGroups   OrderSellerGroup[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

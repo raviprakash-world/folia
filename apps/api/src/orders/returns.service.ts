@@ -107,6 +107,12 @@ const RESOLUTION_INCLUDE = {
           categorySlug: true,
           variantId: true,
           variantLabel: true,
+          // Marketplace Phase 5 — a replacement order's own items need
+          // the same seller attribution as the line being replaced (the
+          // replacement is still that seller's product), so
+          // resolveReplacement can build a real OrderSellerGroup for the
+          // new order exactly like a normal checkout does.
+          orderSellerGroup: { select: { sellerId: true } },
         },
       },
     },
@@ -1225,23 +1231,6 @@ export class ReturnsService {
             paymentDisplayLabel: 'Free replacement',
             paymentTransactionId: `replacement-${row.id}`,
             customerNotes: `Free replacement for order ${row.orderId} (return/DOA claim ${row.id}).`,
-            items: {
-              create: row.items.map((claimItem) => ({
-                productId: claimItem.orderItem.productId,
-                slug: claimItem.orderItem.slug,
-                name: claimItem.orderItem.name,
-                categorySlug: claimItem.orderItem.categorySlug,
-                variantId: claimItem.orderItem.variantId,
-                variantLabel: claimItem.orderItem.variantLabel,
-                // Zero, not the original line's price — see
-                // docs/PHASE_6D_MIGRATION_DESIGN.md's replacement-order
-                // notes: a future return claim against THIS order must
-                // never compute a non-zero refund over money never
-                // charged.
-                price: 0,
-                quantity: claimItem.quantity,
-              })),
-            },
             payment: {
               create: {
                 userId: row.order.userId,
@@ -1254,6 +1243,57 @@ export class ReturnsService {
               },
             },
           },
+        });
+
+        // Marketplace Phase 5 — the replacement order's items keep the
+        // SAME seller attribution as the line being replaced (it's still
+        // that seller's product being replaced), grouped exactly like a
+        // normal checkout's confirmAndCreateOrder — a single-seller claim
+        // (still the only kind possible today, since one order line
+        // belongs to exactly one seller) produces exactly one group.
+        const bySeller = new Map<string | null, typeof row.items>();
+        for (const claimItem of row.items) {
+          const key = claimItem.orderItem.orderSellerGroup.sellerId;
+          const bucket = bySeller.get(key);
+          if (bucket) bucket.push(claimItem);
+          else bySeller.set(key, [claimItem]);
+        }
+        const groupIdBySeller = new Map<string | null, string>();
+        for (const sellerId of bySeller.keys()) {
+          // Zero subtotal — same reasoning as each item's own price: a
+          // replacement never charges anything, so its group's subtotal
+          // must never imply otherwise either.
+          const group = await tx.orderSellerGroup.create({
+            data: {
+              orderId: newOrderId,
+              sellerId,
+              status: 'PROCESSING',
+              subtotal: 0,
+            },
+          });
+          groupIdBySeller.set(sellerId, group.id);
+        }
+
+        await tx.orderItem.createMany({
+          data: row.items.map((claimItem) => ({
+            orderId: newOrderId,
+
+            orderSellerGroupId: groupIdBySeller.get(
+              claimItem.orderItem.orderSellerGroup.sellerId,
+            )!,
+            productId: claimItem.orderItem.productId,
+            slug: claimItem.orderItem.slug,
+            name: claimItem.orderItem.name,
+            categorySlug: claimItem.orderItem.categorySlug,
+            variantId: claimItem.orderItem.variantId,
+            variantLabel: claimItem.orderItem.variantLabel,
+            // Zero, not the original line's price — see
+            // docs/PHASE_6D_MIGRATION_DESIGN.md's replacement-order
+            // notes: a future return claim against THIS order must
+            // never compute a non-zero refund over money never charged.
+            price: 0,
+            quantity: claimItem.quantity,
+          })),
         });
 
         const { count } = await tx.returnRequest.updateMany({
