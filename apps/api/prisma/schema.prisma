@@ -949,6 +949,16 @@ model OrderSellerGroup {
   /// identical reason. Always 0 for the Folia-owned group (sellerId null).
   commissionTotal Decimal @default(0) @db.Decimal(10, 2)
 
+  /// Marketplace Phase 10 — a private, seller-only fulfillment note (e.g.
+  /// "packed, ready for courier pickup Tuesday"). Never shown to the
+  /// customer or to Folia admin's own order view — this is the seller's
+  /// own working note about their own portion of the order, distinct from
+  /// Order.customerNotes (the customer's note to Folia). Deliberately NOT
+  /// a status transition: OrderSellerGroup.status itself stays untouched
+  /// by anything until Marketplace Phase 12's real per-seller shipment
+  /// action, per this model's own doc comment above.
+  sellerNote String?
+
   items OrderItem[]
 
   createdAt DateTime @default(now())
