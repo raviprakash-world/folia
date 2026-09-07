@@ -15,8 +15,22 @@ function createDeps() {
       groupBy: jest.fn().mockResolvedValue([]),
     },
     orderItem: { groupBy: jest.fn().mockResolvedValue([]) },
-    product: { findMany: jest.fn().mockResolvedValue([]) },
+    product: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
     user: { count: jest.fn().mockResolvedValue(0) },
+    // Marketplace Phase 14
+    seller: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    orderSellerGroup: {
+      findMany: jest.fn().mockResolvedValue([]),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    sellerPayout: { count: jest.fn().mockResolvedValue(0) },
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
   const service = new AnalyticsService(prisma as never);
@@ -249,5 +263,143 @@ describe('AnalyticsService.getTopSellingProducts', () => {
 
     const result = await service.getTopSellingProducts('best', 10);
     expect(result[0].name).toBe('prod-gone');
+  });
+});
+
+describe('AnalyticsService.getSellerStats', () => {
+  it('sums per-status counts into a real total and a breakdown, same shape as getOrderStats', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.groupBy.mockResolvedValue([
+      { status: 'ACTIVE', _count: { status: 8 } },
+      { status: 'APPLIED', _count: { status: 3 } },
+    ]);
+
+    const result = await service.getSellerStats();
+    expect(result.total).toBe(11);
+    expect(result.byStatus).toEqual({ ACTIVE: 8, APPLIED: 3 });
+  });
+
+  it('returns a real zero when there are no sellers at all', async () => {
+    const { service } = createDeps();
+    const result = await service.getSellerStats();
+    expect(result).toEqual({ total: 0, byStatus: {} });
+  });
+});
+
+describe('AnalyticsService.getMarketplaceGmv', () => {
+  it('splits GMV by sellerId null (Folia) vs set (marketplace seller), and sums commission only from seller groups', async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      {
+        sellerId: null,
+        subtotal: { toNumber: () => 100 },
+        commissionTotal: { toNumber: () => 0 },
+      },
+      {
+        sellerId: 'seller-a',
+        subtotal: { toNumber: () => 50 },
+        commissionTotal: { toNumber: () => 5 },
+      },
+      {
+        sellerId: 'seller-b',
+        subtotal: { toNumber: () => 30 },
+        commissionTotal: { toNumber: () => 3 },
+      },
+    ]);
+
+    const result = await service.getMarketplaceGmv();
+
+    expect(result).toEqual({
+      sellerGmv: 80,
+      foliaGmv: 100,
+      commissionCollected: 8,
+    });
+  });
+
+  it("excludes cancelled orders, matching totalRevenue's own convention", async () => {
+    const { prisma, service } = createDeps();
+    await service.getMarketplaceGmv();
+
+    expect(prisma.orderSellerGroup.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          order: expect.objectContaining({ status: { notIn: ['CANCELLED'] } }),
+        }),
+      }),
+    );
+  });
+
+  it('returns real zeros, not an error, when there are no orders at all', async () => {
+    const { service } = createDeps();
+    const result = await service.getMarketplaceGmv();
+    expect(result).toEqual({
+      sellerGmv: 0,
+      foliaGmv: 0,
+      commissionCollected: 0,
+    });
+  });
+});
+
+describe('AnalyticsService.getTopSellers', () => {
+  it("excludes Folia's own group (sellerId null) and attaches real seller display names", async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderSellerGroup.groupBy.mockResolvedValue([
+      { sellerId: 'seller-a', _sum: { subtotal: { toNumber: () => 500 } } },
+      { sellerId: 'seller-b', _sum: { subtotal: { toNumber: () => 200 } } },
+    ]);
+    prisma.seller.findMany.mockResolvedValue([
+      { id: 'seller-a', displayName: 'Terracotta & Fern' },
+      { id: 'seller-b', displayName: 'Sunlit Botanicals' },
+    ]);
+
+    const result = await service.getTopSellers();
+
+    expect(result).toEqual([
+      { sellerId: 'seller-a', displayName: 'Terracotta & Fern', revenue: 500 },
+      { sellerId: 'seller-b', displayName: 'Sunlit Botanicals', revenue: 200 },
+    ]);
+    expect(prisma.orderSellerGroup.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ sellerId: { not: null } }),
+        orderBy: { _sum: { subtotal: 'desc' } },
+      }),
+    );
+  });
+
+  it('falls back to the raw seller id when a seller has since been deleted', async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderSellerGroup.groupBy.mockResolvedValue([
+      { sellerId: 'seller-gone', _sum: { subtotal: { toNumber: () => 100 } } },
+    ]);
+    prisma.seller.findMany.mockResolvedValue([]);
+
+    const result = await service.getTopSellers();
+    expect(result[0].displayName).toBe('seller-gone');
+  });
+});
+
+describe('AnalyticsService.getPendingModerationCounts', () => {
+  it('counts each real, actionable queue independently', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.count.mockResolvedValue(2);
+    prisma.product.count.mockResolvedValue(5);
+    prisma.sellerPayout.count.mockResolvedValue(1);
+
+    const result = await service.getPendingModerationCounts();
+
+    expect(result).toEqual({
+      sellersAwaitingReview: 2,
+      productsAwaitingReview: 5,
+      payoutsPending: 1,
+    });
+    expect(prisma.seller.count).toHaveBeenCalledWith({
+      where: { status: { in: ['APPLIED', 'UNDER_REVIEW'] } },
+    });
+    expect(prisma.product.count).toHaveBeenCalledWith({
+      where: { approvalStatus: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+    });
+    expect(prisma.sellerPayout.count).toHaveBeenCalledWith({
+      where: { status: { in: ['PENDING', 'PROCESSING'] } },
+    });
   });
 });
