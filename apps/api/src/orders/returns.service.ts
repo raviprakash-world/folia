@@ -24,6 +24,7 @@ import {
   isWithinReturnWindow,
   requiresEvidence,
   calculateRefundAmount,
+  defaultRequiresReverseLogistics,
   type ReturnClaimType,
 } from './return-policy.util';
 import { RETURN_REASON_TO_DB, returnReasonToPublic } from './order.types';
@@ -469,24 +470,33 @@ export class ReturnsService {
     dto: ApproveReturnDto,
     ipAddress?: string,
   ) {
+    // claimType is immutable once a claim is created, so reading it here
+    // ahead of the atomic transition below is safe — it cannot change
+    // concurrently underneath either check that uses it.
+    const existing = await this.prisma.returnRequest.findUnique({
+      where: { id },
+      select: { claimType: true },
+    });
+    if (!existing) throw new NotFoundException('Return request not found.');
+
     // Phase 6D-4C — REPLACEMENT is the one resolution type an admin picks
     // explicitly, and only for a DOA/damage claim (a "changed my mind"
     // standard return has nothing wrong with the item to replace).
-    // claimType is immutable once a claim is created, so reading it here
-    // ahead of the atomic transition below is safe — it cannot change
-    // concurrently underneath this check.
-    if (dto.resolutionType === 'REPLACEMENT') {
-      const existing = await this.prisma.returnRequest.findUnique({
-        where: { id },
-        select: { claimType: true },
-      });
-      if (!existing) throw new NotFoundException('Return request not found.');
-      if (existing.claimType !== 'DOA_CLAIM') {
-        throw new BadRequestException(
-          'Replacement resolution is only available for DOA/damage claims.',
-        );
-      }
+    if (
+      dto.resolutionType === 'REPLACEMENT' &&
+      existing.claimType !== 'DOA_CLAIM'
+    ) {
+      throw new BadRequestException(
+        'Replacement resolution is only available for DOA/damage claims.',
+      );
     }
+
+    // Phase 6D-4D — an explicit admin choice always wins; otherwise fall
+    // back to the schema's own documented default per claimType (see
+    // return-policy.util.defaultRequiresReverseLogistics's own comment).
+    const requiresReverseLogistics =
+      dto.requiresReverseLogistics ??
+      defaultRequiresReverseLogistics(existing.claimType);
 
     const { count } = await this.prisma.returnRequest.updateMany({
       where: { id, status: 'PENDING' },
@@ -496,6 +506,7 @@ export class ReturnsService {
         decidedAt: new Date(),
         decisionNote: dto.note,
         resolutionType: dto.resolutionType ?? null,
+        requiresReverseLogistics,
       },
     });
     if (count === 0) await this.rejectStaleDecision(id);
@@ -589,6 +600,75 @@ export class ReturnsService {
     );
   }
 
+  /**
+   * Phase 6D-4D — records that the returned item physically arrived back
+   * at the warehouse. Only meaningful for a claim whose
+   * requiresReverseLogistics is true; this is the one thing
+   * ReturnsService.resolveClaim's own gate checks before it will execute
+   * any resolution (refund, store credit, or replacement) for such a
+   * claim. The atomic `updateMany` precondition
+   * (`status: 'APPROVED', requiresReverseLogistics: true, itemReceivedAt: null`)
+   * is the same conditional-transition idiom used throughout this class —
+   * of two concurrent calls, exactly one sets itemReceivedAt; the other's
+   * updateMany matches zero rows and is disambiguated below.
+   */
+  async markItemReceived(adminId: string, id: string, ipAddress?: string) {
+    const { count } = await this.prisma.returnRequest.updateMany({
+      where: {
+        id,
+        status: 'APPROVED',
+        requiresReverseLogistics: true,
+        itemReceivedAt: null,
+      },
+      data: { itemReceivedAt: new Date() },
+    });
+
+    if (count === 0) {
+      const existing = await this.prisma.returnRequest.findUnique({
+        where: { id },
+        select: {
+          status: true,
+          requiresReverseLogistics: true,
+          itemReceivedAt: true,
+        },
+      });
+      if (!existing) throw new NotFoundException('Return request not found.');
+      if (existing.itemReceivedAt) {
+        // Already recorded — a duplicate/retried call (e.g. a double
+        // click), not an error. This isn't a financial operation, so
+        // idempotent-return is safe with no further guard needed.
+        return this.adminGetClaim(id);
+      }
+      if (!existing.requiresReverseLogistics) {
+        throw new BadRequestException(
+          'This claim does not require reverse logistics.',
+        );
+      }
+      const currentPublic =
+        RETURN_STATUS_TO_PUBLIC[existing.status] ??
+        existing.status.toLowerCase();
+      throw new ConflictException(
+        `This claim is ${currentPublic} and cannot be marked received.`,
+      );
+    }
+
+    const updated = await this.prisma.returnRequest.findUniqueOrThrow({
+      where: { id },
+      include: ADMIN_RETURN_INCLUDE,
+    });
+
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'RETURN_ITEM_RECEIVED',
+      resource: 'return_request',
+      resourceId: id,
+      metadata: { orderId: updated.orderId },
+      ipAddress,
+    });
+
+    return this.toAdminRecord(updated);
+  }
+
   private toAdminRecord(row: AdminReturnRequestRow) {
     const claimType = row.claimType;
     const evidenceRequired = requiresEvidence(claimType);
@@ -644,6 +724,14 @@ export class ReturnsService {
       resolution: {
         resolutionType: row.resolutionType,
         requiresReverseLogistics: row.requiresReverseLogistics,
+        // Phase 6D-4D — surfaced alongside requiresReverseLogistics since
+        // an admin now needs to see whether the item has actually been
+        // received back, not just whether it's required: resolveClaim
+        // blocks on exactly this field once requiresReverseLogistics is
+        // true.
+        itemReceivedAt: row.itemReceivedAt
+          ? row.itemReceivedAt.toISOString()
+          : null,
         refundAmount: row.refundAmount ? Number(row.refundAmount) : null,
         refundId: row.refundId,
         replacementOrderId: row.replacementOrderId,
@@ -703,6 +791,19 @@ export class ReturnsService {
       // REPLACEMENT_ISSUED) — idempotent: return the persisted result,
       // never re-execute a financial operation.
       return this.adminGetClaim(id);
+    }
+
+    // Phase 6D-4D — applies uniformly to every resolution type (refund,
+    // store credit, and replacement alike): requiresReverseLogistics is a
+    // property of the CLAIM's own return-shipping flow, not of how it's
+    // ultimately paid out, so gating only some resolution types would be
+    // an arbitrary carve-out. Most DOA_CLAIM+REPLACEMENT claims never hit
+    // this at all (defaultRequiresReverseLogistics is false for DOA_CLAIM)
+    // unless an admin explicitly opted a specific claim into it.
+    if (row.requiresReverseLogistics && !row.itemReceivedAt) {
+      throw new ConflictException(
+        'This claim requires the returned item to be received back before it can be resolved — see ReturnsService.markItemReceived.',
+      );
     }
 
     // Phase 6D-4C — REPLACEMENT was chosen explicitly at approval time

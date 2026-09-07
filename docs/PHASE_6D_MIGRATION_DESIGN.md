@@ -376,3 +376,58 @@ loser gets an idempotent result, never a duplicate. Unlike 6D-4B's prepaid
 retry gap, this path has no equivalent "can't safely tell in-flight from
 failed" ambiguity — a failed reservation attempt writes nothing to the
 database at all, so a subsequent retry from scratch is always safe.
+
+# Phase 6D-4D — Reverse Logistics / markItemReceived: design notes
+
+No schema or migration change was made in this phase. `ReturnRequest.requiresReverseLogistics`
+and `.itemReceivedAt` were both already present from the 6D-1 migration —
+this phase is their first real implementation, not a new column.
+
+## How requiresReverseLogistics is set
+
+`return-policy.util.defaultRequiresReverseLogistics(claimType)` is the
+schema's own long-documented default, now actually implemented: `false`
+for `DOA_CLAIM` (a dead/damaged plant is rarely worth reverse-shipping —
+low value, fragile, often not worth the courier cost), `true` for
+`STANDARD_RETURN` (a normal, undamaged good the business wants back
+before refunding). `ApproveReturnDto.requiresReverseLogistics` lets an
+admin override either way at approval time — the override always wins
+over the default when present, matching how `resolutionType` already
+works in this same DTO.
+
+## Where the gate lives, and why it applies uniformly
+
+`ReturnsService.resolveClaim` checks
+`row.requiresReverseLogistics && !row.itemReceivedAt` immediately after
+its existing idempotency checks and *before* dispatching to any of the
+three resolution paths (prepaid refund, COD store credit, replacement).
+The gate is a single check shared by all three, not duplicated per path:
+`requiresReverseLogistics` is a property of the claim's own return-
+shipping flow, not of how it's ultimately paid out, so gating only some
+resolution types would be an arbitrary carve-out. In practice this rarely
+touches the replacement path at all — `defaultRequiresReverseLogistics`
+is `false` for `DOA_CLAIM`, and REPLACEMENT is only ever chosen for
+`DOA_CLAIM` (see 6D-4C's own notes above) — unless an admin explicitly
+opts a specific DOA claim into it (e.g. a supplier wants the damaged unit
+back for a warranty claim).
+
+## markItemReceived
+
+A new `ReturnsService.markItemReceived(adminId, id, ipAddress?)` /
+`POST /admin/returns/:id/mark-item-received` records the one fact this
+gate checks: `itemReceivedAt`. It uses the exact same atomic-conditional-
+update idiom as every other state transition in this class —
+`updateMany({ where: { id, status: 'APPROVED', requiresReverseLogistics: true, itemReceivedAt: null } })`
+— so of two concurrent calls, exactly one performs the transition and
+logs `RETURN_ITEM_RECEIVED`; the other's `updateMany` matches zero rows
+and is disambiguated by a re-fetch: already-received is treated as
+idempotent (a duplicate/retried call, not an error — this isn't a
+financial operation), not-required-at-all is a clean `BadRequestException`,
+and any other state (not yet `APPROVED`, or already resolved without ever
+requiring this) is a `ConflictException` naming the actual state.
+
+`ReturnsService.toAdminRecord`'s `resolution` block now also surfaces
+`itemReceivedAt` alongside the existing `requiresReverseLogistics`, since
+an admin now needs to see not just whether the item is required back but
+whether it has actually arrived — the same field `resolveClaim`'s own
+gate reads.

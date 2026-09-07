@@ -1045,6 +1045,7 @@ describe('ReturnsService.adminListClaims', () => {
     expect(item.resolution).toEqual({
       resolutionType: null,
       requiresReverseLogistics: null,
+      itemReceivedAt: null,
       refundAmount: null,
       refundId: null,
       replacementOrderId: null,
@@ -1140,6 +1141,9 @@ describe('ReturnsService.adminGetClaim', () => {
 describe('ReturnsService.adminApprove', () => {
   it('transitions PENDING -> APPROVED, records who/when, and returns the updated claim', async () => {
     const { prisma, service, auditService, eventEmitter } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'STANDARD_RETURN',
+    });
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({
@@ -1268,8 +1272,64 @@ describe('ReturnsService.adminApprove', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('defaults requiresReverseLogistics to true for a STANDARD_RETURN when the admin does not specify one', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'STANDARD_RETURN',
+    });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+
+    await service.adminApprove('admin-1', 'rr-1', {}, undefined);
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.data).toMatchObject({ requiresReverseLogistics: true });
+  });
+
+  it('defaults requiresReverseLogistics to false for a DOA_CLAIM when the admin does not specify one', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'DOA_CLAIM',
+    });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+
+    await service.adminApprove('admin-1', 'rr-1', {}, undefined);
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.data).toMatchObject({ requiresReverseLogistics: false });
+  });
+
+  it('honors an explicit requiresReverseLogistics override over the claimType default', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'STANDARD_RETURN',
+    });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED' }),
+    );
+
+    await service.adminApprove(
+      'admin-1',
+      'rr-1',
+      { requiresReverseLogistics: false },
+      undefined,
+    );
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.data).toMatchObject({ requiresReverseLogistics: false });
+  });
+
   it('never creates a refund/store-credit/replacement side effect — approval only records the decision', async () => {
     const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'STANDARD_RETURN',
+    });
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({ status: 'APPROVED' }),
@@ -1289,7 +1349,10 @@ describe('ReturnsService.adminApprove', () => {
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({ status: 'APPROVED' }),
     );
-    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      status: 'APPROVED',
+      claimType: 'STANDARD_RETURN',
+    });
 
     const [first, second] = await Promise.allSettled([
       service.adminApprove('admin-1', 'rr-1', {}, undefined),
@@ -1408,26 +1471,32 @@ describe('ReturnsService approve vs reject cross-race', () => {
   it('a concurrent APPROVE and REJECT for the same claim produce exactly one winner', async () => {
     const { prisma, service } = createDeps();
     // Whichever call's UPDATE statement reaches Postgres first wins in
-    // reality; both orderings are equally valid, so this simulates one
-    // arbitrary but internally consistent outcome (approve wins).
+    // reality — both orderings are equally valid, and adminApprove's own
+    // Phase 6D-4D claimType lookup (an extra await before its own
+    // conditional update) means this mock queue can be consumed by either
+    // side first, so the assertion below doesn't hardcode which one wins.
     prisma.returnRequest.updateMany
-      .mockResolvedValueOnce({ count: 1 }) // approve's own conditional update
-      .mockResolvedValueOnce({ count: 0 }); // reject's own conditional update, now stale
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({ status: 'APPROVED' }),
     );
-    prisma.returnRequest.findUnique.mockResolvedValue({ status: 'APPROVED' });
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      status: 'APPROVED',
+      claimType: 'STANDARD_RETURN',
+    });
 
     const [approveResult, rejectResult] = await Promise.allSettled([
       service.adminApprove('admin-1', 'rr-1', {}, undefined),
       service.adminReject('admin-2', 'rr-1', { reason: 'too late' }, undefined),
     ]);
 
-    expect(approveResult.status).toBe('fulfilled');
-    expect(rejectResult.status).toBe('rejected');
-    if (rejectResult.status === 'rejected') {
-      expect(rejectResult.reason).toBeInstanceOf(ConflictException);
-    }
+    const outcomes = [approveResult.status, rejectResult.status].sort();
+    expect(outcomes).toEqual(['fulfilled', 'rejected']);
+    const rejected = [approveResult, rejectResult].find(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    )!;
+    expect(rejected.reason).toBeInstanceOf(ConflictException);
   });
 });
 
@@ -1446,6 +1515,9 @@ describe('ReturnsService admin audit — no false successes', () => {
 
   it('a successful approval logs exactly one RETURN_APPROVED audit record', async () => {
     const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      claimType: 'STANDARD_RETURN',
+    });
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
       makeAdminRow({ status: 'APPROVED' }),
@@ -1547,6 +1619,43 @@ describe('ReturnsService.resolveClaim — eligibility', () => {
     await expect(
       service.resolveClaim('admin-1', 'rr-1', undefined),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('refuses to resolve a claim that requires reverse logistics and has not had its item received, for every resolution type', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeResolutionRow({
+        requiresReverseLogistics: true,
+        itemReceivedAt: null,
+      }),
+    );
+
+    await expect(
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(ConflictException);
+    expect(paymentsService.refund).not.toHaveBeenCalled();
+  });
+
+  it('proceeds normally once itemReceivedAt is set on a claim that required reverse logistics', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          requiresReverseLogistics: true,
+          itemReceivedAt: new Date('2026-09-10T00:00:00.000Z'),
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(paymentsService.refund).toHaveBeenCalled();
   });
 
   it('is idempotent for an already REFUND_ISSUED claim — returns the persisted result, never re-executes', async () => {
@@ -2193,5 +2302,121 @@ describe('ReturnsService.resolveClaim — replacement', () => {
     expect(auditService.log).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'RETURN_REPLACEMENT_FAILED' }),
     );
+  });
+});
+
+describe('ReturnsService.markItemReceived', () => {
+  it('records itemReceivedAt for an APPROVED claim that requires reverse logistics, and logs the audit record', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED', requiresReverseLogistics: true }),
+    );
+
+    const result = await service.markItemReceived(
+      'admin-1',
+      'rr-1',
+      '10.0.0.1',
+    );
+
+    const [[updateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(updateCall.where).toEqual({
+      id: 'rr-1',
+      status: 'APPROVED',
+      requiresReverseLogistics: true,
+      itemReceivedAt: null,
+    });
+    expect(updateCall.data.itemReceivedAt).toBeInstanceOf(Date);
+    expect(result.status).toBe('approved');
+
+    expect(auditService.log).toHaveBeenCalledWith({
+      actorId: 'admin-1',
+      action: 'RETURN_ITEM_RECEIVED',
+      resource: 'return_request',
+      resourceId: 'rr-1',
+      metadata: { orderId: 'order-1' },
+      ipAddress: '10.0.0.1',
+    });
+  });
+
+  it('is idempotent — a second call on an already-received claim returns the persisted result rather than erroring', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce({
+        status: 'APPROVED',
+        requiresReverseLogistics: true,
+        itemReceivedAt: new Date('2026-09-10T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce(
+        makeAdminRow({ status: 'APPROVED', requiresReverseLogistics: true }),
+      );
+
+    const result = await service.markItemReceived('admin-1', 'rr-1', undefined);
+
+    expect(result.status).toBe('approved');
+    expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  it('rejects with BadRequestException a claim that does not require reverse logistics', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      status: 'APPROVED',
+      requiresReverseLogistics: false,
+      itemReceivedAt: null,
+    });
+
+    await expect(
+      service.markItemReceived('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects with a clean ConflictException naming the actual state for a claim that is not yet APPROVED', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue({
+      status: 'PENDING',
+      requiresReverseLogistics: true,
+      itemReceivedAt: null,
+    });
+
+    await expect(
+      service.markItemReceived('admin-1', 'rr-1', undefined),
+    ).rejects.toThrow(/pending/);
+  });
+
+  it('throws NotFoundException for a nonexistent return request', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.markItemReceived('admin-1', 'unknown', undefined),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('exactly one of two concurrent mark-received calls actually performs the transition', async () => {
+    const { prisma, service, auditService } = createDeps();
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeAdminRow({
+        status: 'APPROVED',
+        requiresReverseLogistics: true,
+        itemReceivedAt: new Date('2026-09-10T00:00:00.000Z'),
+      }),
+    );
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue(
+      makeAdminRow({ status: 'APPROVED', requiresReverseLogistics: true }),
+    );
+
+    await Promise.allSettled([
+      service.markItemReceived('admin-1', 'rr-1', undefined),
+      service.markItemReceived('admin-2', 'rr-1', undefined),
+    ]);
+
+    expect(auditService.log).toHaveBeenCalledTimes(1);
   });
 });

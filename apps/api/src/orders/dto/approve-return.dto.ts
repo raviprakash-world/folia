@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class ApproveReturnDto {
   @ApiPropertyOptional({
@@ -26,4 +32,20 @@ export class ApproveReturnDto {
   @IsOptional()
   @IsIn(['REPLACEMENT'])
   resolutionType?: 'REPLACEMENT';
+
+  /**
+   * Phase 6D-4D — overrides return-policy.util's
+   * defaultRequiresReverseLogistics(claimType) default (false for
+   * DOA_CLAIM, true for STANDARD_RETURN). When true, ReturnsService.
+   * resolveClaim refuses to execute ANY resolution (refund, store credit,
+   * or replacement) until ReturnsService.markItemReceived has recorded
+   * itemReceivedAt.
+   */
+  @ApiPropertyOptional({
+    description:
+      'Overrides the default reverse-logistics requirement for this claim. When true, financial/replacement resolution is blocked until the item is marked received.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  requiresReverseLogistics?: boolean;
 }

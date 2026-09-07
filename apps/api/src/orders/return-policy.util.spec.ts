@@ -1,6 +1,7 @@
 import {
   calculateRefundAmount,
   calculateShippingDeduction,
+  defaultRequiresReverseLogistics,
   deriveClaimType,
   DOA_CLAIM_WINDOW_MS,
   isReasonEligibleForClaimType,
@@ -160,6 +161,16 @@ describe('requiresEvidence', () => {
 
   it('does not require evidence for STANDARD_RETURN', () => {
     expect(requiresEvidence('STANDARD_RETURN')).toBe(false);
+  });
+});
+
+describe('defaultRequiresReverseLogistics', () => {
+  it('defaults to true for STANDARD_RETURN — a normal, undamaged good the business wants back before refunding', () => {
+    expect(defaultRequiresReverseLogistics('STANDARD_RETURN')).toBe(true);
+  });
+
+  it('defaults to false for DOA_CLAIM — rarely worth reverse-shipping a dead/damaged plant', () => {
+    expect(defaultRequiresReverseLogistics('DOA_CLAIM')).toBe(false);
   });
 });
 

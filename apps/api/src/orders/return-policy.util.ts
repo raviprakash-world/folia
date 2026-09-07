@@ -146,6 +146,24 @@ export function requiresEvidence(claimType: ReturnClaimType): boolean {
 }
 
 /**
+ * Phase 6D-4D — the schema's own comment on ReturnRequest.requiresReverseLogistics
+ * already specified this default (false for DOA_CLAIM, true for
+ * STANDARD_RETURN) back in the 6D-1 migration design; this is that rule's
+ * first actual implementation. A dead/damaged plant is rarely worth
+ * reverse-shipping (low value, often not worth the courier cost, and
+ * fragile/perishable besides); a standard "changed my mind"/"wrong item"
+ * return is a normal, undamaged good the business wants back before
+ * refunding. An admin can override either way at approval time — this is
+ * only the default ReturnsService.adminApprove applies when the DTO
+ * doesn't specify one.
+ */
+export function defaultRequiresReverseLogistics(
+  claimType: ReturnClaimType,
+): boolean {
+  return claimType === 'STANDARD_RETURN';
+}
+
+/**
  * RETURN_SHIPPING_DEDUCTION_INR, only for a genuinely customer-caused
  * STANDARD_RETURN reason — never for DOA_CLAIM (never the customer's
  * fault) and never for a non-change-of-mind STANDARD_RETURN reason.

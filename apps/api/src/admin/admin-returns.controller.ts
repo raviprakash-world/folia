@@ -69,4 +69,18 @@ export class AdminReturnsController {
   ) {
     return this.returnsService.resolveClaim(admin.id, id, req.ip);
   }
+
+  /**
+   * Phase 6D-4D — records that the returned item physically arrived back
+   * at the warehouse. No body: there is nothing for a client to supply,
+   * the timestamp is simply "now."
+   */
+  @Post(':id/mark-item-received')
+  markItemReceived(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    return this.returnsService.markItemReceived(admin.id, id, req.ip);
+  }
 }
