@@ -42,7 +42,7 @@ export function AccountLayout() {
         ]}
       />
 
-      <AccountMobileNav />
+      <AccountMobileNav onLogoutClick={() => setConfirmOpen(true)} />
 
       <div className="flex gap-10 items-start">
         <AccountSidebar onLogoutClick={() => setConfirmOpen(true)} />

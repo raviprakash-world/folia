@@ -1,8 +1,13 @@
 import { NavLink } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { accountNavItems } from './accountNavItems';
 import { cn } from '@/utils/cn';
 
-export function AccountMobileNav() {
+interface AccountMobileNavProps {
+  onLogoutClick: () => void;
+}
+
+export function AccountMobileNav({ onLogoutClick }: AccountMobileNavProps) {
   return (
     <nav aria-label="Account" className="md:hidden -mx-4 px-4 mb-8 overflow-x-auto">
       <div className="flex gap-2 w-max">
@@ -21,6 +26,14 @@ export function AccountMobileNav() {
             {label}
           </NavLink>
         ))}
+        <button
+          type="button"
+          onClick={onLogoutClick}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm border border-rust/40 text-rust whitespace-nowrap transition-colors hover:bg-rust-light"
+        >
+          <LogOut size={14} />
+          Log out
+        </button>
       </div>
     </nav>
   );
