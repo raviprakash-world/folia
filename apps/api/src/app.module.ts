@@ -30,8 +30,10 @@ import { AdminModule } from './admin/admin.module';
 import { JobsModule } from './jobs/jobs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { EmailModule } from './email/email.module';
+import { SellersModule } from './sellers/sellers.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { SellerGuard } from './sellers/guards/seller.guard';
 
 @Module({
   imports: [
@@ -90,16 +92,23 @@ import { RolesGuard } from './auth/guards/roles.guard';
     JobsModule,
     NotificationsModule,
     EmailModule,
+    SellersModule,
   ],
   providers: [
     // Order matters: ThrottlerGuard first (rate-limit before doing any
     // auth work), then JwtAuthGuard (secure-by-default — every route
     // requires a valid access token unless marked @Public()), then
     // RolesGuard (narrows access further for routes with @Roles()/
-    // @RequirePermissions() — a no-op for everything else).
+    // @RequirePermissions() — a no-op for everything else), then
+    // SellerGuard (Marketplace Phase 1 — narrows further still for routes
+    // with @RequireSeller(), resolving the caller's own Seller row from
+    // their session; also a no-op for everything else). SellerGuard runs
+    // last because it depends on request.user, which only JwtAuthGuard
+    // populates.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: SellerGuard },
   ],
 })
 export class AppModule {}

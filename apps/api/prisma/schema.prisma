@@ -42,6 +42,12 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   notifications           Notification[]
   storeCreditEntries      StoreCreditEntry[]
+  /// Marketplace Phase 1 — a user's own seller account, if they have one.
+  /// A user can hold both: `role` gaining 'seller' authorizes seller-scoped
+  /// actions, but customer-facing endpoints (orders, cart, wishlist, ...)
+  /// carry no @Roles() gate at all today, so a seller keeps shopping as a
+  /// normal customer unchanged — see docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md §10.
+  seller                  Seller?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -206,6 +212,33 @@ enum CareLevel {
   ADVANCED
 }
 
+/// Marketplace Phase 1 — see Product.ownerType's own comment for the
+/// backfill reasoning.
+enum ProductOwnerType {
+  FOLIA_OWNED
+  SELLER_OWNED
+}
+
+/// Marketplace Phase 1. DRAFT/SUBMITTED/UNDER_REVIEW/APPROVED/ACTIVE form
+/// the seller product-listing pipeline; REJECTED loops back to DRAFT (per
+/// the governing brief's exact lifecycle) rather than being terminal, so a
+/// seller can revise and resubmit the same product row instead of starting
+/// over. ARCHIVED is the seller's own "unlist this" action, distinct from
+/// admin REJECTED/deactivation. Every existing pre-marketplace Product row
+/// backfills to ACTIVE (see Product.approvalStatus's own comment) — this
+/// enum's ordering therefore does NOT carry the same NULLS-FIRST/ORDER BY
+/// sorting significance ProductBadge's declaration order does; nothing
+/// sorts on this column today.
+enum ProductApprovalStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  REJECTED
+  APPROVED
+  ACTIVE
+  ARCHIVED
+}
+
 model Product {
   id             String   @id @default(uuid())
   slug           String   @unique
@@ -219,6 +252,30 @@ model Product {
 
   brandId String?
   brand   Brand?  @relation(fields: [brandId], references: [id])
+
+  /// Marketplace Phase 1 — nullable ONLY for backward compatibility with
+  /// existing Folia-owned catalog data (ownerType distinguishes the two
+  /// cases unambiguously; sellerId is never meaningfully null for a
+  /// SELLER_OWNED product — enforced in SellersService, not the schema,
+  /// same convention as this schema's other application-enforced
+  /// invariants). onDelete: Restrict — a seller account is deactivated,
+  /// never hard-deleted while it still owns product rows.
+  sellerId String?
+  seller   Seller? @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  /// Every existing row backfills to FOLIA_OWNED at migration time (the
+  /// column default), which is unambiguously correct — every product that
+  /// existed before this migration genuinely was Folia's own catalog.
+  ownerType ProductOwnerType @default(FOLIA_OWNED)
+
+  /// Every existing row backfills to ACTIVE — an already-live product does
+  /// not silently re-enter moderation the moment this migration runs. New
+  /// SELLER_OWNED products start at DRAFT instead (set explicitly by
+  /// SellersService at creation, not by this column default, since the
+  /// default only needs to be correct for the backfill case).
+  approvalStatus ProductApprovalStatus @default(ACTIVE)
+  /// Set by an admin on REJECTED — see ProductApprovalStatus's own comment.
+  rejectionNote  String?
 
   badge       ProductBadge?
   careLevel   CareLevel?
@@ -245,6 +302,8 @@ model Product {
 
   @@index([categoryId])
   @@index([brandId])
+  @@index([sellerId])
+  @@index([approvalStatus])
   @@map("products")
 }
 
@@ -1366,4 +1425,268 @@ enum NotificationType {
   WISHLIST
   ACCOUNT
   SECURITY
+}
+
+// --- Marketplace Phase 1: Seller Domain ---
+//
+// See docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md for the full
+// design discussion this section implements. This is a separate initiative
+// from PRODUCTION_ROADMAP.md's own numbered phases (which are mid-flight
+// at Phase 6/7) — "Marketplace Phase N" always refers to this initiative's
+// own Phase 0-23 breakdown, never the roadmap's.
+
+/// Exactly the lifecycle the governing brief specifies. No seller may sell
+/// (create/submit/have live products) while in any state but ACTIVE — that
+/// gate is enforced in SellersService/product-write services, not here.
+enum SellerStatus {
+  APPLIED
+  UNDER_REVIEW
+  APPROVED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum SellerVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SellerLedgerEntryType {
+  SALE
+  COMMISSION
+  REFUND
+  ADJUSTMENT
+  PAYOUT
+}
+
+enum SellerPayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+/// The seller aggregate root. userId is @unique (one seller account per
+/// user, matching Cart's existing one-per-user pattern) — the brief allows
+/// a seller to also shop as an ordinary customer on the SAME account (see
+/// User.seller's own comment), not a second, separate login.
+model Seller {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  /// For /sellers/:slug — unique for the same reason Product.slug and
+  /// Category.slug already are.
+  slug        String  @unique
+  displayName String
+  description String
+  logoUrl     String?
+
+  /// Deliberately separate from the seller-user's own User.email/phone —
+  /// a seller's public storefront/support contact may reasonably differ
+  /// from the login email, and per the brief's own rule ("never expose
+  /// seller email... to customers"), this field is what a storefront is
+  /// allowed to show; User.email never is.
+  contactEmail String
+  contactPhone String
+
+  status      SellerStatus @default(APPLIED)
+  appliedAt   DateTime     @default(now())
+  approvedAt  DateTime?
+  suspendedAt DateTime?
+
+  address       SellerAddress?
+  bankAccount   SellerBankAccount?
+  verifications SellerVerification[]
+  commissions   SellerCommission[]
+  ledgerEntries SellerLedgerEntry[]
+  payouts       SellerPayout[]
+  products      Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("sellers")
+}
+
+/// One row per submitted verification document — kept off the Seller row
+/// itself (not columns on Seller) so a routine seller-profile read never
+/// incidentally joins in verification-document URLs, matching this
+/// schema's existing separation of ReturnEvidence from ReturnRequest for
+/// the identical reason. documentUrl is a StorageService-returned URL
+/// (same reused upload infrastructure as return evidence/avatars) — never
+/// returned by any public or customer-facing API; admin read access is
+/// audited via AuditService, not enforced here.
+model SellerVerification {
+  id       String @id @default(uuid())
+  sellerId String
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  documentType String
+  documentUrl  String
+  status       SellerVerificationStatus @default(PENDING)
+
+  reviewedBy String?
+  reviewedAt DateTime?
+  note       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
+  @@map("seller_verifications")
+}
+
+/// A seller's business address — mirrors Address's existing field shape
+/// (Phase 5's model) rather than inventing a second address shape; this is
+/// business/operational data, not a customer shipping address, so it's its
+/// own table rather than reusing Address directly.
+model SellerAddress {
+  id       String @id @default(uuid())
+  sellerId String @unique
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  country      String
+  postalCode   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("seller_addresses")
+}
+
+/// Deliberately minimal — see docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md
+/// §9 for the full reasoning. NO real payout provider is configured in
+/// this environment, so this table stores only what a human admin needs to
+/// manually verify/initiate a transfer OUTSIDE this system — never a full
+/// account number. If/when a real tokenizing payout provider (e.g.
+/// RazorpayX linked accounts) is integrated, the provider's own account
+/// reference token is the right thing to add here, NOT the raw number this
+/// deliberately never stores.
+model SellerBankAccount {
+  id       String @id @default(uuid())
+  sellerId String @unique
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  accountHolderName  String
+  bankName           String
+  /// Last 4 digits only — see this model's own comment.
+  accountNumberLast4 String
+  ifsc               String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("seller_bank_accounts")
+}
+
+/// Versioned, never mutated in place — a rate change is a new row, not an
+/// UPDATE, so a historical order's frozen commissionRatePercent (added to
+/// OrderItem in a later marketplace phase, once orders can actually contain
+/// seller products) stays accurate to what was configured when it was
+/// charged, even if the rate is later changed. sellerId null means "the
+/// marketplace default"; a seller-specific row (sellerId set) overrides it.
+/// Real infrastructure ahead of the feature that resolves/consumes it
+/// (Marketplace Phase 8) — same status as this schema's existing Brand/Tag
+/// precedent for forward-declared tables.
+model SellerCommission {
+  id       String  @id @default(uuid())
+  sellerId String?
+  seller   Seller? @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  ratePercent   Decimal  @db.Decimal(5, 2)
+  effectiveFrom DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
+  @@map("seller_commissions")
+}
+
+/// The real, persisted seller financial ledger — a seller's balance is
+/// ALWAYS SUM(amount) for their id, computed on read, never a cached
+/// mutable balance column (the governing brief is explicit about this, and
+/// it matches StoreCreditEntry's existing derive-don't-cache design for
+/// the identical reason: a cached balance can drift from what actually
+/// happened; a ledger cannot). referenceType/referenceId are a free-text
+/// polymorphic pointer — deliberately NOT an enum yet, unlike
+/// StockReservation's closed CART/ORDER/PAYMENT set, because the real set
+/// of things a ledger entry can reference (an order item sale, a return
+/// refund, a payout, a manual admin adjustment) is genuinely still open
+/// and gets defined by the marketplace phases that actually write these
+/// rows (Phase 8 commission, Phase 9 payouts, Phase 11 returns) — locking
+/// an enum now would mean guessing at that set before it exists.
+model SellerLedgerEntry {
+  id       String @id @default(uuid())
+  sellerId String
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  type   SellerLedgerEntryType
+  amount Decimal               @db.Decimal(10, 2)
+
+  referenceType String?
+  referenceId   String?
+  note          String?
+
+  /// Reverse side of SellerPayoutItem.ledgerEntryId — see that model's
+  /// own comment for why this is @unique there (a ledger entry can be
+  /// claimed by at most one payout).
+  payoutItem SellerPayoutItem?
+
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
+  @@index([referenceType, referenceId])
+  @@map("seller_ledger_entries")
+}
+
+/// Explicit payout lifecycle per the governing brief. idempotencyKey is
+/// @unique — the real guarantee a duplicate payout-initiation request
+/// can't create two payouts for the same intent, same idempotency-via-
+/// unique-constraint idiom this schema already uses throughout (Payment's
+/// own idempotencyKey, StoreCreditEntry.returnRequestId).
+model SellerPayout {
+  id       String @id @default(uuid())
+  sellerId String
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  status SellerPayoutStatus @default(PENDING)
+  amount Decimal            @db.Decimal(10, 2)
+
+  idempotencyKey String    @unique
+  failureReason  String?
+  processedAt    DateTime?
+
+  items SellerPayoutItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId])
+  @@map("seller_payouts")
+}
+
+/// One row per ledger entry a payout covers. ledgerEntryId is @unique —
+/// the real idempotency guarantee that the SAME ledger entry (e.g. one
+/// seller's commission-adjusted sale proceeds) can never be claimed by two
+/// different payouts, at the database level, not by application-level
+/// bookkeeping discipline alone.
+model SellerPayoutItem {
+  id       String       @id @default(uuid())
+  payoutId String
+  payout   SellerPayout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+
+  ledgerEntryId String            @unique
+  ledgerEntry   SellerLedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@map("seller_payout_items")
 }
