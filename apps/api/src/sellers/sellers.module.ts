@@ -3,6 +3,7 @@ import { SellersController } from './sellers.controller';
 import { SellersService } from './sellers.service';
 import { SellerProductsController } from './seller-products.controller';
 import { SellerProductsService } from './seller-products.service';
+import { SellerCommissionService } from './seller-commission.service';
 import { RolesModule } from '../roles/roles.module';
 import { AuditModule } from '../audit/audit.module';
 import { StorageModule } from '../storage/storage.module';
@@ -25,7 +26,7 @@ import { WarehousesModule } from '../warehouses/warehouses.module';
     WarehousesModule,
   ],
   controllers: [SellersController, SellerProductsController],
-  providers: [SellersService, SellerProductsService],
-  exports: [SellersService, SellerProductsService],
+  providers: [SellersService, SellerProductsService, SellerCommissionService],
+  exports: [SellersService, SellerProductsService, SellerCommissionService],
 })
 export class SellersModule {}

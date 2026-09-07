@@ -17,6 +17,7 @@ import { CartService } from '../cart/cart.service';
 import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { RazorpayProvider } from './providers/razorpay.provider';
+import { SellerCommissionService } from '../sellers/seller-commission.service';
 import { PAYMENT_EVENTS } from './payments.events';
 import type { PaymentRefundedPayload } from './payments.events';
 import { toPublicOrder } from '../orders/order.types';
@@ -127,6 +128,7 @@ export class PaymentsService {
     private readonly inventoryService: InventoryService,
     private readonly eventEmitter: EventEmitter2,
     private readonly auditService: AuditService,
+    private readonly commissionService: SellerCommissionService,
   ) {}
 
   async createForOrder(
@@ -449,10 +451,51 @@ export class PaymentsService {
         else bySeller.set(key, [item]);
       }
 
+      // Marketplace Phase 8 — resolve each seller's commission rate once
+      // per group (seller-specific override if one exists, else the
+      // marketplace default) and freeze it onto every item in that group.
+      // Always 0 for the Folia-owned group (sellerId null): Folia does not
+      // charge itself a commission — see SellerCommissionService and
+      // OrderItem.commissionRatePercent's doc comments for why this is
+      // resolved here, inside this same transaction, rather than computed
+      // later from a possibly-since-changed rate.
+      const commissionRateBySeller = new Map<string | null, number>();
+      for (const sellerId of bySeller.keys()) {
+        if (sellerId === null) {
+          commissionRateBySeller.set(null, 0);
+          continue;
+        }
+        const resolved = await this.commissionService.resolveEffectiveRate(
+          sellerId,
+          tx,
+        );
+        commissionRateBySeller.set(sellerId, resolved.ratePercent);
+      }
+
+      // Per-item commission, computed once here so the group's own
+      // commissionTotal below is the exact SUM() of these — never
+      // independently re-derived from the group subtotal, which could
+      // drift by a cent from summed per-line rounding.
+      const commissionAmountByItem = new Map<
+        (typeof snapshot.items)[number],
+        number
+      >();
+      for (const item of snapshot.items) {
+        const ratePercent = commissionRateBySeller.get(item.sellerId)!;
+        commissionAmountByItem.set(
+          item,
+          Math.round(item.price * item.quantity * ratePercent) / 100,
+        );
+      }
+
       const groupIdBySeller = new Map<string | null, string>();
       for (const [sellerId, items] of bySeller) {
         const groupSubtotal = items.reduce(
           (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+        const groupCommissionTotal = items.reduce(
+          (sum, item) => sum + commissionAmountByItem.get(item)!,
           0,
         );
         const group = await tx.orderSellerGroup.create({
@@ -461,6 +504,7 @@ export class PaymentsService {
             sellerId,
             status: 'PROCESSING',
             subtotal: groupSubtotal,
+            commissionTotal: groupCommissionTotal,
           },
         });
         groupIdBySeller.set(sellerId, group.id);
@@ -480,6 +524,8 @@ export class PaymentsService {
           price: item.price,
           quantity: item.quantity,
           inventoryItemId: item.inventoryItemId,
+          commissionRatePercent: commissionRateBySeller.get(item.sellerId)!,
+          commissionAmount: commissionAmountByItem.get(item)!,
         })),
       });
 

@@ -1519,6 +1519,19 @@ async function main() {
     },
   });
 
+  // Marketplace Phase 8 — the marketplace-default commission rate. No
+  // natural unique key to upsert() against (versioned by effectiveFrom,
+  // like a rate change), so idempotency is a plain existence check, same
+  // pattern as the notifications block below.
+  const existingDefaultCommission = await prisma.sellerCommission.count({
+    where: { sellerId: null },
+  });
+  if (existingDefaultCommission === 0) {
+    await prisma.sellerCommission.create({
+      data: { sellerId: null, ratePercent: 10 },
+    });
+  }
+
   console.log('Seeding categories and collections...');
   const categoryBySlug = new Map<string, string>();
   for (const category of CATEGORIES) {

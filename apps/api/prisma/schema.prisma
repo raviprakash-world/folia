@@ -895,6 +895,19 @@ model OrderItem {
   orderSellerGroupId String
   orderSellerGroup   OrderSellerGroup @relation(fields: [orderSellerGroupId], references: [id], onDelete: Cascade)
 
+  /// Marketplace Phase 8 — the SellerCommission rate actually resolved for
+  /// this line at order-creation time (seller-specific override if one was
+  /// configured, else the marketplace default), and the amount computed
+  /// from it. Frozen here and never recomputed, even if the configured
+  /// rate is later changed — same "accurate to what was actually charged"
+  /// discipline as ReturnRequest.refundAmount. Always 0 for a Folia-owned
+  /// line (orderSellerGroup.sellerId null): Folia does not charge itself a
+  /// commission. Defaulted to 0 (not nullable) so every pre-Phase-8 order
+  /// line — all of them Folia-owned at the time — backfills to the
+  /// correct real value, not a placeholder.
+  commissionRatePercent Decimal @default(0) @db.Decimal(5, 2)
+  commissionAmount      Decimal @default(0) @db.Decimal(10, 2)
+
   @@index([orderId])
   @@index([productId])
   @@index([orderSellerGroupId])
@@ -930,6 +943,11 @@ model OrderSellerGroup {
   /// frozen at order-creation time — same "never silently recompute a
   /// historical figure" discipline as every other pricing field on Order.
   subtotal Decimal @db.Decimal(10, 2)
+
+  /// Marketplace Phase 8 — SUM(commissionAmount) across this group's own
+  /// OrderItems, frozen at the same time as subtotal above and for the
+  /// identical reason. Always 0 for the Folia-owned group (sellerId null).
+  commissionTotal Decimal @default(0) @db.Decimal(10, 2)
 
   items OrderItem[]
 
@@ -1678,14 +1696,13 @@ model SellerBankAccount {
 }
 
 /// Versioned, never mutated in place — a rate change is a new row, not an
-/// UPDATE, so a historical order's frozen commissionRatePercent (added to
-/// OrderItem in a later marketplace phase, once orders can actually contain
-/// seller products) stays accurate to what was configured when it was
+/// UPDATE, so a historical order's frozen OrderItem.commissionRatePercent
+/// (Marketplace Phase 8) stays accurate to what was configured when it was
 /// charged, even if the rate is later changed. sellerId null means "the
 /// marketplace default"; a seller-specific row (sellerId set) overrides it.
-/// Real infrastructure ahead of the feature that resolves/consumes it
-/// (Marketplace Phase 8) — same status as this schema's existing Brand/Tag
-/// precedent for forward-declared tables.
+/// Resolved by SellerCommissionService.resolveEffectiveRate: the most
+/// recent row (by effectiveFrom) for the specific seller if one exists,
+/// else the most recent marketplace-default row.
 model SellerCommission {
   id       String  @id @default(uuid())
   sellerId String?

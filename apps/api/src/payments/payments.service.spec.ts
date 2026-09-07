@@ -164,6 +164,19 @@ function createDeps() {
   const auditService = {
     log: jest.fn<Promise<void>, [LogAuditInput]>().mockResolvedValue(undefined),
   };
+  // Marketplace Phase 8 — defaults to 0% so pre-existing tests that don't
+  // care about commission (most of them) see commissionAmount/Total: 0,
+  // exactly as they would have before this field existed. Tests that DO
+  // care override this mock's return value directly.
+  const commissionService = {
+    resolveEffectiveRate: jest.fn().mockImplementation((sellerId: string) =>
+      Promise.resolve({
+        sellerId,
+        ratePercent: 0,
+        isMarketplaceDefault: true,
+      }),
+    ),
+  };
 
   const service = new PaymentsService(
     prisma as never,
@@ -173,6 +186,7 @@ function createDeps() {
     inventoryService as never,
     eventEmitter,
     auditService as never,
+    commissionService as never,
   );
 
   return {
@@ -184,6 +198,7 @@ function createDeps() {
     inventoryService,
     eventEmitter,
     auditService,
+    commissionService,
     service,
   };
 }
@@ -406,6 +421,178 @@ describe('PaymentsService.createForOrder — COD', () => {
           }),
         ],
       });
+    });
+  });
+
+  describe('Marketplace Phase 8 — commission', () => {
+    it('resolves and freezes commission on each seller group, but always 0 for the Folia-owned group', async () => {
+      const { prisma, orderTx, commissionService, service } = createDeps();
+      commissionService.resolveEffectiveRate.mockImplementation(
+        (sellerId: string) =>
+          Promise.resolve({
+            sellerId,
+            ratePercent: sellerId === 'seller-a' ? 10 : 20,
+            isMarketplaceDefault: false,
+          }),
+      );
+      const snapshot = makeSnapshot({
+        items: [
+          {
+            productId: 'prod-folia',
+            slug: 'folia-pot',
+            name: 'Folia Pot',
+            categorySlug: 'vessels',
+            variantId: null,
+            variantLabel: null,
+            price: 20,
+            quantity: 1,
+            inventoryItemId: 'inv-folia',
+            reservationId: 'res-folia',
+            sellerId: null,
+          },
+          {
+            productId: 'prod-a1',
+            slug: 'seller-a-plant',
+            name: 'Seller A Plant',
+            categorySlug: 'plants',
+            variantId: null,
+            variantLabel: null,
+            price: 30,
+            quantity: 1,
+            inventoryItemId: 'inv-a1',
+            reservationId: 'res-a1',
+            sellerId: 'seller-a',
+          },
+          {
+            productId: 'prod-b1',
+            slug: 'seller-b-tool',
+            name: 'Seller B Tool',
+            categorySlug: 'tools',
+            variantId: null,
+            variantLabel: null,
+            price: 10,
+            quantity: 2,
+            inventoryItemId: 'inv-b1',
+            reservationId: 'res-b1',
+            sellerId: 'seller-b',
+          },
+        ],
+      });
+      prisma.payment.create.mockResolvedValue(
+        makePayment({
+          id: 'pay-comm',
+          provider: 'COD',
+          checkoutSnapshot: snapshot,
+        }),
+      );
+      orderTx.orderSellerGroup.create.mockImplementation(
+        (args: { data: { sellerId: string | null } }) =>
+          Promise.resolve({ id: `group-${args.data.sellerId ?? 'folia'}` }),
+      );
+
+      await service.createForOrder({
+        paymentId: 'pay-comm',
+        userId: 'user-1',
+        method: 'COD',
+        amount: 60,
+        displayLabel: 'Pay on delivery',
+        checkoutSnapshot: snapshot,
+      });
+
+      // Never asked to resolve a rate for the Folia-owned bucket — there
+      // is no commission to resolve for a sale Folia makes to itself.
+      expect(commissionService.resolveEffectiveRate).not.toHaveBeenCalledWith(
+        null,
+        expect.anything(),
+      );
+      expect(commissionService.resolveEffectiveRate).toHaveBeenCalledWith(
+        'seller-a',
+        orderTx,
+      );
+      expect(commissionService.resolveEffectiveRate).toHaveBeenCalledWith(
+        'seller-b',
+        orderTx,
+      );
+
+      const groupCalls = orderTx.orderSellerGroup.create.mock.calls.map(
+        (c: [{ data: Record<string, unknown> }]) => c[0].data,
+      );
+      expect(groupCalls).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ sellerId: null, commissionTotal: 0 }),
+          expect.objectContaining({ sellerId: 'seller-a', commissionTotal: 3 }), // 30 * 10%
+          expect.objectContaining({ sellerId: 'seller-b', commissionTotal: 4 }), // 20 * 20%
+        ]),
+      );
+
+      const itemCalls = (
+        orderTx.orderItem.createMany.mock.calls[0][0] as {
+          data: Record<string, unknown>[];
+        }
+      ).data;
+      expect(itemCalls).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            productId: 'prod-folia',
+            commissionRatePercent: 0,
+            commissionAmount: 0,
+          }),
+          expect.objectContaining({
+            productId: 'prod-a1',
+            commissionRatePercent: 10,
+            commissionAmount: 3,
+          }),
+          expect.objectContaining({
+            productId: 'prod-b1',
+            commissionRatePercent: 20,
+            commissionAmount: 4,
+          }),
+        ]),
+      );
+    });
+
+    it('propagates the "no marketplace default configured" error rather than silently charging 0% commission', async () => {
+      const { prisma, commissionService, service } = createDeps();
+      commissionService.resolveEffectiveRate.mockRejectedValue(
+        new BadRequestException(
+          'No marketplace-default commission rate is configured.',
+        ),
+      );
+      const snapshot = makeSnapshot({
+        items: [
+          {
+            productId: 'prod-a1',
+            slug: 'seller-a-plant',
+            name: 'Seller A Plant',
+            categorySlug: 'plants',
+            variantId: null,
+            variantLabel: null,
+            price: 30,
+            quantity: 1,
+            inventoryItemId: 'inv-a1',
+            reservationId: 'res-a1',
+            sellerId: 'seller-a',
+          },
+        ],
+      });
+      prisma.payment.create.mockResolvedValue(
+        makePayment({
+          id: 'pay-no-default',
+          provider: 'COD',
+          checkoutSnapshot: snapshot,
+        }),
+      );
+
+      await expect(
+        service.createForOrder({
+          paymentId: 'pay-no-default',
+          userId: 'user-1',
+          method: 'COD',
+          amount: 30,
+          displayLabel: 'Pay on delivery',
+          checkoutSnapshot: snapshot,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
