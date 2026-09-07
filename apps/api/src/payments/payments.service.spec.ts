@@ -678,6 +678,94 @@ describe('PaymentsService.verify', () => {
     );
   });
 
+  it('Marketplace Phase 7 — a gateway-confirmed capture splits a multi-seller cart into OrderSellerGroups exactly like the COD path, since both share the same confirmAndCreateOrder', async () => {
+    const { prisma, orderTx, razorpay, service } = createDeps();
+    const snapshot = makeSnapshot({
+      items: [
+        {
+          productId: 'prod-folia',
+          slug: 'folia-pot',
+          name: 'Folia Pot',
+          categorySlug: 'vessels',
+          variantId: null,
+          variantLabel: null,
+          price: 20,
+          quantity: 1,
+          inventoryItemId: 'inv-folia',
+          reservationId: 'res-folia',
+          sellerId: null,
+        },
+        {
+          productId: 'prod-a1',
+          slug: 'seller-a-plant',
+          name: 'Seller A Plant',
+          categorySlug: 'plants',
+          variantId: null,
+          variantLabel: null,
+          price: 51.3,
+          quantity: 1,
+          inventoryItemId: 'inv-a1',
+          reservationId: 'res-a1',
+          sellerId: 'seller-a',
+        },
+      ],
+    });
+    const pending = makePayment({ checkoutSnapshot: snapshot });
+    prisma.payment.findUnique.mockResolvedValue(pending);
+    prisma.payment.updateMany.mockResolvedValue({ count: 1 });
+    prisma.payment.findUniqueOrThrow.mockResolvedValue(
+      makePayment({
+        status: 'CAPTURED',
+        providerPaymentId: 'pay_abc',
+        checkoutSnapshot: snapshot,
+      }),
+    );
+    orderTx.order.create.mockResolvedValue(
+      makeOrderRow({ id: snapshot.orderId }),
+    );
+    orderTx.orderSellerGroup.create.mockImplementation(
+      (args: { data: { sellerId: string | null } }) =>
+        Promise.resolve({
+          id: args.data.sellerId ? 'group-seller-a' : 'group-folia',
+        }),
+    );
+    razorpay.verifyPaymentSignature.mockReturnValue(true);
+    razorpay.fetchPayment.mockResolvedValue({
+      providerPaymentId: 'pay_abc',
+      status: 'captured',
+      amount: 71.3,
+    });
+
+    await service.verify('pay-1', 'user-1', {
+      providerOrderId: 'order_razorpay_1',
+      providerPaymentId: 'pay_abc',
+      signature: 'sig',
+    });
+
+    expect(orderTx.orderSellerGroup.create).toHaveBeenCalledTimes(2);
+    const groupCalls = orderTx.orderSellerGroup.create.mock.calls.map(
+      (c: [{ data: Record<string, unknown> }]) => c[0].data,
+    );
+    expect(groupCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sellerId: null, subtotal: 20 }),
+        expect.objectContaining({ sellerId: 'seller-a', subtotal: 51.3 }),
+      ]),
+    );
+    expect(orderTx.orderItem.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          productId: 'prod-folia',
+          orderSellerGroupId: 'group-folia',
+        }),
+        expect.objectContaining({
+          productId: 'prod-a1',
+          orderSellerGroupId: 'group-seller-a',
+        }),
+      ],
+    });
+  });
+
   it('is idempotent — verifying an already-CAPTURED payment again is a safe no-op that returns the existing order, not a second one', async () => {
     const { prisma, cartService, razorpay, service } = createDeps();
     const alreadyOrdered = makePayment({
