@@ -375,11 +375,22 @@ model Tag {
   @@map("tags")
 }
 
-/// Matches apps/web's Review type exactly.
+/// Matches apps/web's Review type exactly. Marketplace Phase 13 — until
+/// this phase, every row here was seed-time-only display data: `author`
+/// was a plain string with no real account behind it and `verified` was
+/// never computed from an actual purchase. `userId` (nullable — every
+/// pre-Phase-13 seeded review keeps it null; a real review always sets
+/// it) is what makes ReviewsService.createReview's verified-purchase gate
+/// and the @@unique constraint below possible, without touching a single
+/// existing seeded row. No FK relation to User, matching this schema's
+/// existing convention for a reference-only column that isn't
+/// cascade-relevant (see Order.userId's own comment) — a deleted account
+/// should not delete its own real reviews.
 model Review {
   id        String   @id @default(uuid())
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String?
   author    String
   rating    Int
   title     String
@@ -387,6 +398,14 @@ model Review {
   date      DateTime
   verified  Boolean  @default(false)
 
+  /// Postgres treats every NULL as distinct under a unique constraint, so
+  /// this only ever enforces "one review per (product, real userId)" —
+  /// the unlimited NULL-userId seeded rows for the same product are
+  /// completely unaffected. The real, race-proof duplicate-review guard
+  /// (ReviewsService.createReview catches the resulting P2002 as a clean
+  /// 409), matching this codebase's established unique-constraint-as-
+  /// atomic-gate idiom used throughout this whole marketplace initiative.
+  @@unique([productId, userId])
   @@index([productId])
   @@map("reviews")
 }
