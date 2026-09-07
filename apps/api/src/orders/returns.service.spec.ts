@@ -991,7 +991,15 @@ function makeAdminRow(overrides: Record<string, unknown> = {}) {
       {
         orderItemId: 'item-1',
         quantity: 1,
-        orderItem: { name: 'Ceramic Vessel — Ash', price: 42, quantity: 2 },
+        orderItem: {
+          name: 'Ceramic Vessel — Ash',
+          price: 42,
+          quantity: 2,
+          // Marketplace Phase 20 — Folia-owned by default (sellerId
+          // null); tests that care about seller attribution override
+          // this directly (see makeSellerItem).
+          orderSellerGroup: { sellerId: null, seller: null },
+        },
       },
     ],
     evidence: [],
@@ -1055,6 +1063,8 @@ describe('ReturnsService.adminListClaims', () => {
         unitPrice: 42,
         purchasedQuantity: 2,
         claimedLineValue: 42,
+        sellerId: null,
+        sellerName: null,
       },
     ]);
     expect(item.policy).toEqual({
@@ -1155,6 +1165,54 @@ describe('ReturnsService.adminGetClaim', () => {
     await expect(service.adminGetClaim('unknown')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('Marketplace Phase 20 — surfaces which seller a claimed line belongs to, null for a Folia-owned line', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findUnique.mockResolvedValue(
+      makeAdminRow({
+        items: [
+          {
+            orderItemId: 'item-1',
+            quantity: 1,
+            orderItem: {
+              name: 'Terracotta Planter',
+              price: 42,
+              quantity: 2,
+              orderSellerGroup: {
+                sellerId: 'seller-1',
+                seller: { displayName: 'Terracotta & Fern' },
+              },
+            },
+          },
+          {
+            orderItemId: 'item-2',
+            quantity: 1,
+            orderItem: {
+              name: 'Monstera Deliciosa',
+              price: 68,
+              quantity: 1,
+              orderSellerGroup: { sellerId: null, seller: null },
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await service.adminGetClaim('rr-1');
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        orderItemId: 'item-1',
+        sellerId: 'seller-1',
+        sellerName: 'Terracotta & Fern',
+      }),
+      expect.objectContaining({
+        orderItemId: 'item-2',
+        sellerId: null,
+        sellerName: null,
+      }),
+    ]);
   });
 });
 

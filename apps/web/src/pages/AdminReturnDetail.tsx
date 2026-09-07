@@ -129,6 +129,7 @@ export default function AdminReturnDetail() {
             <thead>
               <tr className="border-b border-stone-dark">
                 <th scope="col" className="py-2 px-3 text-left font-mono text-xs uppercase tracking-wider text-ink-soft">Item</th>
+                <th scope="col" className="py-2 px-3 text-left font-mono text-xs uppercase tracking-wider text-ink-soft">Seller</th>
                 <th scope="col" className="py-2 px-3 text-right font-mono text-xs uppercase tracking-wider text-ink-soft">Unit price</th>
                 <th scope="col" className="py-2 px-3 text-right font-mono text-xs uppercase tracking-wider text-ink-soft">Qty claimed</th>
                 <th scope="col" className="py-2 px-3 text-right font-mono text-xs uppercase tracking-wider text-ink-soft">Line value</th>
@@ -138,13 +139,14 @@ export default function AdminReturnDetail() {
               {claim.items.map((item) => (
                 <tr key={item.orderItemId} className="border-b border-stone-dark/60 last:border-0">
                   <td className="py-2.5 px-3 text-ink">{item.productName}</td>
+                  <td className="py-2.5 px-3 text-ink-soft">{item.sellerName ?? 'Folia'}</td>
                   <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(item.unitPrice)}</td>
                   <td className="py-2.5 px-3 text-right font-mono">{item.quantity} / {item.purchasedQuantity}</td>
                   <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(item.claimedLineValue)}</td>
                 </tr>
               ))}
               <tr>
-                <td colSpan={3} className="py-2.5 px-3 text-right text-sm font-medium text-ink-soft">Total claim value</td>
+                <td colSpan={4} className="py-2.5 px-3 text-right text-sm font-medium text-ink-soft">Total claim value</td>
                 <td className="py-2.5 px-3 text-right font-mono font-medium">{formatCurrency(claimValue)}</td>
               </tr>
             </tbody>

@@ -61,7 +61,23 @@ const ADMIN_RETURN_INCLUDE = {
   items: {
     include: {
       orderItem: {
-        select: { name: true, price: true, quantity: true },
+        select: {
+          name: true,
+          price: true,
+          quantity: true,
+          // Marketplace Phase 20 — which seller this line belongs to
+          // (null = Folia's own), so a claim against a multi-seller
+          // order shows an admin which seller's item is actually being
+          // returned/refunded. The refund itself was already correctly
+          // attributed per-seller (see recordSellerRefundEntries below)
+          // — this closes the read side, which never surfaced it.
+          orderSellerGroup: {
+            select: {
+              sellerId: true,
+              seller: { select: { displayName: true } },
+            },
+          },
+        },
       },
     },
   },
@@ -717,6 +733,8 @@ export class ReturnsService {
         unitPrice: Number(item.orderItem.price),
         purchasedQuantity: item.orderItem.quantity,
         claimedLineValue: Number(item.orderItem.price) * item.quantity,
+        sellerId: item.orderItem.orderSellerGroup.sellerId,
+        sellerName: item.orderItem.orderSellerGroup.seller?.displayName ?? null,
       })),
       evidence: row.evidence.map((e) => ({
         url: e.url,
