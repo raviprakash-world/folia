@@ -151,6 +151,11 @@ function createDeps() {
     commitReservation: jest.fn(),
     releaseReservation: jest.fn(),
   };
+  // Marketplace Phase 11 — a no-op by default; tests that care about the
+  // seller ledger clawback assert on this mock's calls directly.
+  const sellerLedgerService = {
+    recordRefund: jest.fn().mockResolvedValue(undefined),
+  };
 
   const service = new ReturnsService(
     prisma as never,
@@ -159,6 +164,7 @@ function createDeps() {
     auditService as never,
     paymentsService as never,
     inventoryService as never,
+    sellerLedgerService as never,
   );
 
   return {
@@ -168,6 +174,7 @@ function createDeps() {
     auditService,
     inventoryService,
     paymentsService,
+    sellerLedgerService,
     service,
   };
 }
@@ -1655,6 +1662,9 @@ function makeResolutionRow(overrides: Record<string, unknown> = {}) {
           // Marketplace Phase 5 — a replacement order's items keep the
           // same seller attribution as the line being replaced.
           orderSellerGroup: { sellerId: null },
+          // Marketplace Phase 11 — the commission frozen at sale time;
+          // 0 here matches a Folia-owned line's real default.
+          commissionAmount: 0,
         },
       },
     ],
@@ -2089,19 +2099,20 @@ describe('ReturnsService.handlePaymentRefunded — Phase 6D-4G crash reconciliat
 
   it('completes the transition (REFUND_ISSUED, refundId, refundAttemptState reset) for a claim stuck IN_PROGRESS on this payment, and audits RETURN_REFUND_RECONCILED', async () => {
     const { prisma, auditService, service } = createDeps();
-    prisma.returnRequest.findFirst.mockResolvedValue({ id: 'rr-1' });
+    prisma.returnRequest.findFirst.mockResolvedValue({ id: 'rr-1', items: [] });
     prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
 
     await service.handlePaymentRefunded(refundedPayload());
 
-    expect(prisma.returnRequest.findFirst).toHaveBeenCalledWith({
-      where: {
-        status: 'APPROVED',
-        refundAttemptState: 'IN_PROGRESS',
-        order: { payment: { id: 'pay-1' } },
-      },
-      select: { id: true },
-    });
+    expect(prisma.returnRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: 'APPROVED',
+          refundAttemptState: 'IN_PROGRESS',
+          order: { payment: { id: 'pay-1' } },
+        },
+      }),
+    );
     expect(prisma.returnRequest.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'rr-1',
@@ -2294,6 +2305,281 @@ describe('ReturnsService.resolveClaim — COD store credit', () => {
 
     const [[loggedInput]] = auditService.log.mock.calls;
     expect(loggedInput.action).toBe('RETURN_STORE_CREDIT_FAILED');
+  });
+});
+
+describe('ReturnsService — Marketplace Phase 11 seller ledger clawback', () => {
+  function makeSellerItem(overrides: Record<string, unknown> = {}) {
+    return {
+      orderItemId: 'item-1',
+      quantity: 1,
+      orderItem: {
+        price: 50,
+        quantity: 2,
+        productId: 'prod-a1',
+        slug: 'seller-a-plant',
+        name: 'Seller A Plant',
+        categorySlug: 'plants',
+        variantId: null,
+        variantLabel: null,
+        orderSellerGroup: { sellerId: 'seller-a' },
+        commissionAmount: 10, // 10% of price(50) * quantity(2) = 100
+      },
+      ...overrides,
+    };
+  }
+
+  it("claws back the seller's net proceeds (price - commission) on a prepaid REFUND resolution", async () => {
+    const { prisma, paymentsService, sellerLedgerService, service } =
+      createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow({ items: [makeSellerItem()] }))
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    // Full line: price 50 * quantity 2 = 100 subtotal, commission 10 ->
+    // net 90 for the whole line. Claimed quantity 1 of 2 -> half:
+    // subtotal 50, commission 5, net 45.
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledWith(
+      'seller-a',
+      'rr-1',
+      45,
+    );
+  });
+
+  it('claws back the same way on a COD FOLIA_STORE_CREDIT resolution', async () => {
+    const { prisma, sellerLedgerService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          items: [makeSellerItem()],
+          order: {
+            id: 'order-1',
+            userId: 'user-1',
+            subtotal: 42,
+            discount: 0,
+            tax: 3.36,
+            paymentMethod: 'COD',
+            payment: { id: 'pay-1' },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockResolvedValue({ id: 'sce-1' });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledWith(
+      'seller-a',
+      'rr-1',
+      45,
+    );
+  });
+
+  it('never touches the seller ledger for a Folia-owned line (sellerId null)', async () => {
+    const { prisma, paymentsService, sellerLedgerService, service } =
+      createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow()) // default fixture: orderSellerGroup.sellerId is null
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(sellerLedgerService.recordRefund).not.toHaveBeenCalled();
+  });
+
+  it('sums multiple claimed lines belonging to the same seller into exactly one ledger entry', async () => {
+    const { prisma, paymentsService, sellerLedgerService, service } =
+      createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          items: [
+            makeSellerItem({ orderItemId: 'item-1', quantity: 1 }), // net 45
+            makeSellerItem({
+              orderItemId: 'item-2',
+              quantity: 2,
+              orderItem: {
+                price: 20,
+                quantity: 2,
+                productId: 'prod-a2',
+                slug: 'seller-a-pot',
+                name: 'Seller A Pot',
+                categorySlug: 'vessels',
+                variantId: null,
+                variantLabel: null,
+                orderSellerGroup: { sellerId: 'seller-a' },
+                commissionAmount: 4, // full line: 40 subtotal, 4 commission, net 36
+              },
+            }), // full quantity claimed -> net 36
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledTimes(1);
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledWith(
+      'seller-a',
+      'rr-1',
+      81, // 45 + 36
+    );
+  });
+
+  it('writes separate entries for two different sellers claimed in the same request', async () => {
+    const { prisma, paymentsService, sellerLedgerService, service } =
+      createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          items: [
+            makeSellerItem({ orderItemId: 'item-1' }), // seller-a, net 45
+            makeSellerItem({
+              orderItemId: 'item-2',
+              orderItem: {
+                price: 50,
+                quantity: 2,
+                productId: 'prod-b1',
+                slug: 'seller-b-plant',
+                name: 'Seller B Plant',
+                categorySlug: 'plants',
+                variantId: null,
+                variantLabel: null,
+                orderSellerGroup: { sellerId: 'seller-b' },
+                commissionAmount: 10,
+              },
+            }), // seller-b, net 45
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledTimes(2);
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledWith(
+      'seller-a',
+      'rr-1',
+      45,
+    );
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledWith(
+      'seller-b',
+      'rr-1',
+      45,
+    );
+  });
+
+  it('does not double-claw-back when this call loses the COD create() race (a concurrent call already issued the credit)', async () => {
+    const { prisma, sellerLedgerService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          items: [makeSellerItem()],
+          order: {
+            id: 'order-1',
+            userId: 'user-1',
+            subtotal: 42,
+            discount: 0,
+            tax: 3.36,
+            paymentMethod: 'COD',
+            payment: { id: 'pay-1' },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'STORE_CREDIT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    prisma.storeCreditEntry.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    prisma.storeCreditEntry.findUniqueOrThrow.mockResolvedValue({
+      id: 'sce-1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(sellerLedgerService.recordRefund).not.toHaveBeenCalled();
+  });
+
+  it('never claws back for a REPLACEMENT resolution — no money moves, the seller keeps their original proceeds', async () => {
+    const { prisma, sellerLedgerService, inventoryService, service } =
+      createDeps();
+    inventoryService.reserveForProduct.mockResolvedValue({ id: 'res-1' });
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeReplacementRow({ items: [makeSellerItem()] }))
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REPLACEMENT_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(sellerLedgerService.recordRefund).not.toHaveBeenCalled();
+  });
+
+  const PHASE_11_REFUNDED_PAYLOAD: PaymentRefundedPayload = {
+    orderId: 'order-1',
+    userId: 'user-1',
+    paymentId: 'pay-1',
+    amount: 45.36,
+    refundId: 'refund-1',
+  };
+
+  it("writes the clawback from handlePaymentRefunded's own crash-recovery path when it wins the race instead of resolvePrepaidRefund", async () => {
+    const { prisma, sellerLedgerService, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue({
+      id: 'rr-1',
+      items: [makeSellerItem()],
+    });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.handlePaymentRefunded(PHASE_11_REFUNDED_PAYLOAD);
+
+    expect(sellerLedgerService.recordRefund).toHaveBeenCalledWith(
+      'seller-a',
+      'rr-1',
+      45,
+    );
+  });
+
+  it('does not double-claw-back from handlePaymentRefunded when it loses the race to the normal resolvePrepaidRefund completion', async () => {
+    const { prisma, sellerLedgerService, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue({
+      id: 'rr-1',
+      items: [makeSellerItem()],
+    });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.handlePaymentRefunded(PHASE_11_REFUNDED_PAYLOAD);
+
+    expect(sellerLedgerService.recordRefund).not.toHaveBeenCalled();
   });
 });
 

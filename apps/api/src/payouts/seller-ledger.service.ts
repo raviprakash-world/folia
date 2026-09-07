@@ -89,6 +89,34 @@ export class SellerLedgerService {
     });
   }
 
+  /**
+   * Marketplace Phase 11 — claws back a seller's net proceeds
+   * (price - commission, exactly mirroring recordOrderProceeds' own SALE +
+   * COMMISSION math) for whatever quantity of their product a
+   * ReturnRequest actually claimed, once that claim resolves as a real
+   * REFUND or FOLIA_STORE_CREDIT (never for a REPLACEMENT — no money
+   * moves there, the seller keeps their original proceeds). One entry per
+   * (ReturnRequest, seller) pair — ReturnsService.recordSellerRefundEntries
+   * sums every claimed item this seller owns in the claim before calling
+   * this once, rather than once per item, matching SALE/COMMISSION's own
+   * "one entry per real triggering event per seller" shape.
+   */
+  async recordRefund(
+    sellerId: string,
+    returnRequestId: string,
+    clawbackAmount: number,
+  ): Promise<SellerLedgerEntry> {
+    return this.prisma.sellerLedgerEntry.create({
+      data: {
+        sellerId,
+        type: 'REFUND',
+        amount: -clawbackAmount,
+        referenceType: 'RETURN_REQUEST',
+        referenceId: returnRequestId,
+      },
+    });
+  }
+
   /** SUM(amount) over every ledger entry for this seller — the one, only definition of "balance" (see this class's own doc comment). */
   async getBalance(sellerId: string): Promise<number> {
     const result = await this.prisma.sellerLedgerEntry.aggregate({

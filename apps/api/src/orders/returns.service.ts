@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { SellerLedgerService } from '../payouts/seller-ledger.service';
 import { STORAGE_SERVICE } from '../storage/storage.interface';
 import type { StorageService } from '../storage/storage.interface';
 import {
@@ -113,6 +114,11 @@ const RESOLUTION_INCLUDE = {
           // resolveReplacement can build a real OrderSellerGroup for the
           // new order exactly like a normal checkout does.
           orderSellerGroup: { select: { sellerId: true } },
+          // Marketplace Phase 11 — the commission actually frozen on this
+          // line at sale time (Phase 8), needed to compute each seller's
+          // proportional REFUND ledger clawback for the claimed quantity.
+          // See recordSellerRefundEntries.
+          commissionAmount: true,
         },
       },
     },
@@ -170,6 +176,7 @@ export class ReturnsService {
     private readonly auditService: AuditService,
     private readonly paymentsService: PaymentsService,
     private readonly inventoryService: InventoryService,
+    private readonly sellerLedgerService: SellerLedgerService,
   ) {}
 
   async createClaim(
@@ -960,6 +967,7 @@ export class ReturnsService {
     ipAddress?: string,
   ) {
     let entry: { id: string };
+    let freshlyCreated = true;
     try {
       entry = await this.prisma.storeCreditEntry.create({
         data: {
@@ -977,7 +985,11 @@ export class ReturnsService {
         // A concurrent resolveClaim() call already issued the credit —
         // the real, race-proof guarantee (this codebase's established
         // "unique constraint as the atomic gate" idiom, same as
-        // ReturnRequest.orderId in Phase 6D-3). Idempotent, not an error.
+        // ReturnRequest.orderId in Phase 6D-3). Idempotent, not an error —
+        // but NOT this call's own win either, so it must not also record
+        // the Marketplace Phase 11 seller ledger clawback below; the
+        // concurrent call that actually created the entry does that.
+        freshlyCreated = false;
         entry = await this.prisma.storeCreditEntry.findUniqueOrThrow({
           where: { returnRequestId: row.id },
         });
@@ -1010,6 +1022,13 @@ export class ReturnsService {
         resolutionType: 'FOLIA_STORE_CREDIT',
       },
     });
+
+    // Marketplace Phase 11 — only on the genuine first-time win (see
+    // freshlyCreated's own comment above); a losing racer must not also
+    // double-claw-back a seller's proceeds for the same claim.
+    if (freshlyCreated) {
+      await this.recordSellerRefundEntries(row.id, row.items);
+    }
 
     await this.auditService.log({
       actorId: adminId,
@@ -1097,6 +1116,13 @@ export class ReturnsService {
           metadata: { orderId: row.orderId, amount, refundId: result.id },
           ipAddress,
         });
+
+        // Marketplace Phase 11 — only on the genuine first-time win
+        // (count === 1, mirroring resolveCodStoreCredit's own
+        // freshlyCreated guard); PAYMENT_EVENTS.REFUNDED can also race
+        // this same update via handlePaymentRefunded below, and that
+        // path must not double-claw-back a seller's proceeds either.
+        await this.recordSellerRefundEntries(row.id, row.items);
       }
 
       return this.adminGetClaim(row.id);
@@ -1398,7 +1424,7 @@ export class ReturnsService {
         refundAttemptState: 'IN_PROGRESS',
         order: { payment: { id: payload.paymentId } },
       },
-      select: { id: true },
+      select: { id: true, items: RESOLUTION_INCLUDE.items },
     });
     if (!stuck) return;
 
@@ -1417,6 +1443,13 @@ export class ReturnsService {
     });
     if (count === 0) return;
 
+    // Marketplace Phase 11 — this listener winning the race means
+    // resolvePrepaidRefund's own count===1 branch (where this call
+    // normally lives) lost it and skipped this entirely; this is the one
+    // other place a genuine first-time win can happen, so it must record
+    // the same seller ledger clawback resolvePrepaidRefund would have.
+    await this.recordSellerRefundEntries(stuck.id, stuck.items);
+
     await this.auditService.log({
       actorId: payload.userId,
       action: 'RETURN_REFUND_RECONCILED',
@@ -1430,5 +1463,51 @@ export class ReturnsService {
         actorType: 'system',
       },
     });
+  }
+
+  /**
+   * Marketplace Phase 11 — claws back each affected seller's net proceeds
+   * (price - commission, exactly mirroring
+   * SellerLedgerService.recordOrderProceeds' own SALE + COMMISSION math,
+   * scaled to the CLAIMED quantity rather than the full line) for a
+   * REFUND or FOLIA_STORE_CREDIT resolution. Never called for REPLACEMENT
+   * — no money moves there, the seller keeps their original proceeds and
+   * simply ships another unit. Skips any line whose orderSellerGroup has
+   * no sellerId (Folia-owned) — there is no seller ledger to touch.
+   * Sums every claimed line a given seller owns into ONE entry, matching
+   * SALE/COMMISSION's own "one entry per real triggering event per
+   * seller" shape rather than one per line.
+   */
+  private async recordSellerRefundEntries(
+    returnRequestId: string,
+    items: ResolutionRow['items'],
+  ): Promise<void> {
+    const clawbackBySeller = new Map<string, number>();
+    for (const item of items) {
+      const sellerId = item.orderItem.orderSellerGroup?.sellerId;
+      if (!sellerId) continue;
+
+      const lineQuantity = item.orderItem.quantity;
+      const claimedQuantity = item.quantity;
+      const claimedSubtotal = Number(item.orderItem.price) * claimedQuantity;
+      const claimedCommission =
+        (Number(item.orderItem.commissionAmount) * claimedQuantity) /
+        lineQuantity;
+      const clawback = claimedSubtotal - claimedCommission;
+
+      clawbackBySeller.set(
+        sellerId,
+        (clawbackBySeller.get(sellerId) ?? 0) + clawback,
+      );
+    }
+
+    for (const [sellerId, clawback] of clawbackBySeller) {
+      if (clawback <= 0) continue; // nothing owed back from this seller — a real but harmless edge case (e.g. a $0 promotional item)
+      await this.sellerLedgerService.recordRefund(
+        sellerId,
+        returnRequestId,
+        Math.round(clawback * 100) / 100,
+      );
+    }
   }
 }

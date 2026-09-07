@@ -12,6 +12,7 @@ import { AppConfigModule } from '../config/config.module';
 import { ShippingModule } from '../shipping/shipping.module';
 import { StorageModule } from '../storage/storage.module';
 import { AuditModule } from '../audit/audit.module';
+import { PayoutsModule } from '../payouts/payouts.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuditModule } from '../audit/audit.module';
     ShippingModule,
     StorageModule,
     AuditModule,
+    PayoutsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, ReturnsService],
