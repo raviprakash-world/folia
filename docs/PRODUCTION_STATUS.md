@@ -11,15 +11,27 @@ see `PRODUCTION_READINESS.md` at the repo root for why that discipline matters
 here specifically (it documents claims, e.g. a working CI pipeline, that turned
 out not to exist).
 
-## Build / lint / typecheck / test — measured this session, not inherited
+> **P0-A/P0-B/P0-C update (2026-09-07/08)**: a separate, later production-
+> engineering pass (audit → tooling/CI → security, tracked outside this
+> file's own Phase-N numbering) superseded the build/lint/test state
+> this table originally described. The table below is corrected to
+> match current reality; the rest of this document's Phase 1–6
+> narrative (payments/shipping/refunds/admin features) is untouched by
+> that pass and still describes those features' own state accurately as
+> of when each was written — only the tooling/lint/CI/security facts
+> below were stale.
+
+## Build / lint / typecheck / test — corrected by P0-B/P0-C, see note above
 
 | Workspace | Build | Typecheck | Lint | Test |
 |---|---|---|---|---|
-| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 33 errors, 20 warnings (`--max-warnings 0`) in pre-existing files, unchanged in shape since Phase 0; every file Phases 1–6 touched is separately confirmed lint-clean | ✅ 635/635 pass (unit, mocked Prisma; up from 375 at Phase 0, 452 at Phase 5 — Phase 6 alone added 183 tests for returns/refunds/replacement/reverse-logistics/notifications/webhook-reconciliation) |
-| `apps/api` (e2e) | — | — | — | ❌ **FAIL** — same Jest config bug as Phase 0, still not fixed (out of scope for Phases 1–3) |
-| `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged since Phase 0) |
+| `apps/api` | ✅ pass | ✅ pass | ✅ **0 errors, 0 warnings** (fixed P0-B — was 33 errors/20 warnings) | ✅ 830/830 pass (unit, mocked Prisma — P0-C added 13 new security-regression tests: register-throttle e2e, changePassword session revocation, seller-suspension authorization) |
+| `apps/api` (e2e) | — | — | — | ✅ **FIXED (P0-B)** — 6/6 pass, including a real e2e proof that register/login/forgot-password/reset-password all genuinely return 429 on their (N+1)th request (`test/auth-rate-limit.e2e-spec.ts`, P0-C) |
+| `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged — installing one was judged out of scope for a tooling/security phase; the P0-C demo-credential regression check is instead a CI-level production-bundle grep, not a unit test) |
 | `packages/*` | n/a | ⚠️ only `shared-types` has a `typecheck` script; `api-client`/`shared-utils` have none | — | — |
-| root (`turbo run *`) | ❌ **FAILS TO RESOLVE** — root `package.json` has no `packageManager` field, so Turbo can't resolve the workspace at all | — | — | — |
+| root (`turbo run *`) | ✅ **FIXED (P0-B)** — `packageManager` field added, all workspaces resolve | — | — | — |
+| CI | — | — | — | ✅ **NEW (P0-B)** — `.github/workflows/ci.yml`, real Postgres/Redis service containers, gates every PR + push to `main` |
+| `npm audit` | — | — | — | ✅ **0 vulnerabilities** (fixed P0-B, re-confirmed P0-C) |
 
 ## Phase 1 (Payments) + Phase 2 (Inventory concurrency) — what changed
 
@@ -114,7 +126,7 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`; per-sub-phase design not
 - Refunds/cancellations/returns: **no longer ad hoc as of Phase 6** — real race-safe refunds, a real return/DOA/replacement/store-credit system with admin + customer UI, reverse-logistics gating, and refund-webhook reconciliation all exist. See the Phase 6 summary above; the real Razorpay webhook success path remains unverified (same root cause as the Phase 1 gap), and none of it is merged/deployed yet.
 - Notifications: real in-app records, plus a real email channel as of Phase 3 (code complete, not live-delivery-verified — see the Phase 3 summary above), extended in Phase 6 to cover return-lifecycle events. SMS still has no provider anywhere.
 - Reviews: read-only API, no submission endpoint, all seed data.
-- CI/CD: **does not exist** despite `PRODUCTION_READINESS.md` and `apps/api/CHANGELOG.md` both describing a working GitHub Actions pipeline.
+- CI/CD: **fixed as of P0-B** (2026-09-07/08, see the note at the top of this document) — a real GitHub Actions pipeline now exists (`.github/workflows/ci.yml`), simulated end-to-end against ephemeral Postgres/Redis before being trusted, not just written and assumed correct. Prior to that, this bullet was accurate: `PRODUCTION_READINESS.md`/`apps/api/CHANGELOG.md` described a pipeline that didn't actually exist.
 - Backup/DR: no plan exists; the live production Postgres (Render free tier) auto-deletes ~30 days after creation.
 - Graceful shutdown: `app.enableShutdownHooks()` is never called; Dockerfile `CMD` shape likely prevents SIGTERM from reaching Node at all.
 - Zero product photography anywhere in the frontend.

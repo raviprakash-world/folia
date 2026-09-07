@@ -320,6 +320,14 @@ describe('SellerProductsService.archive', () => {
     expect(args.where).toMatchObject({ approvalStatus: 'ACTIVE' });
     expect(args.data.approvalStatus).toBe('ARCHIVED');
   });
+
+  it('refuses when the seller account itself is not ACTIVE — P0-C-5, same gate as submitForModeration', async () => {
+    const { prisma, service } = createDeps();
+    await expect(
+      service.archive(makeSeller({ status: 'SUSPENDED' }), 'prod-1'),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.product.updateMany).not.toHaveBeenCalled();
+  });
 });
 
 describe('SellerProductsService.uploadMedia', () => {

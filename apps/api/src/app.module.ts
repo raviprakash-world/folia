@@ -49,7 +49,17 @@ import { SellerGuard } from './sellers/guards/seller.guard';
             ? undefined
             : { target: 'pino-pretty', options: { singleLine: true } },
           autoLogging: true,
-          redact: ['req.headers.authorization', 'req.headers.cookie'],
+          // P0-C-10 — the outgoing Set-Cookie header (refresh token,
+          // guest-cart id) carries the same secret-bearing value as the
+          // incoming Cookie header below, but on the response side. Pino's
+          // autoLogging serializes res.headers by default, so without this
+          // path the refresh token would land in plaintext server logs on
+          // every /auth/login, /auth/register, and /auth/refresh call.
+          redact: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'res.headers["set-cookie"]',
+          ],
           // Phase 12 observability — every log line for a request now
           // carries a real correlation id. Honors an incoming
           // X-Request-Id (a load balancer or upstream service may

@@ -308,6 +308,16 @@ export class AuthService {
 
     const passwordHash = await hashPassword(newPassword);
     await this.usersService.updatePasswordHash(userId, passwordHash);
+    // P0-C-4 — same reasoning as resetPassword: a password change is a
+    // "this account may have been compromised, or the owner is
+    // deliberately locking out a stolen session" signal either way, so
+    // every existing session (refresh token) is revoked here too, not
+    // just on the token-based reset flow. The caller's own still-live
+    // 15-minute access token keeps working until it naturally expires
+    // (access tokens aren't session-checked per request — see
+    // jwt.strategy.ts), but their next refresh attempt requires signing
+    // in again, same as every other device.
+    await this.sessionsService.revokeAllForUser(userId);
   }
 
   // --- Email verification ---

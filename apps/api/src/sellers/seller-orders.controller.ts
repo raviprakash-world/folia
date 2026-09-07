@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Seller } from '@prisma/client';
 import { SellerOrdersService } from './seller-orders.service';
@@ -42,6 +50,16 @@ export class SellerOrdersController {
     @Param('id') id: string,
     @Body() dto: UpdateSellerOrderNoteDto,
   ) {
+    // P0-C-5 — SellerGuard is deliberately status-agnostic (reads stay
+    // open at any status so an applicant/suspended seller can still see
+    // their own account state); writes are gated per-endpoint instead,
+    // same pattern as SellerProductsService.archive and
+    // SellerFulfillmentController.ship.
+    if (seller.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'Your seller account must be active to update order notes.',
+      );
+    }
     return this.sellerOrdersService.updateSellerNote(seller.id, id, dto.note);
   }
 }

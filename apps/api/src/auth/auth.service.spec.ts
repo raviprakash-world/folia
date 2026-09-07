@@ -427,6 +427,30 @@ describe('AuthService', () => {
         expect.any(String),
       );
     });
+
+    it('revokes every existing session on success, same as resetPassword — P0-C-4', async () => {
+      const { service, usersService, sessionsService } = createDeps();
+      const hash = await hashPassword('ActualPassword1');
+      usersService.findById.mockResolvedValue(makeUser({}, hash));
+
+      await service.changePassword('user-1', 'ActualPassword1', 'NewPassword1');
+      expect(sessionsService.revokeAllForUser).toHaveBeenCalledWith('user-1');
+    });
+
+    it('does not revoke sessions when the current password is wrong', async () => {
+      const { service, usersService, sessionsService } = createDeps();
+      const hash = await hashPassword('ActualPassword1');
+      usersService.findById.mockResolvedValue(makeUser({}, hash));
+
+      await expect(
+        service.changePassword(
+          'user-1',
+          'WrongCurrentPassword',
+          'NewPassword1',
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(sessionsService.revokeAllForUser).not.toHaveBeenCalled();
+    });
   });
 
   describe('verifyEmail', () => {

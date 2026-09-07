@@ -56,10 +56,12 @@ export default function AdminLogin() {
         <ShieldCheck size={20} className="text-fern" />
         <h1 className="font-display text-3xl font-semibold text-heading">Admin sign in</h1>
       </div>
-      <p className="text-sm text-ink-soft mt-2">
-        Demo admin: <span className="font-mono">admin@folia.example</span> /{' '}
-        <span className="font-mono">folia-admin</span>
-      </p>
+      {import.meta.env.DEV && (
+        <p className="text-sm text-ink-soft mt-2">
+          Demo admin: <span className="font-mono">admin@folia.example</span> /{' '}
+          <span className="font-mono">folia-admin</span>
+        </p>
+      )}
 
       {error && (
         <Alert tone="error" className="mt-5">

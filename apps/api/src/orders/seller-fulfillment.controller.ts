@@ -1,4 +1,4 @@
-import { Controller, Param, Post } from '@nestjs/common';
+import { Controller, ForbiddenException, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Seller } from '@prisma/client';
 import { OrdersService } from './orders.service';
@@ -26,6 +26,15 @@ export class SellerFulfillmentController {
   @Post(':id/ship')
   @RequireSeller()
   ship(@CurrentSeller() seller: Seller, @Param('id') id: string) {
+    // P0-C-5 — SellerGuard is deliberately status-agnostic (see
+    // SellersService.apply's doc comment); this is the enforcement point
+    // that stops a SUSPENDED/DEACTIVATED seller from continuing to ship
+    // real customer orders after an admin has revoked their standing.
+    if (seller.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'Your seller account must be active to ship orders.',
+      );
+    }
     return this.ordersService.shipOrderSellerGroup(id, seller.id);
   }
 }

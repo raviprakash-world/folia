@@ -54,10 +54,12 @@ export default function SellerLogin() {
         <Store size={20} className="text-fern" />
         <h1 className="font-display text-3xl font-semibold text-heading">Seller sign in</h1>
       </div>
-      <p className="text-sm text-ink-soft mt-2">
-        Demo seller: <span className="font-mono">seller@folia.example</span> /{' '}
-        <span className="font-mono">folia-seller</span>
-      </p>
+      {import.meta.env.DEV && (
+        <p className="text-sm text-ink-soft mt-2">
+          Demo seller: <span className="font-mono">seller@folia.example</span> /{' '}
+          <span className="font-mono">folia-seller</span>
+        </p>
+      )}
 
       {error && (
         <Alert tone="error" className="mt-5">

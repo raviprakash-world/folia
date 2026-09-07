@@ -269,11 +269,22 @@ export class SellerProductsService {
   }
 
   /** ACTIVE -> ARCHIVED, seller-initiated (distinct audit action from
-   * adminDeactivate's admin-initiated equivalent, same terminal status). */
+   * adminDeactivate's admin-initiated equivalent, same terminal status).
+   * P0-C-5 — same ACTIVE-only gate as submitForModeration: SellerGuard
+   * itself is deliberately status-agnostic (see apply()'s doc comment),
+   * so this is the enforcement point that keeps a SUSPENDED/DEACTIVATED
+   * seller from continuing to mutate their catalog after an admin has
+   * revoked their standing. */
   async archive(
     seller: Seller,
     productId: string,
   ): Promise<SellerProductRecord> {
+    if (seller.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'Your seller account must be active to archive products.',
+      );
+    }
+
     const { count } = await this.prisma.product.updateMany({
       where: { id: productId, sellerId: seller.id, approvalStatus: 'ACTIVE' },
       data: { approvalStatus: 'ARCHIVED' },

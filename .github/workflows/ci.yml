@@ -119,3 +119,18 @@ jobs:
 
       - name: Build
         run: npx turbo run build
+
+      # P0-C-2/P0-C-16 — Login.tsx/AdminLogin.tsx/SellerLogin.tsx gate their
+      # demo-credential hints behind import.meta.env.DEV, which Vite always
+      # sets false for a `vite build` output regardless of --mode. This step
+      # proves that holds for the real built bundle on every CI run, not
+      # just at the time the gate was added — a future edit that
+      # accidentally moves a credential string outside the DEV check fails
+      # the build here rather than shipping.
+      - name: Scan frontend bundle for demo credentials
+        run: |
+          if grep -rlE "demo@folia\.example|admin@folia\.example|seller@folia\.example|'folia-demo'|\"folia-demo\"|\`folia-demo|'folia-admin'|\"folia-admin\"|\`folia-admin\`|'folia-seller'|\"folia-seller\"|\`folia-seller\`" apps/web/dist/; then
+            echo "::error::Demo credential strings found in the production frontend bundle."
+            exit 1
+          fi
+          echo "Clean: no demo credential strings in apps/web/dist/"

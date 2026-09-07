@@ -25,7 +25,10 @@ import { ApplySellerDto } from './dto/apply-seller.dto';
 import { UpdateSellerDto } from './dto/update-seller.dto';
 import { UploadVerificationDto } from './dto/upload-verification.dto';
 import { PublicSellersQueryDto } from './dto/public-sellers-query.dto';
-import { MAX_VERIFICATION_FILES } from './seller-verification-file.util';
+import {
+  MAX_VERIFICATION_FILE_BYTES,
+  MAX_VERIFICATION_FILES,
+} from './seller-verification-file.util';
 import type { AuthenticatedUser } from '../users/user.types';
 import type { Seller } from '@prisma/client';
 
@@ -85,7 +88,11 @@ export class SellersController {
     summary:
       'Upload one or more verification documents (images or PDFs) for the authenticated seller.',
   })
-  @UseInterceptors(FilesInterceptor('files', MAX_VERIFICATION_FILES))
+  @UseInterceptors(
+    FilesInterceptor('files', MAX_VERIFICATION_FILES, {
+      limits: { fileSize: MAX_VERIFICATION_FILE_BYTES },
+    }),
+  )
   uploadVerification(
     @CurrentSeller() seller: Seller,
     @Body() dto: UploadVerificationDto,

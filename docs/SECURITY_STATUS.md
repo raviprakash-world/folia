@@ -7,20 +7,28 @@ tracks status at a glance and layers in what that document doesn't cover
 
 | Control | Status | Evidence |
 |---|---|---|
-| JWT + refresh rotation with reuse detection | ✅ VERIFIED | `apps/api/src/auth/auth.service.ts:135-195`, unit-tested |
-| Argon2id password hashing (OWASP params) | ✅ VERIFIED | `apps/api/src/auth/password.util.ts:15-20`, real hash/verify round-trip tested |
-| Global RBAC guard chain (Throttler → JWT → Roles) | ✅ VERIFIED | `apps/api/src/app.module.ts:93-100` |
-| Rate limiting, global + tuned on sensitive routes | ✅ VERIFIED | `apps/api/src/auth/auth.controller.ts:97,226,240` |
-| CORS scoped to configured origin | ✅ VERIFIED | `apps/api/src/main.ts:42` |
-| Helmet, strict ValidationPipe | ✅ VERIFIED | `apps/api/src/main.ts:38,52-58` |
-| Structured log redaction (auth headers, secrets) | ✅ VERIFIED | `apps/api/src/app.module.ts:48` |
+| JWT + refresh rotation with reuse detection | ✅ VERIFIED | `apps/api/src/auth/auth.service.ts:167-222`, unit-tested |
+| Argon2id password hashing (OWASP params) | ✅ VERIFIED | `apps/api/src/auth/password.util.ts:15-24`, real hash/verify round-trip tested |
+| Global RBAC guard chain (Throttler → JWT → Roles → Seller) | ✅ VERIFIED | `apps/api/src/app.module.ts:110-113` |
+| Rate limiting, global + tuned on sensitive routes | ✅ VERIFIED | `apps/api/src/auth/auth.controller.ts` register/login/reset-password (5/min), forgot-password (3/min) — e2e-proven, `test/auth-rate-limit.e2e-spec.ts` (P0-C-3: `register` was previously undocumented-but-unthrottled; fixed) |
+| Authorization/IDOR sweep (customer/seller/admin isolation) | ✅ VERIFIED (P0-C-5) | Systematic endpoint audit; one real gap found and fixed — suspended/deactivated sellers could still archive products, ship orders, edit fulfillment notes (`SellerGuard` is deliberately status-agnostic by design; per-endpoint `ACTIVE`-only gates added) |
+| Mass assignment audit | ✅ VERIFIED (P0-C-6) | No exploitable path found; 2 defense-in-depth gaps closed — `AdminUpdateRoleDto.role` allowlist, `UpdateProfileDto.avatarUrl` removed (bypassed upload validation) |
+| File upload security (MIME/magic-byte/size) | ✅ VERIFIED (P0-C-7) | Avatar upload previously trusted client `Content-Type` alone — now magic-byte-validated like the other 3 upload endpoints; all 4 now enforce size limits via Multer, not post-buffer checks |
+| Webhook signature verification + idempotency | ✅ VERIFIED | Razorpay: raw-body HMAC verification, DB-unique-constraint dedup, amount sourced from Folia's own DB never the payload — `apps/api/src/payments/payments.service.ts:902-986` |
+| CORS scoped to configured origin | ✅ VERIFIED | `apps/api/src/main.ts:58`, explicit env-driven allowlist, never a wildcard |
+| Helmet, strict ValidationPipe | ✅ VERIFIED | `apps/api/src/main.ts` |
+| Structured log redaction (auth headers, secrets, Set-Cookie) | ✅ VERIFIED | `apps/api/src/app.module.ts` — P0-C-10 added `res.headers["set-cookie"]`, a real gap (refresh-token leak via response-header autologging), verified fixed against a live running server |
+| Error responses (no stack/Prisma-internals leakage) | ✅ VERIFIED | `apps/api/src/common/filters/all-exceptions.filter.ts` — generic message for any non-`HttpException`, unconditional (not `NODE_ENV`-gated) |
 | Secrets hygiene (no hardcoded secrets repo-wide) | ✅ VERIFIED | Two independent grep passes, zero hits |
-| CSRF token mechanism | ❌ MISSING | No `csurf` or equivalent; state-changing routes rely on bearer tokens + httpOnly cookies only |
-| Graceful shutdown | ❌ MISSING | `enableShutdownHooks()` never called; Dockerfile `CMD` shape (`sh -c "... && node ..."`) likely prevents SIGTERM reaching Node at all |
-| File upload durability | ⚠️ PARTIAL | Size/type limits real; storage is local-disk only, not durable, and not even served back over HTTP today |
+| Demo credentials hidden from production frontend build | ✅ VERIFIED (P0-C-2) | `Login.tsx`/`AdminLogin.tsx`/`SellerLogin.tsx` gated behind `import.meta.env.DEV`; CI scans the built `apps/web/dist/` bundle for the literal strings on every run |
+| CSRF token mechanism | ✅ ASSESSED — not needed | No CSRF middleware/token exists, deliberately: every business endpoint requires `Authorization: Bearer`, never ambient-cookie auth; the one cookie-authenticated endpoint (`/auth/refresh`) is `SameSite=Lax` + POST-only + performs no business state change. Full reasoning in `apps/api/SECURITY.md`'s CSRF section — this was previously listed as "MISSING," which incorrectly implied a gap rather than an assessed non-issue |
+| Dependency vulnerabilities (`npm audit`) | ✅ 0 VULNERABILITIES | Fixed in P0-B (`deepmerge-ts` override), re-confirmed at the end of P0-C |
+| Graceful shutdown | ❌ MISSING | `enableShutdownHooks()` never called; Dockerfile `CMD` shape (`sh -c "... && node ..."`) likely prevents SIGTERM reaching Node at all — out of scope for P0-C, belongs to a later infrastructure phase |
+| File retrieval / serving endpoint | ❌ MISSING (flagged critical for whoever builds it) | `LocalStorageService` writes files and returns `/uploads/<key>` URLs, but nothing serves them — a functional gap today, and a serious future risk if "fixed" with a naive static mount for verification-document/return-evidence uploads specifically (see `apps/api/SECURITY.md`'s file-upload section) |
 | Error tracking / APM | ❌ MISSING | No Sentry/equivalent in either app |
-| CI-gated security checks | ❌ MISSING | No CI exists at all (see `API_INTEGRATION_STATUS.md`) |
-| Backend lint (includes some type-safety rules) | ❌ CURRENTLY FAILING | 34 errors, 27 warnings as of this baseline — see `PRODUCTION_STATUS.md` |
+| CI-gated security checks | ✅ FIXED (P0-B) | Real GitHub Actions CI now exists (`.github/workflows/ci.yml`), lint/typecheck/test/e2e/build gated on every PR + push to `main`, plus a demo-credential bundle scan (P0-C) |
+| Backend lint (includes some type-safety rules) | ✅ FIXED (P0-B) | 0 errors, 0 warnings — previously failing, see `PRODUCTION_STATUS.md`'s now-stale table for the prior state |
+| Account lockout / per-account brute-force protection | ❌ MISSING (documented residual risk) | Only per-IP rate limiting exists; a slow, distributed credential-stuffing attempt against one account isn't specifically mitigated. Not fixed in P0-C — a correct implementation needs to avoid becoming its own DoS vector against real customers, a bigger design decision than this phase |
 
 ## Known-mocked flows with security-relevant consequences
 
@@ -48,11 +56,14 @@ tracks status at a glance and layers in what that document doesn't cover
   returned outside development, and never itself exploitable in production
   (production returns `{}`, same as before).
 
-## Not yet assessed in this pass (deferred to Phase 9)
+## P0-C update — most of the below is now done
 
-XSS surface review, IDOR sweep beyond the one documented fix in
-`apps/api/SECURITY.md`, mass-assignment review of every DTO, and a
-live cookie-flag inspection over real HTTPS. (Webhook signature verification
-now exists — Phase 1 — and is unit-tested; see the payments entry above.)
-Phase 9 is where these get a
-dedicated pass; Phase 0 only inventories what's already known.
+The IDOR sweep and mass-assignment review this section used to defer
+are now complete (P0-C, see the table above and `apps/api/SECURITY.md`
+for full findings). Still genuinely not assessed: a dedicated XSS
+surface review of the React frontend (no CSP tuning was needed on the
+API side since it serves no HTML, but the frontend's own XSS posture —
+e.g. any `dangerouslySetInnerHTML` usage — hasn't had a focused pass),
+and a live cookie-flag inspection over real HTTPS in an actual deployed
+environment (the `secure` flag's `isProduction` branch is code-verified
+but has not been observed on a real production HTTPS request).

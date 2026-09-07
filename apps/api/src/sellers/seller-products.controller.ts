@@ -21,7 +21,10 @@ import { RequireSeller } from './decorators/require-seller.decorator';
 import { CurrentSeller } from './decorators/current-seller.decorator';
 import { SellerProductInputDto } from './dto/seller-product-input.dto';
 import { UpdateSellerProductDto } from './dto/update-seller-product.dto';
-import { MAX_PRODUCT_MEDIA_FILES } from './seller-product-media-file.util';
+import {
+  MAX_PRODUCT_MEDIA_FILE_BYTES,
+  MAX_PRODUCT_MEDIA_FILES,
+} from './seller-product-media-file.util';
 import type { Seller } from '@prisma/client';
 
 /**
@@ -87,7 +90,11 @@ export class SellerProductsController {
   @Post(':id/media')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload one or more product photos.' })
-  @UseInterceptors(FilesInterceptor('files', MAX_PRODUCT_MEDIA_FILES))
+  @UseInterceptors(
+    FilesInterceptor('files', MAX_PRODUCT_MEDIA_FILES, {
+      limits: { fileSize: MAX_PRODUCT_MEDIA_FILE_BYTES },
+    }),
+  )
   uploadMedia(
     @CurrentSeller() seller: Seller,
     @Param('id') id: string,
