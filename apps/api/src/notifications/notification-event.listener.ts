@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
 import { NOTIFICATION_EVENTS } from './notification.events';
 import type {
@@ -12,6 +13,17 @@ import type {
   ReplacementIssuedPayload,
   ProfileUpdatedPayload,
   PasswordChangedPayload,
+  SellerAppliedPayload,
+  SellerApprovedPayload,
+  SellerRejectedPayload,
+  SellerSuspendedPayload,
+  SellerReactivatedPayload,
+  SellerDeactivatedPayload,
+  ProductSubmittedPayload,
+  ProductApprovedPayload,
+  ProductRejectedPayload,
+  ProductDeactivatedPayload,
+  SellerPayoutPaidPayload,
 } from './notification.events';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
 import type { OrderCreatedPayload } from '../analytics/analytics.events';
@@ -32,7 +44,27 @@ import type { PaymentRefundedPayload } from '../payments/payments.events';
  */
 @Injectable()
 export class NotificationEventListener {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  /**
+   * Marketplace Phase 18 — the four PRODUCT_* payloads below carry only
+   * sellerId (Phase 3's own payload shape, set before this listener
+   * existed to consume it), not the seller's userId a Notification row
+   * needs. Every other event this listener handles already carries
+   * userId directly in its payload; this is the one small enrichment
+   * lookup needed to close that gap without reopening Phase 3's own
+   * emission call sites just to add a field only this listener needs.
+   */
+  private async resolveSellerUserId(sellerId: string): Promise<string> {
+    const seller = await this.prisma.seller.findUniqueOrThrow({
+      where: { id: sellerId },
+      select: { userId: true },
+    });
+    return seller.userId;
+  }
 
   @OnEvent(ANALYTICS_EVENTS.ORDER_CREATED)
   async handleOrderCreated(payload: OrderCreatedPayload): Promise<void> {
@@ -160,6 +192,151 @@ export class NotificationEventListener {
       type: 'SECURITY',
       title: 'Password Changed',
       message: 'Your password was updated successfully.',
+    });
+  }
+
+  // --- Marketplace Phase 18 — seller lifecycle, seller-product moderation, payout paid ---
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_APPLIED)
+  async handleSellerApplied(payload: SellerAppliedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Application Received',
+      message: "We've received your seller application and will review it shortly.",
+      href: '/seller/profile',
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_APPROVED)
+  async handleSellerApproved(payload: SellerApprovedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Seller Application Approved',
+      message: "You're approved to sell on Folia — your storefront is now live.",
+      href: '/seller/profile',
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_REJECTED)
+  async handleSellerRejected(payload: SellerRejectedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Seller Application Not Approved',
+      message: `Your seller application was not approved: ${payload.reason}`,
+      href: '/seller/profile',
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_SUSPENDED)
+  async handleSellerSuspended(payload: SellerSuspendedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Seller Account Suspended',
+      message: payload.note
+        ? `Your seller account was suspended: ${payload.note}`
+        : 'Your seller account was suspended.',
+      href: '/seller/profile',
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_REACTIVATED)
+  async handleSellerReactivated(
+    payload: SellerReactivatedPayload,
+  ): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Seller Account Reactivated',
+      message: 'Your seller account is active again — your storefront is back online.',
+      href: '/seller/profile',
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_DEACTIVATED)
+  async handleSellerDeactivated(
+    payload: SellerDeactivatedPayload,
+  ): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Seller Account Deactivated',
+      message: payload.note
+        ? `Your seller account was deactivated: ${payload.note}`
+        : 'Your seller account was deactivated.',
+      href: '/seller/profile',
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.PRODUCT_SUBMITTED)
+  async handleProductSubmitted(
+    payload: ProductSubmittedPayload,
+  ): Promise<void> {
+    const userId = await this.resolveSellerUserId(payload.sellerId);
+    await this.notificationsService.create({
+      userId,
+      type: 'SELLER',
+      title: 'Product Submitted For Review',
+      message: 'Your product listing was submitted and is awaiting review.',
+      href: `/seller/products/${payload.productId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.PRODUCT_APPROVED)
+  async handleProductApproved(
+    payload: ProductApprovedPayload,
+  ): Promise<void> {
+    const userId = await this.resolveSellerUserId(payload.sellerId);
+    await this.notificationsService.create({
+      userId,
+      type: 'SELLER',
+      title: 'Product Approved',
+      message: 'Your product listing was approved and is now live.',
+      href: `/seller/products/${payload.productId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.PRODUCT_REJECTED)
+  async handleProductRejected(
+    payload: ProductRejectedPayload,
+  ): Promise<void> {
+    const userId = await this.resolveSellerUserId(payload.sellerId);
+    await this.notificationsService.create({
+      userId,
+      type: 'SELLER',
+      title: 'Product Not Approved',
+      message: `Your product listing was not approved: ${payload.reason}`,
+      href: `/seller/products/${payload.productId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.PRODUCT_DEACTIVATED)
+  async handleProductDeactivated(
+    payload: ProductDeactivatedPayload,
+  ): Promise<void> {
+    const userId = await this.resolveSellerUserId(payload.sellerId);
+    await this.notificationsService.create({
+      userId,
+      type: 'SELLER',
+      title: 'Product Archived',
+      message: 'Your product listing was archived and is no longer live.',
+      href: `/seller/products/${payload.productId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.SELLER_PAYOUT_PAID)
+  async handleSellerPayoutPaid(
+    payload: SellerPayoutPaidPayload,
+  ): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'SELLER',
+      title: 'Payout Sent',
+      message: `₹${payload.amount.toFixed(2)} was paid out to you.`,
+      href: '/seller/earnings',
     });
   }
 }

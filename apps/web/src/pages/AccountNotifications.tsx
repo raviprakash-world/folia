@@ -8,6 +8,7 @@ import {
   Heart,
   UserCircle,
   ShieldCheck,
+  Store,
   Check,
   Archive,
   Trash2,
@@ -28,6 +29,7 @@ const typeIcons: Record<NotificationType, typeof Package> = {
   wishlist: Heart,
   account: UserCircle,
   security: ShieldCheck,
+  seller: Store,
 };
 
 const typeFilters: { value: NotificationType | 'all'; label: string }[] = [
@@ -38,6 +40,7 @@ const typeFilters: { value: NotificationType | 'all'; label: string }[] = [
   { value: 'wishlist', label: 'Wishlist' },
   { value: 'account', label: 'Account' },
   { value: 'security', label: 'Security' },
+  { value: 'seller', label: 'Seller' },
 ];
 
 const preferenceToggles: { key: 'orderConfirmationEmail' | 'shippingUpdatesEmail' | 'deliveryUpdatesSms' | 'marketingEmail'; label: string; description: string }[] = [

@@ -1551,6 +1551,10 @@ model Notification {
 
 /// Matches apps/web/src/types/notification.ts's NotificationType exactly
 /// (uppercased, matching this schema's existing enum convention).
+/// Marketplace Phase 18 adds SELLER — seller-lifecycle, seller-product
+/// moderation, and payout-paid notifications all use this one type
+/// rather than overloading ACCOUNT, which reads as profile/password
+/// activity, not marketplace-seller activity.
 enum NotificationType {
   ORDER
   SHIPPING
@@ -1558,6 +1562,7 @@ enum NotificationType {
   WISHLIST
   ACCOUNT
   SECURITY
+  SELLER
 }
 
 // --- Marketplace Phase 1: Seller Domain ---

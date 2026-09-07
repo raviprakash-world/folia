@@ -10,8 +10,16 @@ function createDeps() {
   const notificationsService = {
     create: jest.fn().mockResolvedValue(undefined),
   };
-  const listener = new NotificationEventListener(notificationsService as never);
-  return { listener, notificationsService };
+  const prisma = {
+    seller: {
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ userId: 'user-1' }),
+    },
+  };
+  const listener = new NotificationEventListener(
+    notificationsService as never,
+    prisma as never,
+  );
+  return { listener, notificationsService, prisma };
 }
 
 describe('NotificationEventListener.handlePaymentRefunded', () => {
@@ -153,6 +161,188 @@ describe('NotificationEventListener.handleReplacementIssued', () => {
       title: 'Replacement On The Way',
       message: 'A free replacement for order FOL-1 was created as order FOL-2.',
       href: '/account/orders/FOL-2',
+    });
+  });
+});
+
+// Marketplace Phase 18 — seller lifecycle, seller-product moderation, and
+// payout-paid events all previously had "no listener exists yet" per
+// notification.events.ts's own comments (Phases 2/3/9). This phase closes
+// that gap.
+describe('NotificationEventListener — Marketplace Phase 18', () => {
+  it('handleSellerApplied creates a SELLER notification linking to the seller profile', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerApplied({ sellerId: 'seller-1', userId: 'user-1' });
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'SELLER',
+      title: 'Application Received',
+      message: "We've received your seller application and will review it shortly.",
+      href: '/seller/profile',
+    });
+  });
+
+  it('handleSellerApproved creates a SELLER notification', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerApproved({ sellerId: 'seller-1', userId: 'user-1' });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'SELLER',
+        title: 'Seller Application Approved',
+        href: '/seller/profile',
+      }),
+    );
+  });
+
+  it('handleSellerRejected includes the real rejection reason', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerRejected({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+      reason: 'Business documents did not match the application.',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'SELLER',
+        message:
+          'Your seller application was not approved: Business documents did not match the application.',
+      }),
+    );
+  });
+
+  it('handleSellerSuspended includes the admin note when given', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerSuspended({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+      note: 'Multiple customer complaints under review.',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Your seller account was suspended: Multiple customer complaints under review.',
+      }),
+    );
+  });
+
+  it('handleSellerSuspended omits the note clause when none was given', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerSuspended({ sellerId: 'seller-1', userId: 'user-1' });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Your seller account was suspended.' }),
+    );
+  });
+
+  it('handleSellerReactivated creates a SELLER notification', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerReactivated({ sellerId: 'seller-1', userId: 'user-1' });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', type: 'SELLER', title: 'Seller Account Reactivated' }),
+    );
+  });
+
+  it('handleSellerDeactivated includes the admin note when given', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerDeactivated({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+      note: 'Requested by the seller.',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Your seller account was deactivated: Requested by the seller.' }),
+    );
+  });
+
+  it('handleProductSubmitted resolves the userId from the sellerId (the payload only carries sellerId)', async () => {
+    const { listener, notificationsService, prisma } = createDeps();
+
+    await listener.handleProductSubmitted({ productId: 'prod-1', sellerId: 'seller-1' });
+
+    expect(prisma.seller.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { id: 'seller-1' },
+      select: { userId: true },
+    });
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'SELLER',
+      title: 'Product Submitted For Review',
+      message: 'Your product listing was submitted and is awaiting review.',
+      href: '/seller/products/prod-1',
+    });
+  });
+
+  it('handleProductApproved resolves the userId and links to the product', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleProductApproved({ productId: 'prod-1', sellerId: 'seller-1' });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'SELLER',
+        title: 'Product Approved',
+        href: '/seller/products/prod-1',
+      }),
+    );
+  });
+
+  it('handleProductRejected includes the real rejection reason', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleProductRejected({
+      productId: 'prod-1',
+      sellerId: 'seller-1',
+      reason: 'Photos do not match the description.',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Your product listing was not approved: Photos do not match the description.',
+      }),
+    );
+  });
+
+  it('handleProductDeactivated creates a SELLER notification', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleProductDeactivated({ productId: 'prod-1', sellerId: 'seller-1' });
+
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', type: 'SELLER', title: 'Product Archived' }),
+    );
+  });
+
+  it('handleSellerPayoutPaid includes the real payout amount and links to earnings', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleSellerPayoutPaid({
+      sellerId: 'seller-1',
+      userId: 'user-1',
+      payoutId: 'payout-1',
+      amount: 90,
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'SELLER',
+      title: 'Payout Sent',
+      message: '₹90.00 was paid out to you.',
+      href: '/seller/earnings',
     });
   });
 });
