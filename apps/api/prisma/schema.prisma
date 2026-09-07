@@ -1435,12 +1435,21 @@ enum NotificationType {
 // at Phase 6/7) — "Marketplace Phase N" always refers to this initiative's
 // own Phase 0-23 breakdown, never the roadmap's.
 
-/// Exactly the lifecycle the governing brief specifies. No seller may sell
-/// (create/submit/have live products) while in any state but ACTIVE — that
-/// gate is enforced in SellersService/product-write services, not here.
+/// The governing brief's lifecycle diagram (APPLIED -> UNDER_REVIEW ->
+/// APPROVED -> ACTIVE -> SUSPENDED -> DEACTIVATED), plus REJECTED —
+/// Marketplace Phase 2 addition, closing a real gap in Phase 1's own
+/// schema: the brief separately requires "no seller should be able to
+/// sell while APPLIED/UNDER_REVIEW/REJECTED/SUSPENDED/DEACTIVATED,"
+/// naming REJECTED as its own distinct state, and Phase 2's admin actions
+/// explicitly include "reject" — but Phase 1's enum only transcribed the
+/// diagram's five drawn boxes and missed it. No seller may sell while in
+/// any state but APPROVED/ACTIVE (the brief's own words: "Only
+/// approved/active sellers may sell") — that gate is enforced in
+/// SellersService/product-write services, not here.
 enum SellerStatus {
   APPLIED
   UNDER_REVIEW
+  REJECTED
   APPROVED
   ACTIVE
   SUSPENDED
@@ -1493,10 +1502,20 @@ model Seller {
   contactEmail String
   contactPhone String
 
-  status      SellerStatus @default(APPLIED)
-  appliedAt   DateTime     @default(now())
-  approvedAt  DateTime?
-  suspendedAt DateTime?
+  status        SellerStatus @default(APPLIED)
+  appliedAt     DateTime     @default(now())
+  approvedAt    DateTime?
+  /// Marketplace Phase 2. Set together on reject — mirrors Product.
+  /// rejectionNote's own shape/reasoning exactly.
+  rejectedAt    DateTime?
+  rejectionNote String?
+  suspendedAt   DateTime?
+  deactivatedAt DateTime?
+  /// Marketplace Phase 2 — set on suspend and deactivate alike (an admin
+  /// note explaining either action); nullable and reused across both
+  /// rather than two near-identical fields, since a Seller row is only
+  /// ever in one of those states at a time.
+  statusNote    String?
 
   address       SellerAddress?
   bankAccount   SellerBankAccount?

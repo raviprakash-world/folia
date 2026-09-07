@@ -60,11 +60,61 @@ export const NOTIFICATION_EVENTS = {
   REPLACEMENT_ISSUED: 'notification.replacement_issued',
   PROFILE_UPDATED: 'notification.profile_updated',
   PASSWORD_CHANGED: 'notification.password_changed',
+  /**
+   * Marketplace Phase 2 — the seller-onboarding lifecycle. Emitted from
+   * SellersService itself at each real transition (apply, and every admin
+   * decision), same reasoning as ORDER_STATUS_CHANGED/RETURN_APPROVED
+   * above. Real listeners for these are deferred to a later marketplace
+   * phase — matching this exact codebase's own established precedent
+   * (RETURN_APPROVED/RETURN_REJECTED/STORE_CREDIT_ISSUED/
+   * REPLACEMENT_ISSUED above all shipped with "no listener exists yet" in
+   * their own originating phase too) — not a shortcut invented for this
+   * phase.
+   */
+  SELLER_APPLIED: 'notification.seller_applied',
+  SELLER_APPROVED: 'notification.seller_approved',
+  SELLER_REJECTED: 'notification.seller_rejected',
+  SELLER_SUSPENDED: 'notification.seller_suspended',
+  SELLER_REACTIVATED: 'notification.seller_reactivated',
+  SELLER_DEACTIVATED: 'notification.seller_deactivated',
 } as const;
 
 export interface OrderCancelledPayload {
   orderId: string;
   userId: string;
+}
+
+export interface SellerAppliedPayload {
+  sellerId: string;
+  userId: string;
+}
+
+export interface SellerApprovedPayload {
+  sellerId: string;
+  userId: string;
+}
+
+export interface SellerRejectedPayload {
+  sellerId: string;
+  userId: string;
+  reason: string;
+}
+
+export interface SellerSuspendedPayload {
+  sellerId: string;
+  userId: string;
+  note?: string;
+}
+
+export interface SellerReactivatedPayload {
+  sellerId: string;
+  userId: string;
+}
+
+export interface SellerDeactivatedPayload {
+  sellerId: string;
+  userId: string;
+  note?: string;
 }
 
 export interface OrderReturnRequestedPayload {
