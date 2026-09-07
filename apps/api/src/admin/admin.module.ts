@@ -5,6 +5,7 @@ import { AdminReturnsController } from './admin-returns.controller';
 import { AdminInventoryController } from './admin-inventory.controller';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminSellersController } from './admin-sellers.controller';
+import { AdminSellerProductsController } from './admin-seller-products.controller';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -28,6 +29,7 @@ import { SellersModule } from '../sellers/sellers.module';
     AdminInventoryController,
     AdminUsersController,
     AdminSellersController,
+    AdminSellerProductsController,
   ],
 })
 export class AdminModule {}

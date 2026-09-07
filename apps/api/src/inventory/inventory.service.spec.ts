@@ -52,6 +52,10 @@ function createMockPrisma() {
     inventoryItem: {
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
+      create: jest.fn<
+        Promise<InventoryItemRecord>,
+        [{ data: Record<string, unknown> }]
+      >(),
     },
     product: { update: jest.fn() },
     productVariant: { update: jest.fn() },
@@ -699,5 +703,65 @@ describe('InventoryService.getLowStockItems', () => {
     ]);
     const result = await service.getLowStockItems();
     expect(result.map((i) => i.id)).toEqual(['low']);
+  });
+});
+
+describe('InventoryService.createItem', () => {
+  it('creates the InventoryItem row and syncs the product cache in the same transaction', async () => {
+    const { prisma, tx } = createMockPrisma();
+    const service = new InventoryService(prisma as never);
+    const created = makeItem({
+      id: 'item-new',
+      productId: 'prod-1',
+      variantId: null,
+      warehouseId: 'wh-1',
+      sku: 'PROD-1-ABCD',
+      quantityOnHand: 10,
+      quantityReserved: 0,
+      reorderPoint: 0,
+    });
+    tx.inventoryItem.create.mockResolvedValue(created);
+    // syncProductCache reads inventoryItem.findMany on the SAME tx to
+    // compute the new available total — reflect the row just created.
+    tx.inventoryItem.findMany.mockResolvedValue([created]);
+
+    const result = await service.createItem({
+      productId: 'prod-1',
+      warehouseId: 'wh-1',
+      sku: 'PROD-1-ABCD',
+      quantityOnHand: 10,
+    });
+
+    expect(tx.inventoryItem.create).toHaveBeenCalledWith({
+      data: {
+        productId: 'prod-1',
+        variantId: null,
+        warehouseId: 'wh-1',
+        sku: 'PROD-1-ABCD',
+        quantityOnHand: 10,
+        reorderPoint: 0,
+      },
+    });
+    expect(tx.product.update).toHaveBeenCalledWith({
+      where: { id: 'prod-1' },
+      data: { stockCount: 10, inStock: true },
+    });
+    expect(result).toBe(created);
+  });
+
+  it('defaults reorderPoint to 0 when not provided', async () => {
+    const { prisma, tx } = createMockPrisma();
+    const service = new InventoryService(prisma as never);
+    tx.inventoryItem.create.mockResolvedValue(makeItem());
+
+    await service.createItem({
+      productId: 'prod-1',
+      warehouseId: 'wh-1',
+      sku: 'SKU-1',
+      quantityOnHand: 0,
+    });
+
+    const [createArgs] = tx.inventoryItem.create.mock.calls[0];
+    expect(createArgs.data.reorderPoint).toBe(0);
   });
 });

@@ -60,7 +60,10 @@ export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findMany(query: ProductQueryDto) {
-    const where: Record<string, unknown> = { deletedAt: null };
+    const where: Record<string, unknown> = {
+      deletedAt: null,
+      approvalStatus: 'ACTIVE',
+    };
     if (query.category) where.category = { slug: query.category };
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.price = {
@@ -97,16 +100,28 @@ export class ProductsService {
 
   async findBySlugOrThrow(slug: string): Promise<ProductRecord> {
     const product = await this.prisma.product.findFirst({
-      where: { slug, deletedAt: null },
+      where: { slug, deletedAt: null, approvalStatus: 'ACTIVE' },
       include: PRODUCT_INCLUDE,
     });
     if (!product) throw new NotFoundException('Product not found');
     return product as ProductRecord;
   }
 
+  /**
+   * Marketplace Phase 3 — as of this phase, a Product row can genuinely
+   * be DRAFT/SUBMITTED/UNDER_REVIEW/REJECTED/ARCHIVED (a seller's own
+   * listing, not yet or no longer live), so every read on this
+   * customer/recommendation-facing path filters to approvalStatus:
+   * 'ACTIVE' — every existing admin call site (adminUpdate's own 404
+   * pre-check) is unaffected: an admin-created product is always ACTIVE
+   * (the schema's own column default), so this filter never hides one.
+   * Seller/admin moderation reads use SEPARATE methods
+   * (SellerProductsService) that deliberately do NOT filter here, since
+   * they need to see a seller's own non-ACTIVE rows.
+   */
   async findByIdOrThrow(id: string): Promise<ProductRecord> {
     const product = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, approvalStatus: 'ACTIVE' },
       include: PRODUCT_INCLUDE,
     });
     if (!product) throw new NotFoundException('Product not found');
@@ -127,7 +142,7 @@ export class ProductsService {
   async findManyByIds(ids: string[]): Promise<ProductRecord[]> {
     if (ids.length === 0) return [];
     const products = (await this.prisma.product.findMany({
-      where: { id: { in: ids }, deletedAt: null },
+      where: { id: { in: ids }, deletedAt: null, approvalStatus: 'ACTIVE' },
       include: PRODUCT_INCLUDE,
     })) as ProductRecord[];
     // findMany does not preserve the input array's order — re-sort to

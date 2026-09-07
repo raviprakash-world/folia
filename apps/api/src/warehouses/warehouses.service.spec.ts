@@ -12,6 +12,7 @@ function createMockPrisma() {
     warehouse: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
   };
@@ -73,6 +74,30 @@ describe('WarehousesService', () => {
     });
     expect(tx.warehouse.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ code: 'SECOND', isDefault: true }),
+    });
+  });
+
+  describe('getDefaultOrThrow', () => {
+    it('returns the warehouse marked default', async () => {
+      const { prisma } = createMockPrisma();
+      const warehouse = { id: 'wh-1', code: 'MAIN', isDefault: true };
+      prisma.warehouse.findFirst.mockResolvedValue(warehouse);
+      const service = new WarehousesService(prisma as never);
+
+      await expect(service.getDefaultOrThrow()).resolves.toBe(warehouse);
+      expect(prisma.warehouse.findFirst).toHaveBeenCalledWith({
+        where: { isDefault: true },
+      });
+    });
+
+    it('throws NotFoundException when no warehouse is marked default — a configuration error, not a normal runtime state', async () => {
+      const { prisma } = createMockPrisma();
+      prisma.warehouse.findFirst.mockResolvedValue(null);
+      const service = new WarehousesService(prisma as never);
+
+      await expect(service.getDefaultOrThrow()).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

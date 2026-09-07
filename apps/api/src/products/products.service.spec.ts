@@ -95,6 +95,25 @@ describe('ProductsService.findMany', () => {
     );
   });
 
+  it('Marketplace Phase 3: excludes non-ACTIVE products (a seller draft/submission never appears in the public marketplace)', async () => {
+    const prisma = createMockPrisma();
+    prisma.$transaction.mockResolvedValue([0, []]);
+    const service = new ProductsService(prisma as never);
+
+    await service.findMany({ page: 1, pageSize: 12 });
+
+    expect(prisma.product.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ approvalStatus: 'ACTIVE' }),
+      }),
+    );
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ approvalStatus: 'ACTIVE' }),
+      }),
+    );
+  });
+
   it('computes totalPages correctly, always at least 1 even with zero results', async () => {
     const prisma = createMockPrisma();
     prisma.$transaction.mockResolvedValue([0, []]);
@@ -150,7 +169,9 @@ describe('ProductsService.findByIdOrThrow', () => {
     const service = new ProductsService(prisma as never);
     await service.findByIdOrThrow('prod-1').catch(() => undefined);
     expect(prisma.product.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'prod-1', deletedAt: null } }),
+      expect.objectContaining({
+        where: { id: 'prod-1', deletedAt: null, approvalStatus: 'ACTIVE' },
+      }),
     );
   });
 

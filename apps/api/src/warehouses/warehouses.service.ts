@@ -27,6 +27,26 @@ export class WarehousesService {
     return warehouse as WarehouseRecord;
   }
 
+  /**
+   * Marketplace Phase 3 — used wherever a caller needs "the" warehouse
+   * without asking a customer/seller to pick one (a seller's new
+   * product's initial stock has to go somewhere). Throws if none has
+   * been seeded/marked default — a real configuration error, not a
+   * normal runtime state, mirroring RolesService.getDefaultRoleOrThrow's
+   * exact shape.
+   */
+  async getDefaultOrThrow(): Promise<WarehouseRecord> {
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { isDefault: true },
+    });
+    if (!warehouse) {
+      throw new NotFoundException(
+        'No default warehouse is configured — seed one with isDefault: true.',
+      );
+    }
+    return warehouse;
+  }
+
   async create(input: {
     code: string;
     name: string;

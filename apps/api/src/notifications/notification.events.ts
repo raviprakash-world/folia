@@ -77,6 +77,19 @@ export const NOTIFICATION_EVENTS = {
   SELLER_SUSPENDED: 'notification.seller_suspended',
   SELLER_REACTIVATED: 'notification.seller_reactivated',
   SELLER_DEACTIVATED: 'notification.seller_deactivated',
+  /**
+   * Marketplace Phase 3 — the seller product moderation lifecycle. Same
+   * "emit now, listener deferred" precedent as the Phase 2 SELLER_*
+   * events above. PRODUCT_REJECTED covers both SellerProductsService.
+   * adminReject and adminRequestChanges (they share one mechanism — see
+   * RejectSellerProductDto's own comment) — a future listener reads
+   * whichever admin action name is on the paired audit log entry if it
+   * ever needs to distinguish the two in a notification's wording.
+   */
+  PRODUCT_SUBMITTED: 'notification.product_submitted',
+  PRODUCT_APPROVED: 'notification.product_approved',
+  PRODUCT_REJECTED: 'notification.product_rejected',
+  PRODUCT_DEACTIVATED: 'notification.product_deactivated',
 } as const;
 
 export interface OrderCancelledPayload {
@@ -115,6 +128,27 @@ export interface SellerDeactivatedPayload {
   sellerId: string;
   userId: string;
   note?: string;
+}
+
+export interface ProductSubmittedPayload {
+  productId: string;
+  sellerId: string;
+}
+
+export interface ProductApprovedPayload {
+  productId: string;
+  sellerId: string;
+}
+
+export interface ProductRejectedPayload {
+  productId: string;
+  sellerId: string;
+  reason: string;
+}
+
+export interface ProductDeactivatedPayload {
+  productId: string;
+  sellerId: string;
 }
 
 export interface OrderReturnRequestedPayload {
