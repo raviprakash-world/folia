@@ -1140,6 +1140,75 @@ describe('ReturnsService.adminGetClaim', () => {
   });
 });
 
+describe('ReturnsService.getMyClaim — Phase 6D-4H', () => {
+  it("scopes the lookup to the caller's own order and returns the claim", async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue(makeAdminRow());
+
+    const result = await service.getMyClaim('user-1', 'order-1');
+
+    expect(prisma.returnRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { orderId: 'order-1', order: { userId: 'user-1' } },
+      }),
+    );
+    expect(result.id).toBe('rr-1');
+  });
+
+  it('never exposes customer identity or which admin decided — only decidedAt/decisionNote', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue(
+      makeAdminRow({
+        decidedBy: 'admin-1',
+        decidedAt: new Date('2026-09-10T12:00:00.000Z'),
+        decisionNote: 'Approved',
+      }),
+    );
+
+    const result = await service.getMyClaim('user-1', 'order-1');
+
+    expect(result).not.toHaveProperty('customer');
+    expect(result.decision).toEqual({
+      decidedAt: '2026-09-10T12:00:00.000Z',
+      decisionNote: 'Approved',
+    });
+    expect(result.decision).not.toHaveProperty('decidedBy');
+  });
+
+  it('never exposes internal refundId/storeCreditEntryId — only customer-meaningful resolution fields', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue(
+      makeAdminRow({
+        resolutionType: 'REFUND',
+        refundAmount: 45.36,
+        refundId: 'refund-1',
+        storeCreditEntry: { id: 'sce-1' },
+      }),
+    );
+
+    const result = await service.getMyClaim('user-1', 'order-1');
+
+    expect(result.resolution).toEqual({
+      resolutionType: 'REFUND',
+      requiresReverseLogistics: null,
+      itemReceivedAt: null,
+      refundAmount: 45.36,
+      replacementOrderId: null,
+    });
+    expect(result.resolution).not.toHaveProperty('refundId');
+    expect(result.resolution).not.toHaveProperty('storeCreditEntryId');
+  });
+
+  it('throws NotFoundException when the order has no claim, or belongs to someone else — identical either way', async () => {
+    const { prisma, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue(null);
+
+    await expect(service.getMyClaim('user-1', 'order-1')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+
 describe('ReturnsService.adminApprove', () => {
   it('transitions PENDING -> APPROVED, records who/when, and returns the updated claim', async () => {
     const { prisma, service, auditService, eventEmitter } = createDeps();

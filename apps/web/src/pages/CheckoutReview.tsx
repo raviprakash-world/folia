@@ -92,6 +92,7 @@ export default function CheckoutReview() {
   const total = computeTotal(subtotal, discount, deliveryCost, tax);
 
   const items: OrderItem[] = cartItems.map((item) => ({
+    id: crypto.randomUUID(),
     productId: item.productId,
     slug: item.slug,
     name: item.name,

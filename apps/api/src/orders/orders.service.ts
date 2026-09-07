@@ -297,7 +297,6 @@ export class OrdersService {
       include: {
         items: true,
         cancellation: true,
-        returnRequest: true,
         payment: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -321,7 +320,6 @@ export class OrdersService {
       include: {
         items: true,
         cancellation: true,
-        returnRequest: true,
         payment: true,
       },
     });
@@ -664,7 +662,6 @@ export class OrdersService {
       include: {
         items: true,
         cancellation: true,
-        returnRequest: true,
         payment: true,
       },
       orderBy: { createdAt: 'desc' },

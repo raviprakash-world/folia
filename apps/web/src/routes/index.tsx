@@ -51,6 +51,8 @@ const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
 const AdminOverview = lazy(() => import('@/pages/AdminOverview'));
 const AdminRevenue = lazy(() => import('@/pages/AdminRevenue'));
 const AdminOrders = lazy(() => import('@/pages/AdminOrders'));
+const AdminReturns = lazy(() => import('@/pages/AdminReturns'));
+const AdminReturnDetail = lazy(() => import('@/pages/AdminReturnDetail'));
 const AdminProducts = lazy(() => import('@/pages/AdminProducts'));
 const AdminCustomers = lazy(() => import('@/pages/AdminCustomers'));
 const AdminSearch = lazy(() => import('@/pages/AdminSearch'));
@@ -124,6 +126,8 @@ export const router = createBrowserRouter([
               { index: true, element: withSuspense(<AdminOverview />) },
               { path: 'revenue', element: withSuspense(<AdminRevenue />) },
               { path: 'orders', element: withSuspense(<AdminOrders />) },
+              { path: 'returns', element: withSuspense(<AdminReturns />) },
+              { path: 'returns/:id', element: withSuspense(<AdminReturnDetail />) },
               { path: 'products', element: withSuspense(<AdminProducts />) },
               { path: 'customers', element: withSuspense(<AdminCustomers />) },
               { path: 'search', element: withSuspense(<AdminSearch />) },

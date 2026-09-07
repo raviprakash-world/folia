@@ -66,6 +66,8 @@ export interface CancellationRequest {
 }
 
 export interface OrderItem {
+  /** Phase 6D-4H — needed to reference a specific line in a return/DOA claim (see types/returnClaim.ts). */
+  id: string;
   productId: string;
   slug: string;
   name: string;

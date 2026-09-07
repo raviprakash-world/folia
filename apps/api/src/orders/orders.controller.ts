@@ -133,6 +133,26 @@ export class OrdersController {
     return this.returnsService.createClaim(user.id, id, dto, evidence ?? []);
   }
 
+  /**
+   * Phase 6D-4H — the caller's own return/DOA claim for this order, if
+   * any. Same underlying record the admin view uses, minus admin-only
+   * fields (see ReturnsService.getMyClaim). 404 both when no claim exists
+   * for this order and when the order itself isn't the caller's own —
+   * ownership is enforced by the query itself, never revealed via a
+   * different error for "wrong owner" vs "doesn't exist".
+   */
+  @Get('orders/:id/returns')
+  @ApiOperation({
+    summary:
+      "The caller's own return/DOA claim for this order, if any — same shape the admin view uses, minus admin-only fields.",
+  })
+  async getMyReturnClaim(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.returnsService.getMyClaim(user.id, id);
+  }
+
   @Get('orders/:id/tracking')
   @ApiOperation({
     summary:

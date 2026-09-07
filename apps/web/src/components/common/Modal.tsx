@@ -9,9 +9,13 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Defaults to 'sm' (max-w-sm) — every existing caller is a short confirm dialog. 'lg' (max-w-lg) is for content with real structure, e.g. a multi-field form. */
+  size?: 'sm' | 'lg';
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+const sizeStyles = { sm: 'max-w-sm', lg: 'max-w-lg' };
+
+export function Modal({ open, onClose, title, children, size = 'sm' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open, onClose);
 
@@ -37,7 +41,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ duration: 0.15 }}
-              className="pointer-events-auto w-full max-w-sm max-h-[90vh] overflow-y-auto bg-stone-light rounded-[var(--radius-card)] shadow-[var(--shadow-lifted)] p-6"
+              className={`pointer-events-auto w-full ${sizeStyles[size]} max-h-[90vh] overflow-y-auto bg-stone-light rounded-[var(--radius-card)] shadow-[var(--shadow-lifted)] p-6`}
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 id="modal-title" className="font-display text-lg font-semibold text-heading">

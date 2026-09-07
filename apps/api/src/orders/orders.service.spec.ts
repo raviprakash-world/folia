@@ -843,6 +843,32 @@ describe('OrdersService.adminFindAll', () => {
       expect.objectContaining({ where: { status: 'SHIPPED' } }),
     );
   });
+
+  /**
+   * Phase 6D-4H — a real, previously-invisible bug: toPublicOrder used to
+   * map a genuinely present Order.returnRequest row through the OLD,
+   * pre-6D toPublicReturn()/elapsed-time-simulated refundStatus, even
+   * though that row is now the SAME ReturnRequest a real 6D claim lives
+   * in — showing a still-PENDING or REJECTED claim as a fake "refunded"
+   * status once enough wall-clock time passed. Fixed by always returning
+   * null (see order.types.ts's own doc comment on this).
+   */
+  it('never exposes a real ReturnRequest row through the legacy returnRequest field, even when the include would have returned one', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findMany.mockResolvedValue([
+      makeCreatedOrder({
+        returnRequest: {
+          reason: 'CHANGED_MIND',
+          note: null,
+          requestedAt: new Date('2020-01-01T00:00:00.000Z'), // ancient — would simulate "refunded" under the old elapsed-time logic
+        },
+      }),
+    ]);
+
+    const [order] = await service.adminFindAll();
+
+    expect(order.returnRequest).toBeNull();
+  });
 });
 
 describe('OrdersService.adminUpdateStatus', () => {

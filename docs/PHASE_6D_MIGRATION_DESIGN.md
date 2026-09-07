@@ -685,3 +685,124 @@ path race described above. `actorId` is the refund's own real, affected
 own system-refund audits — `actorType` lives inside `metadata`, matching
 `PaymentsService`'s own audit shape, since `AuditService`'s general
 `LogAuditInput` has no dedicated top-level field for it).
+
+# Phase 6D-4H — Admin/Customer Frontend for Returns: design notes
+
+The first frontend work in Phase 6D — every backend piece from 6D-1
+through 6D-4G had no UI until now. Two small backend additions were
+needed to support it; everything else is `apps/web`.
+
+## Backend addition 1 — a customer-scoped claim-read endpoint
+
+No endpoint let a customer read their own claim's status; only
+`POST /orders/:id/returns` (create) and the admin-only routes existed.
+New `GET /orders/:id/returns` /`ReturnsService.getMyClaim(userId, orderId)`
+closes this — ownership-scoped via the query itself (same convention as
+every other customer-facing lookup in this codebase), and reuses
+`toAdminRecord` entirely rather than duplicating its mapping, stripping
+only what a customer shouldn't see (`customer` identity, `decision.
+decidedBy`, and the internal `refundId`/`storeCreditEntryId` row
+pointers) while keeping everything customer-meaningful (status,
+resolution type/amount, `itemReceivedAt`, `replacementOrderId`).
+
+## Backend addition 2 — `OrderItem.id` exposed publicly
+
+The public `Order`/`OrderItem` shape never included each item's own id,
+even though the underlying Prisma row always has one. A return/DOA claim
+form needs to reference a *specific* line
+(`CreateReturnClaimDto.items[].orderItemId`), so this was a real, blocking
+gap — added `id` to `OrderItemRecord`/`toPublicOrder`'s mapping (backend)
+and the frontend's `OrderItem` type, plus a `crypto.randomUUID()` id at
+the one place the local-mock checkout path constructs order items
+(`CheckoutReview.tsx`), matching that file's own existing convention for
+generating client-side ids.
+
+## A real bug found and fixed during live verification: the OLD `Order.returnRequest` field
+
+Live-testing the new claim status card surfaced a genuine, previously
+invisible production bug: `Order.returnRequest` (the DB relation) is the
+*same* `ReturnRequest` row Phase 6D's entire claim system reads and
+writes — see that model's own schema comment, "Phase 6D rewrite of the
+original whole-order, always-auto-approved ReturnRequest." But
+`toPublicOrder`'s mapping of that field (`toPublicReturn`) was never
+updated when 6D repurposed the model: it still simulated `refundStatus`
+from elapsed time since `requestedAt` (a pre-6D concept with no notion of
+claim type, approval, or resolution), so a real claim that was still
+`PENDING` — or had been `REJECTED` — would show as "refunded" once enough
+wall-clock time passed. This was invisible until this phase's UI put a
+real claim's *two* status representations (the old field, the new
+`getMyClaim` endpoint) on screen at once and they visibly disagreed.
+
+Fixed by making `toPublicOrder` always return `returnRequest: null`
+(permanently, not just "for a freshly created order" as the old comment
+said) and deleting the now-dead `toPublicReturn`/`ReturnRequestRecord`
+mapping entirely, plus dropping the now-unnecessary `returnRequest: true`
+Prisma `include` from the three callers that only ever used it for that
+mapping (`findOneForUser`, `findAllForUser`, `adminFindAll`).
+`OrdersService.getTracking`'s own separate use of `returnRequest.
+requestedAt` (to freeze the tracking simulation once a claim exists) was
+deliberately left untouched — that use is still correct and doesn't route
+through the buggy mapping at all. `ReturnsService.getMyClaim` (this
+phase's own new endpoint) is now the sole, correct source for a
+customer's claim status.
+
+## Frontend structure
+
+Followed the existing app's conventions exactly rather than introducing
+new patterns: `types/returnClaim.ts` mirrors the backend's public shapes
+1:1 (three variants — creation response, customer detail, admin detail —
+matching `ReturnsService`'s own three-shape split); `services/
+returnsApiService.ts` (customer) and `services/adminReturnsApiService.ts`
+(admin) are thin `apiClient` wrappers with no business logic, matching
+`ordersApiService.ts`/`adminApiService.ts`'s own split; `hooks/
+useReturnClaim.ts` and `hooks/useAdminReturns.ts` wrap them in
+`@tanstack/react-query`, gated by the same `VITE_REAL_ORDERS_API`/
+`VITE_REAL_ADMIN_API` flags every other real-backend feature in this app
+already uses — there is no local-mock equivalent for the new multi-item
+claim model (matching `useOrder`'s own precedent for `reorder()`: "no
+local-path equivalent... duplicating that logic here would be exactly the
+kind of redundant service this project has avoided").
+
+Customer-facing: `ReturnClaimForm.tsx` derives claim type (`doa-claim` vs
+`standard-return`) client-side from selected items' `categorySlug`,
+mirroring `deriveClaimType`'s exact plant-vs-non-plant rule, and filters
+the reason dropdown to match — the backend re-validates all of this
+regardless, but showing only reasons/evidence requirements that can
+actually succeed avoids a confusing rejection after upload. Multipart
+`FormData` submission follows this app's very first real file-upload-to-
+backend implementation (the existing avatar-upload code is mock-only,
+`localStorage`-backed) — `Content-Type` is deliberately left for axios to
+set itself for a `FormData` body. `ReturnClaimStatus.tsx` replaces the
+old whole-order return `Alert` for real-mode orders. The OLD mock-mode
+return modal in `AccountOrderDetail.tsx` was left completely untouched —
+real and mock mode now render entirely different modals, since the
+backend endpoint the old flow depended on
+(`POST /orders/:id/return`) no longer exists server-side (see 6D-3's own
+design notes above).
+
+Admin-facing: `AdminReturns.tsx` (queue, status-tab filtered, paginated)
+and `AdminReturnDetail.tsx` (full detail + all four actions: approve,
+reject, resolve, mark-item-received) follow `AdminOrders.tsx`/
+`AdminProducts.tsx`'s established table/modal/mutation conventions
+exactly — one `useMutation` per action, invalidating both the detail and
+every list query on success, decision forms (approve/reject) as
+lightweight in-`Modal` `useState` forms matching `AccountOrderDetail.tsx`'s
+own cancel/return modals, not upgraded to react-hook-form given their
+small size. `Modal` gained an optional `size?: 'sm' | 'lg'` prop
+(backward compatible, defaults to the existing `max-w-sm` for every
+current caller) since the claim form's real structure doesn't fit the
+tiny confirm-dialog width every other `Modal` use assumed.
+
+## Live verification
+
+Full round trip verified against the real backend in a real browser:
+customer files a claim (both a DOA/plant selection, confirming evidence-
+required UI and the DOA-only reason filter render correctly, and a
+non-plant standard-return, submitted end-to-end) → claim appears
+correctly in the admin queue and detail page → approved (with an explicit
+`requiresReverseLogistics` override tested both ways) → resolved (COD →
+store credit, exact prorated amount matching the backend formula) →
+customer's status card reflects the resolution. Separately verified
+`reject` (decision note shown to the customer) and `mark-item-received`
+(the one action gated behind the reverse-logistics default) each in
+isolation. All test data cleaned up afterward.

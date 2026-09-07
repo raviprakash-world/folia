@@ -742,6 +742,47 @@ export class ReturnsService {
     };
   }
 
+  /**
+   * Phase 6D-4H — the customer-facing counterpart to adminGetClaim: same
+   * underlying row and mostly the same shape (reused via toAdminRecord,
+   * not duplicated), scoped to the caller's own order and redacted of
+   * fields that are either meaningless to a customer (internal Refund/
+   * StoreCreditEntry row ids) or another customer's/admin's identity
+   * (`customer`, `decision.decidedBy` — which admin acted, as opposed to
+   * decidedAt/decisionNote, which the customer needs to see the outcome
+   * and reason). Ownership is enforced by the WHERE clause itself, same
+   * convention as createClaim's own order lookup — never a separate
+   * fetch-then-compare-userId check.
+   */
+  async getMyClaim(userId: string, orderId: string) {
+    const row = await this.prisma.returnRequest.findFirst({
+      where: { orderId, order: { userId } },
+      include: ADMIN_RETURN_INCLUDE,
+    });
+    if (!row) throw new NotFoundException('Return request not found.');
+
+    const {
+      customer: _customer,
+      decision,
+      resolution,
+      ...rest
+    } = this.toAdminRecord(row);
+    return {
+      ...rest,
+      decision: {
+        decidedAt: decision.decidedAt,
+        decisionNote: decision.decisionNote,
+      },
+      resolution: {
+        resolutionType: resolution.resolutionType,
+        requiresReverseLogistics: resolution.requiresReverseLogistics,
+        itemReceivedAt: resolution.itemReceivedAt,
+        refundAmount: resolution.refundAmount,
+        replacementOrderId: resolution.replacementOrderId,
+      },
+    };
+  }
+
   // --- Phase 6D-4B: financial resolution for an already-APPROVED claim ---
   //
   // Resolution type is never accepted from the client — it is derived
