@@ -1017,6 +1017,32 @@ enum ReturnResolutionType {
   FOLIA_STORE_CREDIT
 }
 
+/// Phase 6D-4E — closes the KNOWN GAP documented in Phase 6D-4B's own
+/// design notes (docs/PHASE_6D_MIGRATION_DESIGN.md): once a prepaid
+/// claim's refundAmount is frozen, ReturnRequestStatus alone cannot tell
+/// "a refund attempt is currently calling Razorpay" apart from "a
+/// previous attempt failed and this is a safe retry" — both look
+/// identical (status still APPROVED, refundAmount already frozen). This
+/// state lives ONLY on the prepaid path; COD and REPLACEMENT have no such
+/// gap (see their own resolution methods' comments) and never touch this
+/// field.
+/// - NONE: never attempted (the default, and irrelevant again the moment
+///   status moves to REFUND_ISSUED, since that main status field is
+///   itself the permanent record of success).
+/// - IN_PROGRESS: a PaymentsService.refund() call is in flight. A second
+///   resolveClaim() call arriving while this is set is refused — this
+///   codebase cannot safely assume an in-flight call is dead, only that
+///   it has NOT yet reached a terminal state.
+/// - FAILED_RETRYABLE: the last attempt's gateway call failed (network
+///   error, Razorpay rejection, etc.) and PaymentsService.refund()'s own
+///   Refund row already reflects FAILED — safe to retry with the SAME
+///   frozen refundAmount, never recomputed.
+enum ReturnRefundAttemptState {
+  NONE
+  IN_PROGRESS
+  FAILED_RETRYABLE
+}
+
 /// Matches apps/web/src/types/order.ts's CancellationRequest. Deliberately
 /// has NO refundStatus column — apps/web/src/utils/refund.ts's
 /// deriveRefundStatus() computes it from elapsed time since requestedAt
@@ -1099,6 +1125,11 @@ model ReturnRequest {
   /// REFUND and FOLIA_STORE_CREDIT resolutions (REPLACEMENT has none —
   /// stays null).
   refundAmount Decimal? @db.Decimal(10, 2)
+
+  /// Phase 6D-4E — see ReturnRefundAttemptState's own comment for the full
+  /// reasoning. Meaningful only for the prepaid REFUND path; COD/
+  /// REPLACEMENT resolutions never read or write this field.
+  refundAttemptState ReturnRefundAttemptState @default(NONE)
 
   /// Set once PaymentsService.refund() resolves successfully (REFUND
   /// resolutions only) — the pointer lives here, not on Refund, so that

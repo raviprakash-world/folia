@@ -749,30 +749,28 @@ export class ReturnsService {
   // phase. Nothing here calls the Razorpay SDK directly — the only
   // gateway path is PaymentsService.refund() itself.
   //
-  // KNOWN GAP (see docs/PHASE_6D_MIGRATION_DESIGN.md): the existing
-  // ReturnRequestStatus enum cannot distinguish "a prepaid refund attempt
-  // is currently in flight" from "a previous attempt failed and this is
-  // a safe retry" — both look identical (status still APPROVED,
+  // Phase 6D-4E closed the KNOWN GAP originally documented here (still
+  // preserved in docs/PHASE_6D_MIGRATION_DESIGN.md's history): the
+  // ReturnRequestStatus enum alone cannot distinguish "a prepaid refund
+  // attempt is currently in flight" from "a previous attempt failed and
+  // this is a safe retry" — both look identical (status still APPROVED,
   // refundAmount already frozen). PaymentsService.refund()'s own
   // aggregate guard protects the PAYMENT's total from being over-
   // refunded, but does NOT protect this ONE LOGICAL CLAIM from being
-  // refunded twice if the payment has enough remaining headroom to
-  // absorb a second, independently-valid-looking refund() call — a real
-  // double-refund risk if a second prepaid resolve() attempt were allowed
-  // to proceed under that ambiguity. Given that, this implementation
-  // deliberately ERRS TOWARD FINANCIAL SAFETY: once a prepaid claim's
-  // refundAmount is frozen, any further resolveClaim() call is refused
-  // with a clean conflict rather than risking a second gateway attempt —
-  // by design, this means an admin cannot self-service-retry a failed
-  // prepaid resolution through this same action; closing that safely
-  // requires a small additive schema change (a distinct transient
-  // status, e.g. a "financial resolution in progress/failed" value) that
-  // has NOT been made without approval, per this phase's explicit
-  // instruction to report rather than invent an unsafe workaround.
+  // refunded twice if the payment has enough remaining headroom to absorb
+  // a second, independently-valid-looking refund() call. The added
+  // ReturnRequest.refundAttemptState column (NONE / IN_PROGRESS /
+  // FAILED_RETRYABLE — see its own schema comment) is exactly that
+  // missing state: the atomic gate below claims the right to attempt (or
+  // retry) a prepaid refund via a single conditional update whose WHERE
+  // clause requires `refundAttemptState != IN_PROGRESS`, so a genuinely
+  // in-flight attempt still blocks a second caller, while a FAILED_
+  // RETRYABLE (or legacy pre-migration NONE) claim can now be safely
+  // retried with the SAME frozen amount, never recomputed.
   // COD has no such gap: StoreCreditEntry.returnRequestId's own unique
   // constraint is a single, instantaneous, airtight guard (no external
   // gateway call sits between "decide to create" and "actually create"),
-  // so COD resolution is always safe to retry.
+  // so COD resolution has always been safe to retry.
 
   async resolveClaim(adminId: string, id: string, ipAddress?: string) {
     const row = await this.prisma.returnRequest.findUnique({
@@ -817,22 +815,21 @@ export class ReturnsService {
 
     const isCod = row.order.paymentMethod === 'COD';
 
+    // The refund amount is deterministic given immutable order/item data —
+    // computing it once here (whether this is truly the first time, or a
+    // retry re-deriving the SAME value the earlier attempt already froze)
+    // means the atomic gates below never need to branch on which case
+    // they're in; writing this value is always either a genuine freeze or
+    // a harmless no-op re-write of the value already there.
     let frozenAmount: number;
     if (row.refundAmount != null) {
-      // A previous attempt (this claim's first, or a concurrent racer)
-      // already froze the amount. See the KNOWN GAP note above.
-      if (!isCod) {
-        throw new ConflictException(
-          'A financial resolution attempt for this claim has already been initiated and cannot be automatically retried — manual review is required.',
-        );
-      }
       frozenAmount = Number(row.refundAmount);
     } else {
       const eligibleItemSubtotal = row.items.reduce(
         (sum, item) => sum + Number(item.orderItem.price) * item.quantity,
         0,
       );
-      const computed = calculateRefundAmount({
+      frozenAmount = calculateRefundAmount({
         claimType: row.claimType,
         reason: row.reason,
         orderSubtotal: Number(row.order.subtotal),
@@ -840,47 +837,70 @@ export class ReturnsService {
         orderTax: Number(row.order.tax),
         eligibleItemSubtotal,
       });
-      if (computed <= 0) {
+      if (frozenAmount <= 0) {
         throw new BadRequestException(
           'The computed refund amount for this claim is zero — there is nothing to resolve.',
         );
       }
-
-      // Deterministic given immutable order/item data — freezing it is
-      // the real, atomic gate: exactly one of two concurrent first-time
-      // callers wins this conditional update (Postgres serializes
-      // concurrent UPDATEs to the same row), the same idiom this
-      // codebase already uses for PaymentsService.confirmCapture and
-      // Phase 6D-4A's own approve/reject transitions.
-      const { count } = await this.prisma.returnRequest.updateMany({
-        where: { id, status: 'APPROVED', refundAmount: null },
-        data: { refundAmount: computed },
-      });
-
-      if (count === 1) {
-        frozenAmount = computed;
-      } else {
-        // Lost the freeze race — re-read fresh state rather than assume
-        // why. Someone else may have already finished (idempotent
-        // return) or may have just frozen the amount a moment ago (the
-        // KNOWN GAP case for prepaid; safe to proceed for COD).
-        const fresh = await this.prisma.returnRequest.findUniqueOrThrow({
-          where: { id },
-          select: { status: true, refundAmount: true },
-        });
-        if (fresh.status !== 'APPROVED') return this.adminGetClaim(id);
-        if (!isCod) {
-          throw new ConflictException(
-            'A financial resolution attempt for this claim is already in progress.',
-          );
-        }
-        frozenAmount = Number(fresh.refundAmount);
-      }
     }
 
     if (isCod) {
+      // COD has always been safe to retry (see the block comment above) —
+      // a plain conditional freeze-if-null is sufficient; no attempt-state
+      // tracking needed.
+      if (row.refundAmount == null) {
+        // Exactly one of two concurrent first-time callers wins this
+        // conditional update (Postgres serializes concurrent UPDATEs to
+        // the same row), the same idiom this codebase already uses for
+        // PaymentsService.confirmCapture and Phase 6D-4A's own
+        // approve/reject transitions.
+        const { count } = await this.prisma.returnRequest.updateMany({
+          where: { id, status: 'APPROVED', refundAmount: null },
+          data: { refundAmount: frozenAmount },
+        });
+        if (count === 0) {
+          const fresh = await this.prisma.returnRequest.findUniqueOrThrow({
+            where: { id },
+            select: { status: true, refundAmount: true },
+          });
+          if (fresh.status !== 'APPROVED') return this.adminGetClaim(id);
+          frozenAmount = Number(fresh.refundAmount);
+        }
+      }
       return this.resolveCodStoreCredit(adminId, row, frozenAmount, ipAddress);
     }
+
+    // Prepaid — Phase 6D-4E's attempt-state gate. One atomic conditional
+    // update covers BOTH a true first attempt and a safe retry: the WHERE
+    // clause requires refundAttemptState isn't currently IN_PROGRESS
+    // (blocking a genuinely in-flight attempt, whether this is anyone's
+    // first try or a retry), and the write both freezes/re-writes
+    // refundAmount and claims IN_PROGRESS in the same statement. Of two
+    // concurrent callers (first-time or retry), Postgres serializes the
+    // UPDATEs to this row, so exactly one sees count===1.
+    const { count } = await this.prisma.returnRequest.updateMany({
+      where: {
+        id,
+        status: 'APPROVED',
+        refundAttemptState: { not: 'IN_PROGRESS' },
+      },
+      data: { refundAttemptState: 'IN_PROGRESS', refundAmount: frozenAmount },
+    });
+
+    if (count === 0) {
+      // Lost the race — re-read fresh state rather than assume why.
+      // Someone else may have already finished (idempotent return) or may
+      // have just claimed IN_PROGRESS a moment ago.
+      const fresh = await this.prisma.returnRequest.findUniqueOrThrow({
+        where: { id },
+        select: { status: true },
+      });
+      if (fresh.status !== 'APPROVED') return this.adminGetClaim(id);
+      throw new ConflictException(
+        'A financial resolution attempt for this claim is already in progress.',
+      );
+    }
+
     return this.resolvePrepaidRefund(adminId, row, frozenAmount, ipAddress);
   }
 
@@ -997,6 +1017,12 @@ export class ReturnsService {
           status: 'REFUND_ISSUED',
           resolutionType: 'REFUND',
           refundId: result.id,
+          // Phase 6D-4E — tidiness, not correctness: once status is
+          // REFUND_ISSUED, resolveClaim's own idempotent-return check
+          // short-circuits before ever reading this field again, but a
+          // reviewer inspecting a successful row shouldn't see a stale
+          // IN_PROGRESS sitting there.
+          refundAttemptState: 'NONE',
         },
       });
 
@@ -1016,9 +1042,19 @@ export class ReturnsService {
       return this.adminGetClaim(row.id);
     } catch (err) {
       // ReturnRequest.status deliberately stays APPROVED here — never a
-      // fake success — and refundAmount stays frozen. See the KNOWN GAP
-      // note above for why this phase does not attempt an automatic
-      // same-endpoint retry.
+      // fake success — and refundAmount stays frozen. Phase 6D-4E: unlike
+      // before, this is no longer a permanent dead end — flipping
+      // refundAttemptState to FAILED_RETRYABLE is what lets a future
+      // resolveClaim() call safely retry with this SAME frozen amount.
+      // The `where: { refundAttemptState: 'IN_PROGRESS' }` guard means
+      // this write is a no-op if a concurrent caller somehow already
+      // moved this claim on (e.g. to REFUND_ISSUED) — never overwrites a
+      // real success.
+      await this.prisma.returnRequest.updateMany({
+        where: { id: row.id, refundAttemptState: 'IN_PROGRESS' },
+        data: { refundAttemptState: 'FAILED_RETRYABLE' },
+      });
+
       await this.auditService.log({
         actorId: adminId,
         action: 'RETURN_REFUND_FAILED',

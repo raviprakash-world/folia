@@ -431,3 +431,94 @@ requiring this) is a `ConflictException` naming the actual state.
 an admin now needs to see not just whether the item is required back but
 whether it has actually arrived — the same field `resolveClaim`'s own
 gate reads.
+
+# Phase 6D-4E — Prepaid Refund Retry Gap: design notes
+
+**This phase required a real migration** — the first schema change since
+6D-1. Every prior 6D-4 sub-phase (4B, 4C, 4D) deliberately avoided one;
+this is the one gap that genuinely could not be closed without adding a
+new column, exactly as 6D-4B's own report predicted.
+
+## Pre-existing migration drift discovered (and how it was resolved, without touching data)
+
+Before this migration could be generated, `prisma migrate dev` refused to
+run: it detected that `20260906095155_phase5_real_shipping_courier`'s
+committed file checksum no longer matched the checksum recorded in
+`_prisma_migrations` at apply time, and offered to fix it by **resetting
+the entire dev database** (dropping all data). This was refused —
+resetting a database to fix a bookkeeping checksum is not an acceptable
+trade. Investigation confirmed this was pre-existing drift unrelated to
+this phase (likely the migration file's comment text was edited sometime
+after it was first applied, in an earlier part of this project's history,
+without ever re-running the migration): `git log` shows the file has only
+ever had one commit, and the live database's actual `orders` table
+structure (`courierId`/`trackingNumber` nullable text, `trackingUrl`,
+`shippedAt`) already exactly matches what the current committed file
+describes — the only mismatch is the stored checksum, not the real
+schema. `prisma migrate resolve --applied` was tried first (the
+documented CLI path for migration bookkeeping issues) but refused with
+P3008 since that command is for migrations not yet marked applied, not a
+checksum-only mismatch on one that is. The checksum was corrected via a
+direct, targeted `UPDATE _prisma_migrations SET checksum = ...` for that
+one row only — no data, no schema, no other migration's bookkeeping
+touched.
+
+## Generating this phase's migration without triggering the same drift-driven reset prompt
+
+With the drift resolved, this phase's actual migration was generated via
+`prisma migrate diff` against a disposable shadow database (created and
+dropped solely for this purpose) rather than `prisma migrate dev` — diff
+replays the real committed migration *files* to build its comparison
+baseline (not their stored checksums), so it doesn't hit the same
+checksum-mismatch code path `migrate dev`'s own drift check uses. The
+generated SQL was written into a normal timestamped migration folder and
+applied with `prisma migrate deploy` (the same command a real deployment
+pipeline would use), which likewise applies pending migrations by name
+without doing `migrate dev`'s destructive-reset-on-drift dance.
+
+## The fix itself
+
+New enum `ReturnRefundAttemptState` (`NONE` / `IN_PROGRESS` /
+`FAILED_RETRYABLE`) and a new `ReturnRequest.refundAttemptState` column
+(`NOT NULL DEFAULT 'NONE'` — safe against existing rows with no backfill
+step needed, since `NONE` is the correct value for every row that
+predates this field). Meaningful only on the prepaid REFUND path; COD and
+REPLACEMENT never read or write it — see the KNOWN GAP analysis in 6D-4B's
+own notes above for why those two paths never needed this.
+
+`resolveClaim`'s prepaid branch now uses **one atomic conditional update**
+for both the true-first-attempt and the safe-retry case:
+```
+updateMany({
+  where: { id, status: 'APPROVED', refundAttemptState: { not: 'IN_PROGRESS' } },
+  data: { refundAttemptState: 'IN_PROGRESS', refundAmount: frozenAmount },
+})
+```
+`frozenAmount` is computed once beforehand from the immutable order/item
+snapshot (identical to before), so this single write is either a genuine
+first freeze or a harmless re-write of the value already there. The WHERE
+clause is the entire safety property: a claim currently `IN_PROGRESS`
+cannot be touched by anyone else, while `NONE` or `FAILED_RETRYABLE`
+(including a **legacy claim frozen before this migration ran**, which
+defaults to `NONE`) can proceed. `PaymentsService.refund()`'s success path
+resets this to `NONE` for tidiness (functionally moot once `status`
+becomes `REFUND_ISSUED`, since `resolveClaim`'s own idempotent-return
+check short-circuits before this field is ever read again); its failure
+path flips it to `FAILED_RETRYABLE`, guarded by
+`where: { refundAttemptState: 'IN_PROGRESS' }` so a concurrent success
+elsewhere can never be overwritten by a stale failure handler.
+
+## Residual limitation, reported rather than solved
+
+A genuine **process crash** between claiming `IN_PROGRESS` and reaching
+either the success or failure branch would leave a claim permanently
+stuck at `IN_PROGRESS` — there is no timeout/staleness sweep (unlike
+`PaymentsService.expireStalePayments` or
+`InventoryService.releaseExpiredReservations`, which this codebase already
+has for analogous problems elsewhere). This was a deliberate scope
+decision: the literal ask was to make a **failed gateway call** retryable,
+which `PaymentsService.refund()`'s own try/catch already surfaces cleanly
+as a rejected promise for every realistic failure (declined, network
+error, timeout) — a mid-call infra crash is a materially different, rarer
+failure category, and adding a time-based recovery sweep for it was not
+asked for and was not built here.

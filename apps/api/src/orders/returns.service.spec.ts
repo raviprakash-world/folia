@@ -1555,6 +1555,7 @@ function makeResolutionRow(overrides: Record<string, unknown> = {}) {
     reason: 'WRONG_ITEM',
     status: 'APPROVED',
     refundAmount: null,
+    refundAttemptState: 'NONE',
     resolutionType: null,
     items: [
       {
@@ -1772,6 +1773,7 @@ describe('ReturnsService.resolveClaim — prepaid refund', () => {
         status: 'REFUND_ISSUED',
         resolutionType: 'REFUND',
         refundId: 'refund-1',
+        refundAttemptState: 'NONE',
       },
     });
   });
@@ -1795,22 +1797,93 @@ describe('ReturnsService.resolveClaim — prepaid refund', () => {
 
     const [[loggedInput]] = auditService.log.mock.calls;
     expect(loggedInput.action).toBe('RETURN_REFUND_FAILED');
+
+    // Phase 6D-4E — this is what makes a future retry possible.
+    const retryableUpdate = prisma.returnRequest.updateMany.mock.calls.find(
+      (call) => call[0].data.refundAttemptState === 'FAILED_RETRYABLE',
+    );
+    expect(retryableUpdate![0]).toEqual({
+      where: { id: 'rr-1', refundAttemptState: 'IN_PROGRESS' },
+      data: { refundAttemptState: 'FAILED_RETRYABLE' },
+    });
   });
 
-  it('never creates a duplicate refund on repeated resolution once the amount is frozen — a clean conflict instead', async () => {
+  it('refuses a second resolve attempt while a prepaid refund is already IN_PROGRESS', async () => {
     const { prisma, paymentsService, service } = createDeps();
-    // Simulates: a first call already froze refundAmount (whether it
-    // succeeded, failed, or is a concurrent racer — see the KNOWN GAP
-    // doc comment in returns.service.ts for why prepaid can't safely
-    // distinguish these).
     prisma.returnRequest.findUnique.mockResolvedValue(
-      makeResolutionRow({ refundAmount: 45.36 }),
+      makeResolutionRow({
+        refundAmount: 45.36,
+        refundAttemptState: 'IN_PROGRESS',
+      }),
     );
+    // The attempt-state gate's WHERE (refundAttemptState != IN_PROGRESS)
+    // correctly matches zero rows.
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue({
+      status: 'APPROVED',
+    });
 
     await expect(
       service.resolveClaim('admin-1', 'rr-1', undefined),
     ).rejects.toThrow(ConflictException);
     expect(paymentsService.refund).not.toHaveBeenCalled();
+  });
+
+  it('Phase 6D-4E: safely retries with the SAME frozen amount after a previous prepaid attempt failed (FAILED_RETRYABLE)', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          refundAmount: 45.36,
+          refundAttemptState: 'FAILED_RETRYABLE',
+        }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    // The attempt-state gate's WHERE matches (FAILED_RETRYABLE != IN_PROGRESS).
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    // Retried with the frozen amount, not a freshly recomputed one.
+    expect(paymentsService.refund).toHaveBeenCalledWith(
+      'pay-1',
+      expect.objectContaining({ amount: 45.36 }),
+      expect.anything(),
+    );
+    const [[gateCall]] = prisma.returnRequest.updateMany.mock.calls;
+    expect(gateCall.where).toEqual({
+      id: 'rr-1',
+      status: 'APPROVED',
+      refundAttemptState: { not: 'IN_PROGRESS' },
+    });
+    expect(gateCall.data).toEqual({
+      refundAttemptState: 'IN_PROGRESS',
+      refundAmount: 45.36,
+    });
+  });
+
+  it('Phase 6D-4E: a legacy claim frozen before this migration (refundAttemptState defaults to NONE) can also be safely retried', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({ refundAmount: 45.36, refundAttemptState: 'NONE' }),
+      )
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(paymentsService.refund).toHaveBeenCalled();
   });
 
   it('exactly one of two concurrent first-time resolution attempts proceeds to call PaymentsService.refund()', async () => {
@@ -1829,6 +1902,50 @@ describe('ReturnsService.resolveClaim — prepaid refund', () => {
     prisma.returnRequest.findUniqueOrThrow.mockResolvedValue({
       status: 'APPROVED',
       refundAmount: 45.36,
+    });
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    const [a, b] = await Promise.allSettled([
+      service.resolveClaim('admin-1', 'rr-1', undefined),
+      service.resolveClaim('admin-2', 'rr-1', undefined),
+    ]);
+
+    expect(a.status).toBe('fulfilled');
+    expect(b.status).toBe('rejected');
+    if (b.status === 'rejected') {
+      expect(b.reason).toBeInstanceOf(ConflictException);
+    }
+    expect(paymentsService.refund).toHaveBeenCalledTimes(1);
+  });
+
+  it('Phase 6D-4E: exactly one of two concurrent RETRY attempts on a FAILED_RETRYABLE claim proceeds to call PaymentsService.refund()', async () => {
+    const { prisma, paymentsService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          refundAmount: 45.36,
+          refundAttemptState: 'FAILED_RETRYABLE',
+        }),
+      ) // request A's fetch
+      .mockResolvedValueOnce(
+        makeResolutionRow({
+          refundAmount: 45.36,
+          refundAttemptState: 'FAILED_RETRYABLE',
+        }),
+      ) // request B's fetch
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' })); // A's final adminGetClaim
+    // Both see the claim as FAILED_RETRYABLE and race the SAME atomic
+    // gate — A's CAS to IN_PROGRESS wins (count: 1), B's loses (count: 0).
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // A claims IN_PROGRESS
+      .mockResolvedValueOnce({ count: 0 }) // B loses the retry race
+      .mockResolvedValueOnce({ count: 1 }); // A's success status transition
+    prisma.returnRequest.findUniqueOrThrow.mockResolvedValue({
+      status: 'APPROVED',
     });
     paymentsService.refund.mockResolvedValue({
       id: 'refund-1',
