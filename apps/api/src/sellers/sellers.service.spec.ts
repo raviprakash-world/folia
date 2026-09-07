@@ -212,6 +212,88 @@ describe('SellersService.getPublicStorefront', () => {
   });
 });
 
+describe('SellersService.listPublic', () => {
+  it('Marketplace Phase 16 — only ever queries ACTIVE sellers, same visibility rule as getPublicStorefront', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.count.mockResolvedValue(0);
+    prisma.seller.findMany.mockResolvedValue([]);
+
+    await service.listPublic({});
+
+    expect(prisma.seller.count).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: 'ACTIVE' }) }),
+    );
+    expect(prisma.seller.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: 'ACTIVE' }) }),
+    );
+  });
+
+  it('applies a case-insensitive displayName search filter when given', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.count.mockResolvedValue(0);
+    prisma.seller.findMany.mockResolvedValue([]);
+
+    await service.listPublic({ search: 'fern' });
+
+    expect(prisma.seller.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          displayName: { contains: 'fern', mode: 'insensitive' },
+        }),
+      }),
+    );
+  });
+
+  it('derives each row via the same real productCount/averageRating aggregation as getPublicStorefront, one seller at a time', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.count.mockResolvedValue(1);
+    prisma.seller.findMany.mockResolvedValue([
+      {
+        id: 'seller-1',
+        slug: 'terracotta-and-fern',
+        displayName: 'Terracotta & Fern',
+        description: 'Small-batch planters.',
+        logoUrl: null,
+      },
+    ]);
+    prisma.product.aggregate.mockResolvedValue({
+      _count: { _all: 5 },
+      _avg: { rating: { toNumber: () => 4.2 } },
+    });
+
+    const result = await service.listPublic({ page: 1, pageSize: 12 });
+
+    expect(result.items).toEqual([
+      {
+        id: 'seller-1',
+        slug: 'terracotta-and-fern',
+        displayName: 'Terracotta & Fern',
+        description: 'Small-batch planters.',
+        logoUrl: null,
+        productCount: 5,
+        averageRating: 4.2,
+      },
+    ]);
+    expect(result.total).toBe(1);
+    expect(result.totalPages).toBe(1);
+  });
+
+  it('computes totalPages/skip correctly for page 2, defaulting page/pageSize when omitted', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.count.mockResolvedValue(25);
+    prisma.seller.findMany.mockResolvedValue([]);
+
+    const result = await service.listPublic({ page: 2 });
+
+    expect(prisma.seller.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 12, take: 12 }),
+    );
+    expect(result.totalPages).toBe(3); // ceil(25/12)
+    expect(result.page).toBe(2);
+    expect(result.pageSize).toBe(12);
+  });
+});
+
 describe('SellersService.apply', () => {
   it('creates the Seller + SellerAddress and flips the user role to seller, in one transaction', async () => {
     const { prisma, service } = createDeps();

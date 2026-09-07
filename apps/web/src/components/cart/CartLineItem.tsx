@@ -31,6 +31,7 @@ export function CartLineItem({ item, compact = false }: CartLineItemProps) {
               {item.name}
             </Link>
             {item.variantLabel && <p className="text-xs text-ink-soft mt-0.5">{item.variantLabel}</p>}
+            {item.sellerName && <p className="text-xs text-ink-soft mt-0.5">Sold by {item.sellerName}</p>}
           </div>
           <button
             type="button"

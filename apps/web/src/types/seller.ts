@@ -13,3 +13,18 @@ export interface SellerStorefront {
   productCount: number;
   averageRating: number | null;
 }
+
+/** Marketplace Phase 16 — GET /sellers (the public sellers directory). */
+export interface SellerDirectoryQuery {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface SellerDirectoryResult {
+  items: SellerStorefront[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}

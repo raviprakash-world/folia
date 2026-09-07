@@ -23,6 +23,8 @@ export interface CartItemRecord {
      * to group order items by seller. */
     sellerId: string | null;
     approvalStatus: ProductApprovalStatus;
+    /** Marketplace Phase 16 — null for a Folia-owned line, matching sellerId's own nullability. */
+    seller: { displayName: string } | null;
   };
   variant: { label: string } | null;
 }
@@ -46,6 +48,7 @@ export function toPublicCartItem(item: CartItemRecord) {
     variantId: item.variantId,
     variantLabel: item.variant?.label ?? null,
     quantity: item.quantity,
+    sellerName: item.product.seller?.displayName ?? null,
   };
 }
 

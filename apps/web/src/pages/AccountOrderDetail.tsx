@@ -16,6 +16,7 @@ import { Modal } from '@/components/common/Modal';
 import { Alert } from '@/components/common/Alert';
 import { OrderSummary } from '@/components/order/OrderSummary';
 import { TrackingTimeline } from '@/components/order/TrackingTimeline';
+import { SellerShipments } from '@/components/order/SellerShipments';
 import { ReturnClaimForm } from '@/components/order/ReturnClaimForm';
 import { ReturnClaimStatus } from '@/components/order/ReturnClaimStatus';
 import { ShareButtons } from '@/components/product/ShareButtons';
@@ -320,7 +321,11 @@ export default function AccountOrderDetail() {
 
       <div className="mb-12">
         <h2 className="font-display text-lg font-semibold text-heading mb-4">Delivery tracking</h2>
-        <TrackingTimeline order={order} />
+        {order.sellerGroups && order.sellerGroups.length > 1 ? (
+          <SellerShipments groups={order.sellerGroups} />
+        ) : (
+          <TrackingTimeline order={order} />
+        )}
       </div>
 
       <div className="mb-10">

@@ -13,6 +13,12 @@ export interface ProductSpec {
   value: string;
 }
 
+export interface ProductSeller {
+  id: string;
+  slug: string;
+  displayName: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -31,6 +37,8 @@ export interface Product {
   variants: ProductVariant[];
   specs: ProductSpec[];
   createdAt: string;
+  /** Marketplace Phase 16 — absent for a Folia-owned product, matching the real API's own omit-rather-than-null convention (see toPublicProduct). */
+  seller?: ProductSeller;
 }
 
 export interface Review {

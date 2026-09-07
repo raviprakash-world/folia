@@ -111,6 +111,68 @@ export class SellersService {
   }
 
   /**
+   * Marketplace Phase 16 — the public sellers directory (GET /sellers).
+   * Same visibility rule as getPublicStorefront below: only ACTIVE
+   * sellers, same reasoning. Reuses PublicSellerStorefront's exact shape
+   * for each row (already the right, already-public card shape — no
+   * separate "directory row" type needed) rather than one aggregate
+   * query, mirroring getPublicStorefront's own per-seller
+   * productCount/averageRating derivation exactly; acceptable at
+   * directory-page scale (one page of sellers, not the whole table).
+   */
+  async listPublic(query: {
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const page = query.page || 1;
+    const pageSize = query.pageSize || 12;
+    const where: Prisma.SellerWhereInput = {
+      status: 'ACTIVE',
+      ...(query.search
+        ? { displayName: { contains: query.search, mode: 'insensitive' } }
+        : {}),
+    };
+
+    const [total, sellers] = await this.prisma.$transaction([
+      this.prisma.seller.count({ where }),
+      this.prisma.seller.findMany({
+        where,
+        orderBy: { displayName: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    const items = await Promise.all(
+      sellers.map(async (seller) => {
+        const aggregate = await this.prisma.product.aggregate({
+          where: {
+            sellerId: seller.id,
+            approvalStatus: 'ACTIVE',
+            deletedAt: null,
+          },
+          _count: { _all: true },
+          _avg: { rating: true },
+        });
+        return toPublicSellerStorefront(
+          seller,
+          aggregate._count._all,
+          aggregate._avg.rating?.toNumber() ?? null,
+        );
+      }),
+    );
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
+  }
+
+  /**
    * Marketplace Phase 4 — public, unauthenticated storefront read. Only
    * ACTIVE sellers are ever returned; an APPLIED/UNDER_REVIEW/REJECTED/
    * SUSPENDED/DEACTIVATED seller's slug 404s exactly like a nonexistent

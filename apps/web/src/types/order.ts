@@ -85,6 +85,19 @@ export interface PaymentSummary {
   transactionId: string;
 }
 
+/** Marketplace Phase 16 — one seller's own portion of a real, multi-seller order (OrderSellerGroup). `sellerName: null` is Folia's own shipment, not an unknown seller. */
+export interface OrderShipmentGroup {
+  id: string;
+  sellerName: string | null;
+  status: OrderStatus;
+  courierId: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  items: Pick<OrderItem, 'id' | 'productId' | 'slug' | 'name' | 'variantId' | 'variantLabel' | 'quantity'>[];
+}
+
 export interface Order {
   id: string;
   createdAt: string;
@@ -113,4 +126,6 @@ export interface Order {
   customerNotes: string | null;
   cancellation: CancellationRequest | null;
   returnRequest: ReturnRequest | null;
+  /** Marketplace Phase 16 — only present on the order-detail fetch (not order history/checkout preview). Render per-seller shipment breakdown from this, not the single courierId/trackingNumber above, whenever this order has more than one group. */
+  sellerGroups?: OrderShipmentGroup[];
 }

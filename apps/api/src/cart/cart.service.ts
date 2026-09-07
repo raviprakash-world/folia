@@ -11,7 +11,16 @@ import type { CartRecord } from './cart.types';
 
 const CART_INCLUDE = {
   items: {
-    include: { product: { include: { category: true } }, variant: true },
+    include: {
+      // Marketplace Phase 16 — displayName only, so the cart can label
+      // which seller each line ships from (customer-facing; the
+      // Folia-owned sellerId: null case already omits this at the
+      // toPublicCartItem mapping layer).
+      product: {
+        include: { category: true, seller: { select: { displayName: true } } },
+      },
+      variant: true,
+    },
   },
 } as const;
 

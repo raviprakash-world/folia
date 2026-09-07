@@ -356,6 +356,16 @@ export class OrdersService {
         items: true,
         cancellation: true,
         payment: true,
+        // Marketplace Phase 16 — per-seller shipment breakdown for the
+        // order detail page. Only fetched here, not findAllForUser: the
+        // order list only ever showed one whole-order status, and this
+        // is real extra data the list view has no use for.
+        sellerGroups: {
+          include: {
+            items: true,
+            seller: { select: { displayName: true } },
+          },
+        },
       },
     });
     if (!order) throw new NotFoundException('Order not found.');

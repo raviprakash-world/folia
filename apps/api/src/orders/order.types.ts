@@ -74,6 +74,35 @@ const paymentMethodToPublic: Record<PaymentMethodType, string> = {
   WALLET: 'wallet',
 };
 
+/**
+ * Marketplace Phase 16 — a customer-facing view of one OrderSellerGroup
+ * (Phase 5/12). Deliberately narrower than
+ * seller-order.types.ts's PublicSellerOrderGroup: no commissionTotal, no
+ * sellerNote (both seller-private, per that model's own schema comment),
+ * no shippingAddress (the customer already knows their own address).
+ */
+export interface OrderShipmentItemRecord {
+  id: string;
+  productId: string;
+  slug: string;
+  name: string;
+  variantId: string | null;
+  variantLabel: string | null;
+  quantity: number;
+}
+
+export interface OrderShipmentGroupRecord {
+  id: string;
+  seller: { displayName: string } | null;
+  status: OrderStatus;
+  courierId: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: Date | null;
+  deliveredAt: Date | null;
+  items: OrderShipmentItemRecord[];
+}
+
 export interface OrderItemRecord {
   /** Phase 6D-4H — needed so a customer's return/DOA claim UI can reference a specific line (CreateReturnClaimDto.items[].orderItemId); the field always existed on the underlying OrderItem row, this was just never surfaced in the public order shape before. */
   id: string;
@@ -114,6 +143,31 @@ export interface OrderRecord {
   cancellation?: CancellationRequestRecord | null;
   /** Phase 6: the real Payment.status, when the caller's query included it — lets toPublicCancellation derive a real refundStatus instead of the elapsed-time simulation. Optional because not every caller needs cancellation detail (and the raw Prisma `include` shape puts this at order.payment.status, not flattened). */
   payment?: { status: string } | null;
+  /** Marketplace Phase 16 — only present when the caller's query included it (findOneForUser); the order list view has no need for per-seller shipment detail. */
+  sellerGroups?: OrderShipmentGroupRecord[];
+}
+
+/** Matches apps/web/src/types/order.ts's OrderShipmentGroup exactly. */
+export function toPublicOrderShipmentGroup(group: OrderShipmentGroupRecord) {
+  return {
+    id: group.id,
+    sellerName: group.seller?.displayName ?? null,
+    status: statusToPublic[group.status],
+    courierId: group.courierId,
+    trackingNumber: group.trackingNumber,
+    trackingUrl: group.trackingUrl,
+    shippedAt: group.shippedAt ? group.shippedAt.toISOString() : null,
+    deliveredAt: group.deliveredAt ? group.deliveredAt.toISOString() : null,
+    items: group.items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      slug: item.slug,
+      name: item.name,
+      variantId: item.variantId,
+      variantLabel: item.variantLabel,
+      quantity: item.quantity,
+    })),
+  };
 }
 
 /**
@@ -169,6 +223,7 @@ export function toPublicOrder(order: OrderRecord) {
       ? toPublicCancellation(order.cancellation, order.payment?.status)
       : null,
     returnRequest: null,
+    sellerGroups: order.sellerGroups?.map(toPublicOrderShipmentGroup),
   };
 }
 

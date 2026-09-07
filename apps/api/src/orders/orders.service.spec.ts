@@ -940,6 +940,129 @@ describe('OrdersService.getPurchasedProductIds', () => {
   });
 });
 
+describe('OrdersService.findOneForUser', () => {
+  it('Marketplace Phase 16 — includes sellerGroups (with items and the seller displayName) in the query', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder({ sellerGroups: [] }));
+
+    await service.findOneForUser('user-1', 'FOL-20260829-1234');
+
+    expect(prisma.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          sellerGroups: {
+            include: {
+              items: true,
+              seller: { select: { displayName: true } },
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it('Marketplace Phase 16 — maps each seller group to its public shape, omitting seller-private commissionTotal/sellerNote', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(
+      makeCreatedOrder({
+        sellerGroups: [
+          {
+            id: 'group-folia',
+            seller: null,
+            status: 'DELIVERED',
+            courierId: 'swiftpost',
+            trackingNumber: 'SW1',
+            trackingUrl: 'https://track/SW1',
+            shippedAt: new Date('2026-08-01T00:00:00Z'),
+            deliveredAt: new Date('2026-08-03T00:00:00Z'),
+            items: [
+              {
+                id: 'item-1',
+                productId: 'prod-1',
+                slug: 'monstera',
+                name: 'Monstera',
+                variantId: null,
+                variantLabel: null,
+                quantity: 2,
+              },
+            ],
+          },
+          {
+            id: 'group-seller',
+            seller: { displayName: 'Terracotta & Fern' },
+            status: 'PROCESSING',
+            courierId: null,
+            trackingNumber: null,
+            trackingUrl: null,
+            shippedAt: null,
+            deliveredAt: null,
+            items: [
+              {
+                id: 'item-2',
+                productId: 'prod-2',
+                slug: 'clay-pot',
+                name: 'Clay Pot',
+                variantId: null,
+                variantLabel: null,
+                quantity: 1,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const result = await service.findOneForUser('user-1', 'FOL-20260829-1234');
+
+    expect(result.sellerGroups).toEqual([
+      {
+        id: 'group-folia',
+        sellerName: null,
+        status: 'delivered',
+        courierId: 'swiftpost',
+        trackingNumber: 'SW1',
+        trackingUrl: 'https://track/SW1',
+        shippedAt: '2026-08-01T00:00:00.000Z',
+        deliveredAt: '2026-08-03T00:00:00.000Z',
+        items: [
+          {
+            id: 'item-1',
+            productId: 'prod-1',
+            slug: 'monstera',
+            name: 'Monstera',
+            variantId: null,
+            variantLabel: null,
+            quantity: 2,
+          },
+        ],
+      },
+      {
+        id: 'group-seller',
+        sellerName: 'Terracotta & Fern',
+        status: 'processing',
+        courierId: null,
+        trackingNumber: null,
+        trackingUrl: null,
+        shippedAt: null,
+        deliveredAt: null,
+        items: [
+          {
+            id: 'item-2',
+            productId: 'prod-2',
+            slug: 'clay-pot',
+            name: 'Clay Pot',
+            variantId: null,
+            variantLabel: null,
+            quantity: 1,
+          },
+        ],
+      },
+    ]);
+    expect(result.sellerGroups?.[0]).not.toHaveProperty('commissionTotal');
+    expect(result.sellerGroups?.[0]).not.toHaveProperty('sellerNote');
+  });
+});
+
 describe('OrdersService.adminFindAll', () => {
   it('returns orders across every customer, not scoped to one user', async () => {
     const { prisma, service } = createDeps();

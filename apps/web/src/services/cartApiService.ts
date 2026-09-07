@@ -12,6 +12,8 @@ interface RealCartItem {
   variantId: string | null;
   variantLabel: string | null;
   quantity: number;
+  /** Marketplace Phase 16. */
+  sellerName: string | null;
 }
 
 interface RealCartResponse {

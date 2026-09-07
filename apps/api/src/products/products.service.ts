@@ -12,6 +12,13 @@ const PRODUCT_INCLUDE = {
   category: true,
   variants: true,
   specs: true,
+  // Marketplace Phase 16 — every customer-facing product read now also
+  // carries its seller's public storefront identity (null for a
+  // Folia-owned product), so ProductDetail can attribute/link to it.
+  // Never selects anything beyond what's already public on
+  // /sellers/:slug (SellersService.getPublicStorefront) — no email/
+  // phone/internal status.
+  seller: { select: { id: true, slug: true, displayName: true } },
 } as const;
 
 /**

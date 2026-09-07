@@ -42,6 +42,12 @@ export interface ReviewRecord {
   verified: boolean;
 }
 
+export interface ProductSellerRecord {
+  id: string;
+  slug: string;
+  displayName: string;
+}
+
 export interface ProductRecord {
   id: string;
   slug: string;
@@ -61,6 +67,8 @@ export interface ProductRecord {
   specs: ProductSpecRecord[];
   createdAt: Date;
   deletedAt: Date | null;
+  /** Marketplace Phase 16 — null for a Folia-owned product, matching Product.sellerId's own nullability exactly. */
+  seller: ProductSellerRecord | null;
 }
 
 const badgeToPublic: Record<
@@ -136,6 +144,7 @@ export function toPublicProduct(product: ProductRecord) {
     })),
     specs: product.specs.map((s) => ({ label: s.label, value: s.value })),
     createdAt: product.createdAt.toISOString().slice(0, 10),
+    seller: product.seller ?? undefined,
   };
 }
 

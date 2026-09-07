@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { ApplySellerDto } from './dto/apply-seller.dto';
 import { UpdateSellerDto } from './dto/update-seller.dto';
 import { UploadVerificationDto } from './dto/upload-verification.dto';
+import { PublicSellersQueryDto } from './dto/public-sellers-query.dto';
 import { MAX_VERIFICATION_FILES } from './seller-verification-file.util';
 import type { AuthenticatedUser } from '../users/user.types';
 import type { Seller } from '@prisma/client';
@@ -94,6 +96,19 @@ export class SellersController {
       dto.documentType,
       files ?? [],
     );
+  }
+
+  /**
+   * Marketplace Phase 16 — the public sellers directory. A bare `GET
+   * /sellers` (no path segment), so — unlike ':slug' below — declaration
+   * order relative to the 'me'-prefixed routes above genuinely doesn't
+   * matter; kept here next to the other public read for readability.
+   */
+  @Get()
+  @Public()
+  @ApiOperation({ summary: 'Browse active marketplace sellers.' })
+  list(@Query() query: PublicSellersQueryDto) {
+    return this.sellersService.listPublic(query);
   }
 
   /**
