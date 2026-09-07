@@ -18,6 +18,18 @@ export type SellerStatus =
   | 'SUSPENDED'
   | 'DEACTIVATED';
 
+/** Marketplace Phase 19 — GET/POST /sellers/me/verifications. */
+export interface SellerVerification {
+  id: string;
+  documentType: string;
+  documentUrl: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface SellerAddress {
   addressLine1: string;
   addressLine2: string | null;

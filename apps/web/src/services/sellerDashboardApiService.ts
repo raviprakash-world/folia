@@ -9,6 +9,7 @@ import type {
   SellerOrderGroup,
   SellerLedgerEntry,
   SellerPayout,
+  SellerVerification,
 } from '@/types/sellerDashboard';
 
 /** Every seller-dashboard endpoint (apps/api/src/sellers/*, payouts/seller-earnings.controller.ts) proxied under /api/sellers — see vite.config.ts's existing VITE_REAL_SELLERS_API-gated entry. */
@@ -50,6 +51,28 @@ export async function updateSellerProfile(input: Partial<ApplyAsSellerInput>): P
     return data;
   } catch (error) {
     throw friendlyError(error, 'Could not save your profile changes.');
+  }
+}
+
+// --- Verification documents ---
+
+export async function fetchSellerVerifications(): Promise<SellerVerification[]> {
+  const { data } = await apiClient.get<SellerVerification[]>('/sellers/me/verifications');
+  return data;
+}
+
+/** Returns only the newly created records (apps/api/src/sellers/sellers.service.ts's uploadVerification), not the full list — callers refetch the list rather than trying to merge this in. */
+export async function uploadSellerVerification(documentType: string, files: File[]): Promise<SellerVerification[]> {
+  const form = new FormData();
+  form.append('documentType', documentType);
+  files.forEach((file) => form.append('files', file));
+  try {
+    const { data } = await apiClient.post<SellerVerification[]>('/sellers/me/verifications', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  } catch (error) {
+    throw friendlyError(error, 'Could not upload that document.');
   }
 }
 

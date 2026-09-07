@@ -4,6 +4,8 @@ import {
   fetchSellerProfile,
   applyAsSeller,
   updateSellerProfile,
+  fetchSellerVerifications,
+  uploadSellerVerification,
 } from '@/services/sellerDashboardApiService';
 import type { ApplyAsSellerInput } from '@/services/sellerDashboardApiService';
 
@@ -36,5 +38,26 @@ export function useUpdateSellerProfile() {
   return useMutation({
     mutationFn: (input: Partial<ApplyAsSellerInput>) => updateSellerProfile(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY }),
+  });
+}
+
+const VERIFICATIONS_QUERY_KEY = ['seller-verifications'];
+
+export function useSellerVerifications() {
+  const role = useAuthStore((s) => s.user?.role);
+  const { data, isLoading } = useQuery({
+    queryKey: VERIFICATIONS_QUERY_KEY,
+    queryFn: fetchSellerVerifications,
+    enabled: useRealSellersApi && role === 'seller',
+  });
+  return { verifications: data ?? [], isLoading };
+}
+
+export function useUploadSellerVerification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentType, files }: { documentType: string; files: File[] }) =>
+      uploadSellerVerification(documentType, files),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: VERIFICATIONS_QUERY_KEY }),
   });
 }
