@@ -67,3 +67,89 @@ describe('NotificationEventListener.handlePaymentRefunded', () => {
     ).rejects.toThrow('db unavailable');
   });
 });
+
+// Phase 6D-4F — the four return/DOA resolution events that previously had
+// no listener at all (see docs/PHASE_6D_MIGRATION_DESIGN.md).
+describe('NotificationEventListener.handleReturnApproved', () => {
+  it('creates an ORDER notification linking to the order', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleReturnApproved({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-1',
+      userId: 'user-1',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'ORDER',
+      title: 'Return Approved',
+      message: 'Your return/DOA claim for order FOL-1 was approved.',
+      href: '/account/orders/FOL-1',
+    });
+  });
+});
+
+describe('NotificationEventListener.handleReturnRejected', () => {
+  it('creates an ORDER notification including the rejection reason', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleReturnRejected({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-1',
+      userId: 'user-1',
+      reason: 'Outside the return window',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'ORDER',
+      title: 'Return Not Approved',
+      message:
+        'Your return/DOA claim for order FOL-1 was not approved: Outside the return window',
+      href: '/account/orders/FOL-1',
+    });
+  });
+});
+
+describe('NotificationEventListener.handleStoreCreditIssued', () => {
+  it('creates an ORDER notification with the issued amount', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleStoreCreditIssued({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-1',
+      userId: 'user-1',
+      amount: 198,
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'ORDER',
+      title: 'Store Credit Issued',
+      message: '₹198.00 in store credit was issued for order FOL-1.',
+      href: '/account/orders/FOL-1',
+    });
+  });
+});
+
+describe('NotificationEventListener.handleReplacementIssued', () => {
+  it('creates an ORDER notification linking to the NEW replacement order, not the original', async () => {
+    const { listener, notificationsService } = createDeps();
+
+    await listener.handleReplacementIssued({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-1',
+      replacementOrderId: 'FOL-2',
+      userId: 'user-1',
+    });
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      userId: 'user-1',
+      type: 'ORDER',
+      title: 'Replacement On The Way',
+      message: 'A free replacement for order FOL-1 was created as order FOL-2.',
+      href: '/account/orders/FOL-2',
+    });
+  });
+});

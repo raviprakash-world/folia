@@ -116,7 +116,12 @@ function createDeps() {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     paymentAttempt: { create: jest.fn() },
-    refund: { create: jest.fn(), update: jest.fn() },
+    refund: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+    },
     paymentWebhookEvent: { create: jest.fn(), update: jest.fn() },
     order: { findUniqueOrThrow: jest.fn() },
     $transaction: jest.fn((cb: (tx: typeof orderTx) => unknown) => cb(orderTx)),
@@ -606,6 +611,190 @@ describe('PaymentsService.handleWebhookEvent', () => {
       service.handleWebhookEvent('{not json', 'sig', 'evt_1'),
     ).rejects.toThrow('Malformed webhook payload.');
     expect(prisma.paymentWebhookEvent.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('PaymentsService.handleWebhookEvent — refund reconciliation (Phase 6D-4F)', () => {
+  function refundWebhookBody(
+    event: 'refund.processed' | 'refund.failed',
+    overrides: Record<string, unknown> = {},
+  ): string {
+    return JSON.stringify({
+      event,
+      payload: {
+        refund: {
+          entity: {
+            id: 'rfnd_test1',
+            payment_id: 'pay_webhook_1',
+            amount: 50000, // paise -> ₹500.00
+            status: event === 'refund.processed' ? 'processed' : 'failed',
+            ...overrides,
+          },
+        },
+      },
+    });
+  }
+
+  it('reconciles a stuck PENDING refund on refund.processed: finalizes success, emits PAYMENT_EVENTS.REFUNDED, audits PAYMENT_REFUND with actorType system', async () => {
+    const { prisma, orderTx, razorpay, eventEmitter, auditService, service } =
+      createDeps();
+    razorpay.verifyWebhookSignature.mockReturnValue(true);
+    prisma.paymentWebhookEvent.create.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(
+      makePayment({ providerPaymentId: 'pay_webhook_1', status: 'CAPTURED' }),
+    );
+    prisma.refund.findFirst.mockResolvedValue(null);
+    prisma.refund.findMany.mockResolvedValue([
+      {
+        id: 'refund-1',
+        status: 'PENDING',
+        amount: decimal(500),
+        reason: 'Return resolution',
+      },
+    ]);
+    orderTx.refund.update.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+    });
+    orderTx.refund.aggregate.mockResolvedValue({ _sum: { amount: 500 } });
+
+    const result = await service.handleWebhookEvent(
+      refundWebhookBody('refund.processed'),
+      'sig',
+      'evt_refund_1',
+    );
+
+    expect(result.status).toBe('processed');
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'payment.refunded',
+      expect.objectContaining({ paymentId: 'pay-1', amount: 500 }),
+    );
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('PAYMENT_REFUND');
+    expect(loggedInput.actorId).toBe('user-1');
+    expect(loggedInput.metadata?.actorType).toBe('system');
+    expect(orderTx.payment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'REFUNDED' } }),
+    );
+  });
+
+  it('reconciles a stuck PENDING refund on refund.failed: marks it FAILED, audits PAYMENT_REFUND_FAILED, never emits REFUNDED', async () => {
+    const { prisma, razorpay, eventEmitter, auditService, service } =
+      createDeps();
+    razorpay.verifyWebhookSignature.mockReturnValue(true);
+    prisma.paymentWebhookEvent.create.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(
+      makePayment({ providerPaymentId: 'pay_webhook_1', status: 'CAPTURED' }),
+    );
+    prisma.refund.findFirst.mockResolvedValue(null);
+    prisma.refund.findMany.mockResolvedValue([
+      { id: 'refund-1', status: 'PENDING', amount: decimal(500), reason: null },
+    ]);
+
+    await service.handleWebhookEvent(
+      refundWebhookBody('refund.failed'),
+      'sig',
+      'evt_refund_2',
+    );
+
+    expect(prisma.refund.update).toHaveBeenCalledWith({
+      where: { id: 'refund-1' },
+      data: { status: 'FAILED' },
+    });
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      'payment.refunded',
+      expect.anything(),
+    );
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'PAYMENT_REFUND_FAILED' }),
+    );
+  });
+
+  it('is idempotent — a refund already recorded under this providerRefundId is left untouched (redelivered webhook, or the synchronous path actually succeeded)', async () => {
+    const { prisma, razorpay, eventEmitter, service } = createDeps();
+    razorpay.verifyWebhookSignature.mockReturnValue(true);
+    prisma.paymentWebhookEvent.create.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(
+      makePayment({ providerPaymentId: 'pay_webhook_1', status: 'REFUNDED' }),
+    );
+    prisma.refund.findFirst.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_test1',
+    });
+
+    await service.handleWebhookEvent(
+      refundWebhookBody('refund.processed'),
+      'sig',
+      'evt_refund_3',
+    );
+
+    expect(prisma.refund.findMany).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      'payment.refunded',
+      expect.anything(),
+    );
+  });
+
+  it('backs off without guessing when no PENDING refund of that amount exists for the payment', async () => {
+    const { prisma, razorpay, eventEmitter, service } = createDeps();
+    razorpay.verifyWebhookSignature.mockReturnValue(true);
+    prisma.paymentWebhookEvent.create.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(
+      makePayment({ providerPaymentId: 'pay_webhook_1', status: 'CAPTURED' }),
+    );
+    prisma.refund.findFirst.mockResolvedValue(null);
+    prisma.refund.findMany.mockResolvedValue([]); // nothing pending — already reconciled some other way, or not ours
+
+    await service.handleWebhookEvent(
+      refundWebhookBody('refund.processed'),
+      'sig',
+      'evt_refund_4',
+    );
+
+    expect(prisma.refund.update).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      'payment.refunded',
+      expect.anything(),
+    );
+  });
+
+  it('backs off without guessing when MULTIPLE PENDING refunds of that amount exist for the payment — never picks one arbitrarily', async () => {
+    const { prisma, razorpay, service } = createDeps();
+    razorpay.verifyWebhookSignature.mockReturnValue(true);
+    prisma.paymentWebhookEvent.create.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(
+      makePayment({ providerPaymentId: 'pay_webhook_1', status: 'CAPTURED' }),
+    );
+    prisma.refund.findFirst.mockResolvedValue(null);
+    prisma.refund.findMany.mockResolvedValue([
+      { id: 'refund-1', status: 'PENDING', amount: decimal(500), reason: null },
+      { id: 'refund-2', status: 'PENDING', amount: decimal(500), reason: null },
+    ]);
+
+    await service.handleWebhookEvent(
+      refundWebhookBody('refund.processed'),
+      'sig',
+      'evt_refund_5',
+    );
+
+    expect(prisma.refund.update).not.toHaveBeenCalled();
+  });
+
+  it('backs off cleanly when the webhook references a payment this system has no record of', async () => {
+    const { prisma, razorpay, service } = createDeps();
+    razorpay.verifyWebhookSignature.mockReturnValue(true);
+    prisma.paymentWebhookEvent.create.mockResolvedValue({});
+    prisma.payment.findFirst.mockResolvedValue(null);
+
+    const result = await service.handleWebhookEvent(
+      refundWebhookBody('refund.processed'),
+      'sig',
+      'evt_refund_6',
+    );
+
+    expect(result.status).toBe('processed');
+    expect(prisma.refund.findMany).not.toHaveBeenCalled();
   });
 });
 

@@ -6,6 +6,10 @@ import type {
   OrderCancelledPayload,
   OrderReturnRequestedPayload,
   OrderStatusChangedPayload,
+  ReturnApprovedPayload,
+  ReturnRejectedPayload,
+  StoreCreditIssuedPayload,
+  ReplacementIssuedPayload,
   ProfileUpdatedPayload,
   PasswordChangedPayload,
 } from './notification.events';
@@ -88,6 +92,54 @@ export class NotificationEventListener {
       title: 'Refund Processed',
       message: `₹${payload.amount.toFixed(2)} was refunded${payload.orderId ? ` for order ${payload.orderId}` : ''}.`,
       href: payload.orderId ? `/account/orders/${payload.orderId}` : undefined,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.RETURN_APPROVED)
+  async handleReturnApproved(payload: ReturnApprovedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'ORDER',
+      title: 'Return Approved',
+      message: `Your return/DOA claim for order ${payload.orderId} was approved.`,
+      href: `/account/orders/${payload.orderId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.RETURN_REJECTED)
+  async handleReturnRejected(payload: ReturnRejectedPayload): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'ORDER',
+      title: 'Return Not Approved',
+      message: `Your return/DOA claim for order ${payload.orderId} was not approved: ${payload.reason}`,
+      href: `/account/orders/${payload.orderId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.STORE_CREDIT_ISSUED)
+  async handleStoreCreditIssued(
+    payload: StoreCreditIssuedPayload,
+  ): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'ORDER',
+      title: 'Store Credit Issued',
+      message: `₹${payload.amount.toFixed(2)} in store credit was issued for order ${payload.orderId}.`,
+      href: `/account/orders/${payload.orderId}`,
+    });
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.REPLACEMENT_ISSUED)
+  async handleReplacementIssued(
+    payload: ReplacementIssuedPayload,
+  ): Promise<void> {
+    await this.notificationsService.create({
+      userId: payload.userId,
+      type: 'ORDER',
+      title: 'Replacement On The Way',
+      message: `A free replacement for order ${payload.orderId} was created as order ${payload.replacementOrderId}.`,
+      href: `/account/orders/${payload.replacementOrderId}`,
     });
   }
 

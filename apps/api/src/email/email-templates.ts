@@ -167,6 +167,74 @@ export function orderRefundedEmail(
   };
 }
 
+export function returnApprovedEmail(
+  orderId: string,
+  orderUrl: string,
+): RenderedEmail {
+  return {
+    subject: `Return approved for order ${orderId}`,
+    html: renderLayout({
+      heading: 'Your return was approved',
+      bodyHtml: `Your return/DOA claim for order <strong>${orderId}</strong> has been approved. We'll follow up with next steps shortly.`,
+      ctaLabel: 'View order',
+      ctaUrl: orderUrl,
+    }),
+    text: `Your return was approved\n\nYour return/DOA claim for order ${orderId} has been approved. We'll follow up with next steps shortly.\n\n${orderUrl}`,
+  };
+}
+
+export function returnRejectedEmail(
+  orderId: string,
+  reason: string,
+  orderUrl: string,
+): RenderedEmail {
+  return {
+    subject: `Update on your return for order ${orderId}`,
+    html: renderLayout({
+      heading: 'Your return request was not approved',
+      bodyHtml: `Your return/DOA claim for order <strong>${orderId}</strong> was not approved: ${reason}`,
+      ctaLabel: 'View order',
+      ctaUrl: orderUrl,
+    }),
+    text: `Your return request was not approved\n\nYour return/DOA claim for order ${orderId} was not approved: ${reason}\n\n${orderUrl}`,
+  };
+}
+
+export function storeCreditIssuedEmail(
+  orderId: string,
+  amount: number,
+  orderUrl: string,
+): RenderedEmail {
+  const formatted = `₹${amount.toFixed(2)}`;
+  return {
+    subject: `Store credit issued for order ${orderId}`,
+    html: renderLayout({
+      heading: 'Store credit issued',
+      bodyHtml: `${formatted} in Folia store credit has been issued for your return on order <strong>${orderId}</strong>.`,
+      ctaLabel: 'View order',
+      ctaUrl: orderUrl,
+    }),
+    text: `Store credit issued\n\n${formatted} in Folia store credit has been issued for your return on order ${orderId}.\n\n${orderUrl}`,
+  };
+}
+
+export function replacementIssuedEmail(
+  orderId: string,
+  replacementOrderId: string,
+  replacementOrderUrl: string,
+): RenderedEmail {
+  return {
+    subject: `Replacement on the way for order ${orderId}`,
+    html: renderLayout({
+      heading: 'Your replacement is on the way',
+      bodyHtml: `A free replacement for order <strong>${orderId}</strong> has been created as order <strong>${replacementOrderId}</strong>.`,
+      ctaLabel: 'View replacement order',
+      ctaUrl: replacementOrderUrl,
+    }),
+    text: `Your replacement is on the way\n\nA free replacement for order ${orderId} has been created as order ${replacementOrderId}.\n\n${replacementOrderUrl}`,
+  };
+}
+
 export function paymentFailedEmail(
   retryUrl: string,
   errorDescription?: string,

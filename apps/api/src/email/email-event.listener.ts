@@ -8,6 +8,10 @@ import {
   orderReturnRequestedEmail,
   orderStatusChangedEmail,
   orderRefundedEmail,
+  returnApprovedEmail,
+  returnRejectedEmail,
+  storeCreditIssuedEmail,
+  replacementIssuedEmail,
   paymentFailedEmail,
 } from './email-templates';
 import { UsersService } from '../users/users.service';
@@ -19,6 +23,10 @@ import type {
   OrderCancelledPayload,
   OrderReturnRequestedPayload,
   OrderStatusChangedPayload,
+  ReturnApprovedPayload,
+  ReturnRejectedPayload,
+  StoreCreditIssuedPayload,
+  ReplacementIssuedPayload,
 } from '../notifications/notification.events';
 import { PAYMENT_EVENTS } from '../payments/payments.events';
 import type {
@@ -117,6 +125,62 @@ export class EmailEventListener {
           this.orderUrl(payload.orderId),
         ),
       'order-status-changed',
+    );
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.RETURN_APPROVED)
+  async handleReturnApproved(payload: ReturnApprovedPayload): Promise<void> {
+    await this.sendTo(
+      payload.userId,
+      () =>
+        returnApprovedEmail(payload.orderId, this.orderUrl(payload.orderId)),
+      'return-approved',
+    );
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.RETURN_REJECTED)
+  async handleReturnRejected(payload: ReturnRejectedPayload): Promise<void> {
+    await this.sendTo(
+      payload.userId,
+      () =>
+        returnRejectedEmail(
+          payload.orderId,
+          payload.reason,
+          this.orderUrl(payload.orderId),
+        ),
+      'return-rejected',
+    );
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.STORE_CREDIT_ISSUED)
+  async handleStoreCreditIssued(
+    payload: StoreCreditIssuedPayload,
+  ): Promise<void> {
+    await this.sendTo(
+      payload.userId,
+      () =>
+        storeCreditIssuedEmail(
+          payload.orderId,
+          payload.amount,
+          this.orderUrl(payload.orderId),
+        ),
+      'store-credit-issued',
+    );
+  }
+
+  @OnEvent(NOTIFICATION_EVENTS.REPLACEMENT_ISSUED)
+  async handleReplacementIssued(
+    payload: ReplacementIssuedPayload,
+  ): Promise<void> {
+    await this.sendTo(
+      payload.userId,
+      () =>
+        replacementIssuedEmail(
+          payload.orderId,
+          payload.replacementOrderId,
+          this.orderUrl(payload.replacementOrderId),
+        ),
+      'replacement-issued',
     );
   }
 

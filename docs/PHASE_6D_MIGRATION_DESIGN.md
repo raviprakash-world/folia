@@ -522,3 +522,87 @@ as a rejected promise for every realistic failure (declined, network
 error, timeout) — a mid-call infra crash is a materially different, rarer
 failure category, and adding a time-based recovery sweep for it was not
 asked for and was not built here.
+
+# Phase 6D-4F — Notification Delivery + Refund Webhook Reconciliation: design notes
+
+Two independent deliverables, both requested together. No schema change —
+both reuse existing tables/columns exactly as they already stood after
+6D-4E.
+
+## Part 1 — notification delivery for the four undelivered return events
+
+Before this phase, `NOTIFICATION_EVENTS.RETURN_APPROVED`, `RETURN_REJECTED`,
+`STORE_CREDIT_ISSUED`, and `REPLACEMENT_ISSUED` were emitted (across
+6D-4A/4B/4C) but had no listener at all — neither the in-app
+`NotificationEventListener` nor the email `EmailEventListener`.
+`PAYMENT_EVENTS.REFUNDED` (the prepaid-refund equivalent) already had both
+kinds of listener from earlier work; this phase brings the other four
+resolution outcomes up to the same level, reusing the exact established
+pattern for both listeners (`notificationsService.create({...})` for
+in-app, `sendTo(userId, () => someTemplateFn(...), 'context-label')` for
+email) and four new templates in `email-templates.ts` following that
+file's existing plain-transactional-email convention. `REPLACEMENT_ISSUED`
+deliberately links to the **new** replacement order
+(`/account/orders/:replacementOrderId`), not the original claim's order —
+that's where the customer actually needs to look next. No new events were
+added; this phase only adds listeners for events that already existed.
+
+## Part 2 — refund webhook reconciliation
+
+Closes the exact gap `PaymentsService.refund()`'s own catch-block comment
+names: a crash between Razorpay confirming a refund and this system's own
+transaction recording that success leaves a `Refund` row stuck at
+`PENDING` with no `providerRefundId`, even though the money genuinely
+moved — because a hard process crash runs neither the success path nor
+the `catch` block at all.
+
+`PaymentsService.refund()`'s success/failure finalization logic was
+extracted into two shared private methods,
+`finalizeRefundSuccess`/`finalizeRefundFailure` — used by both the
+existing synchronous path and this phase's new webhook path, so the two
+can never silently drift apart on the `isFullRefund` calculation, event
+emission, or audit shape. `handleWebhookEvent` now also recognizes
+Razorpay's `refund.processed`/`refund.failed` events and dispatches to a
+new `reconcileRefundEvent`.
+
+**Matching a stuck PENDING refund to an incoming webhook cannot use
+`providerRefundId`** — the whole point is that the crash happened before
+this system ever learned that value. Instead it matches by
+`(paymentId, status: PENDING, amount)`: `refund()`'s own aggregate-based
+remaining-headroom check already guarantees a payment can never have two
+PENDING claims whose amounts could both be legitimate, which is what
+makes "the one PENDING refund of this exact amount" an unambiguous match
+in the crash-recovery case this exists for. If zero or more than one
+candidate matches — or the referenced payment isn't one this system has a
+record of at all (e.g. a refund issued directly through Razorpay's own
+dashboard, which this system never initiated) — the handler logs a
+warning and backs off rather than guessing which row to touch; there is
+no local `ReturnRequest`/audit context to safely attach an unmatched
+refund to. Already-reconciled events (a redelivered webhook, or one that
+arrives after the synchronous path actually succeeded fine) are detected
+via an existing-`providerRefundId` lookup and treated as an idempotent
+no-op, not an error.
+
+A successful reconciliation emits `PAYMENT_EVENTS.REFUNDED` and writes the
+`PAYMENT_REFUND` audit exactly as the synchronous path would — this is
+what completes Part 1's promise for this scenario too: a customer whose
+refund only got confirmed via crash-recovery still gets their
+refund-processed email/notification, not silence.
+
+## Deliberately out of scope
+
+This phase's webhook reconciliation is scoped to the **Payment/Refund**
+layer only, exactly as the code comment it closes describes.
+`PaymentsService` remains completely return-agnostic, per every prior 6D-4
+phase's own stated architectural boundary — it has no knowledge of
+`ReturnRequest` and this phase doesn't introduce any. If a crash happens
+at the **ReturnsService** layer instead (between `PaymentsService.refund()`
+completing successfully and `ReturnsService.resolvePrepaidRefund`'s own
+follow-up `ReturnRequest.status`/`refundAttemptState` update), that claim
+would still show `APPROVED`/`IN_PROGRESS` even after this reconciliation
+runs — this is the same residual limitation already reported in 6D-4E's
+own notes above, not newly discovered or newly fixed here. Closing that
+would mean either coupling `PaymentsService` to `ReturnRequest` (breaking
+the established separation) or having `ReturnsService` itself listen for
+`PAYMENT_EVENTS.REFUNDED` and reconcile any claim it recognizes — a real,
+buildable follow-up, but a distinct scope decision not made in this phase.
