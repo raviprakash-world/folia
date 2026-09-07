@@ -82,6 +82,7 @@ describe('EmailEventListener', () => {
       userId: 'user-1',
       paymentId: 'pay-1',
       amount: 71.3,
+      refundId: 'refund-1',
     });
     const email = sentEmail(emailService);
     expect(email.to).toBe('sam@example.com');
@@ -96,6 +97,7 @@ describe('EmailEventListener', () => {
       userId: 'user-1',
       paymentId: 'pay-1',
       amount: 20,
+      refundId: 'refund-1',
     });
     expect(emailService.send).not.toHaveBeenCalled();
   });
@@ -110,6 +112,7 @@ describe('EmailEventListener', () => {
         userId: 'user-1',
         paymentId: 'pay-1',
         amount: 15,
+        refundId: 'refund-1',
       }),
     ).resolves.toBeUndefined();
   });

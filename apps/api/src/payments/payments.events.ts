@@ -37,4 +37,12 @@ export interface PaymentRefundedPayload {
   userId: string;
   paymentId: string;
   amount: number;
+  /**
+   * Phase 6D-4G — the Refund row's own id, added so a listener that needs
+   * to link back to a SPECIFIC refund (see ReturnsService.
+   * handlePaymentRefunded's crash-reconciliation use) never has to
+   * re-derive it by matching on amount — this event already has it in
+   * hand at the one place it's emitted from (finalizeRefundSuccess).
+   */
+  refundId: string;
 }

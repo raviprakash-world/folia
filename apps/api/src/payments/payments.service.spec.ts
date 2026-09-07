@@ -1061,6 +1061,7 @@ describe('PaymentsService.refund', () => {
       userId: 'user-1',
       paymentId: 'pay-1',
       amount: 71.3,
+      refundId: 'refund-1',
     });
   });
 

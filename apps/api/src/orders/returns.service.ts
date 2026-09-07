@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -40,6 +40,8 @@ import type {
   StoreCreditIssuedPayload,
   ReplacementIssuedPayload,
 } from '../notifications/notification.events';
+import { PAYMENT_EVENTS } from '../payments/payments.events';
+import type { PaymentRefundedPayload } from '../payments/payments.events';
 
 /** DB enum -> public API string, both directions — covers every ReturnRequestStatus value, even the ones no code can reach yet (REFUND_ISSUED/STORE_CREDIT_ISSUED/REPLACEMENT_ISSUED are Phase 6D-4B+'s job), so the admin list/detail responses stay honest if a caller ever filters on one. */
 const RETURN_STATUS_TO_PUBLIC: Record<string, string> = {
@@ -1011,33 +1013,44 @@ export class ReturnsService {
         { actorId: adminId, actorType: 'admin', ipAddress },
       );
 
-      await this.prisma.returnRequest.updateMany({
+      // Phase 6D-4G — PAYMENT_EVENTS.REFUNDED (already emitted, above,
+      // from inside paymentsService.refund() itself) is also observed by
+      // ReturnsService.handlePaymentRefunded, which races this exact
+      // update on every successful prepaid resolution, not just a
+      // crash-recovered one (see that listener's own doc comment for
+      // why). The `count` check is what makes that race safe: if it
+      // already won, this update matches zero rows, and logging our own
+      // "issued" audit record here anyway would be a false duplicate for
+      // a transition this code path didn't actually perform.
+      const { count } = await this.prisma.returnRequest.updateMany({
         where: { id: row.id, status: 'APPROVED' },
         data: {
           status: 'REFUND_ISSUED',
           resolutionType: 'REFUND',
           refundId: result.id,
-          // Phase 6D-4E — tidiness, not correctness: once status is
-          // REFUND_ISSUED, resolveClaim's own idempotent-return check
-          // short-circuits before ever reading this field again, but a
-          // reviewer inspecting a successful row shouldn't see a stale
-          // IN_PROGRESS sitting there.
+          // Tidiness, not correctness: once status is REFUND_ISSUED,
+          // resolveClaim's own idempotent-return check short-circuits
+          // before ever reading this field again, but a reviewer
+          // inspecting a successful row shouldn't see a stale IN_PROGRESS
+          // sitting there.
           refundAttemptState: 'NONE',
         },
       });
 
-      // Return-scoped audit entry — PaymentsService.refund()'s own audit
-      // is keyed by paymentId and has no way to know this ReturnRequest's
-      // id; this is the complementary record for return-side
-      // traceability, not a duplicate of that logic.
-      await this.auditService.log({
-        actorId: adminId,
-        action: 'RETURN_REFUND_ISSUED',
-        resource: 'return_request',
-        resourceId: row.id,
-        metadata: { orderId: row.orderId, amount, refundId: result.id },
-        ipAddress,
-      });
+      if (count === 1) {
+        // Return-scoped audit entry — PaymentsService.refund()'s own
+        // audit is keyed by paymentId and has no way to know this
+        // ReturnRequest's id; this is the complementary record for
+        // return-side traceability, not a duplicate of that logic.
+        await this.auditService.log({
+          actorId: adminId,
+          action: 'RETURN_REFUND_ISSUED',
+          resource: 'return_request',
+          resourceId: row.id,
+          metadata: { orderId: row.orderId, amount, refundId: result.id },
+          ipAddress,
+        });
+      }
 
       return this.adminGetClaim(row.id);
     } catch (err) {
@@ -1260,5 +1273,81 @@ export class ReturnsService {
     this.eventEmitter.emit(NOTIFICATION_EVENTS.REPLACEMENT_ISSUED, payload);
 
     return this.adminGetClaim(row.id);
+  }
+
+  /**
+   * Phase 6D-4G — closes the residual gap flagged in both 6D-4E's and
+   * 6D-4F's own notes: a crash between PaymentsService.refund() actually
+   * committing (Payment/Refund layer fully correct — the money genuinely
+   * moved) and resolvePrepaidRefund's OWN follow-up
+   * (ReturnRequest.status -> REFUND_ISSUED) would leave a claim stuck at
+   * APPROVED with refundAttemptState still IN_PROGRESS forever —
+   * permanently blocking any further resolveClaim() call on it, even
+   * though nothing about the refund itself needs retrying.
+   * PAYMENT_EVENTS.REFUNDED already fires on every successful refund
+   * (prepaid returns and otherwise — e.g. a cancellation-triggered refund
+   * via OrdersService never touches a ReturnRequest at all) — this
+   * listens for it and completes the SAME transition
+   * resolvePrepaidRefund's own success path performs, for whichever
+   * claim (if any) this event's payment matches and is still stuck.
+   *
+   * This races harmlessly with resolvePrepaidRefund's own NORMAL
+   * (non-crashed) completion — not just the rare crash case:
+   * PAYMENT_EVENTS.REFUNDED is emitted synchronously from inside
+   * paymentsService.refund() itself, before resolvePrepaidRefund's own
+   * follow-up update has even run, so both this listener's update and
+   * that one race on EVERY successful prepaid resolution. Postgres
+   * serializes the two conditional UPDATEs to the same row — whichever
+   * reaches it first wins (count: 1); the other's WHERE clause no longer
+   * matches (count: 0) and is a silent no-op (see resolvePrepaidRefund's
+   * own count check, added alongside this listener specifically so it
+   * never logs a false-duplicate audit record when it loses this race).
+   * A direct in-hand update (resolvePrepaidRefund's own path, which
+   * already has row.id and doesn't need to look anything up first) has
+   * one fewer round trip than this listener's find-then-update, so the
+   * normal path wins the large majority of the time in practice — this
+   * listener exists for the rare case where it doesn't get the chance to
+   * run at all.
+   */
+  @OnEvent(PAYMENT_EVENTS.REFUNDED)
+  async handlePaymentRefunded(payload: PaymentRefundedPayload): Promise<void> {
+    const stuck = await this.prisma.returnRequest.findFirst({
+      where: {
+        status: 'APPROVED',
+        refundAttemptState: 'IN_PROGRESS',
+        order: { payment: { id: payload.paymentId } },
+      },
+      select: { id: true },
+    });
+    if (!stuck) return;
+
+    const { count } = await this.prisma.returnRequest.updateMany({
+      where: {
+        id: stuck.id,
+        status: 'APPROVED',
+        refundAttemptState: 'IN_PROGRESS',
+      },
+      data: {
+        status: 'REFUND_ISSUED',
+        resolutionType: 'REFUND',
+        refundId: payload.refundId,
+        refundAttemptState: 'NONE',
+      },
+    });
+    if (count === 0) return;
+
+    await this.auditService.log({
+      actorId: payload.userId,
+      action: 'RETURN_REFUND_RECONCILED',
+      resource: 'return_request',
+      resourceId: stuck.id,
+      metadata: {
+        orderId: payload.orderId,
+        paymentId: payload.paymentId,
+        refundId: payload.refundId,
+        amount: payload.amount,
+        actorType: 'system',
+      },
+    });
   }
 }

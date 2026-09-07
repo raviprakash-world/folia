@@ -606,3 +606,82 @@ would mean either coupling `PaymentsService` to `ReturnRequest` (breaking
 the established separation) or having `ReturnsService` itself listen for
 `PAYMENT_EVENTS.REFUNDED` and reconcile any claim it recognizes — a real,
 buildable follow-up, but a distinct scope decision not made in this phase.
+
+# Phase 6D-4G — ReturnsService-Layer Crash Reconciliation: design notes
+
+No schema/migration change. Closes the residual gap 6D-4F's own notes
+flagged explicitly as a real, buildable follow-up rather than something
+fixed there: a crash between `PaymentsService.refund()` actually
+committing (Payment/Refund layer fully correct, money genuinely moved)
+and `resolvePrepaidRefund`'s own follow-up
+(`ReturnRequest.status -> REFUND_ISSUED`) would leave a claim stuck at
+`APPROVED` with `refundAttemptState` still `IN_PROGRESS` forever —
+permanently blocking any further `resolveClaim()` call on it, even though
+nothing about the underlying refund needed retrying.
+
+## The fix: ReturnsService listens for PAYMENT_EVENTS.REFUNDED
+
+`PAYMENT_EVENTS.REFUNDED` already fires on every successful refund
+(prepaid returns and otherwise — a cancellation-triggered refund via
+`OrdersService` never touches a `ReturnRequest` at all). `ReturnsService.
+handlePaymentRefunded` listens for it and completes the exact same
+transition `resolvePrepaidRefund`'s own success path performs, for
+whichever `APPROVED`/`IN_PROGRESS` claim (if any) matches the event's
+`paymentId` via `ReturnRequest -> order -> payment`.
+
+`PaymentRefundedPayload` gained one new field, `refundId` (the `Refund`
+row's own id) — populated at its one emission site
+(`PaymentsService.finalizeRefundSuccess`, itself already holding that
+value). Without it, this listener would have had to re-derive which
+`Refund` row to link by matching on `(paymentId, amount)`, reintroducing
+the same ambiguity risk 6D-4F's webhook reconciliation had to carefully
+guard against — a genuinely new, real capability the field adds, not
+plumbing for its own sake.
+
+## This races harmlessly with the NORMAL (non-crashed) path too — not just the crash case
+
+`PAYMENT_EVENTS.REFUNDED` is emitted synchronously from inside
+`paymentsService.refund()` itself, which means it fires — and this new
+listener runs — **before** `resolvePrepaidRefund`'s own follow-up update
+has even executed, on every successful prepaid resolution, not only a
+crash-recovered one. Postgres serializes the two conditional `UPDATE`s to
+the same row: whichever reaches it first wins (`count: 1`); the other's
+`WHERE` clause (`status: 'APPROVED', refundAttemptState: 'IN_PROGRESS'`)
+no longer matches (`count: 0`) and is a silent no-op. `resolvePrepaidRefund`
+itself was updated alongside this listener to check that count and skip
+its own `RETURN_REFUND_ISSUED` audit log when it loses — without that
+companion fix, introducing this listener would have created a real,
+newly-possible duplicate-audit bug on the ordinary success path, not just
+closed the crash gap. A direct in-hand update (`resolvePrepaidRefund`'s
+own path, which already has `row.id` and needs no lookup) has one fewer
+round trip than this listener's find-then-update, so the normal path wins
+the large majority of the time in practice — this listener exists for the
+rare case where it doesn't get the chance to run at all.
+
+## Why COD and replacement need no equivalent listener
+
+Both already have their own airtight, single-atomic-operation concurrency
+guards with no external-call race window (see 6D-4C's own notes for
+replacement, and 6D-1's for `StoreCreditEntry.returnRequestId`) — neither
+ever reaches a state where a completed side effect (a real store-credit
+entry, a real replacement order) exists without the `ReturnRequest`
+itself being updated in the same transaction that created it. This gap is
+specific to the prepaid path's two-step shape (an external gateway call,
+then a separate local transition) — the fix accordingly reuses the exact
+`refundAttemptState` mechanism 6D-4E already built for that path, rather
+than inventing a second, parallel reconciliation mechanism.
+
+## A new, distinct audit action
+
+`RETURN_REFUND_RECONCILED` (not `RETURN_REFUND_ISSUED`) — genuinely
+different provenance worth distinguishing in the audit trail: it always
+means "this listener, not `resolveClaim`'s own synchronous call path,
+performed this transition," true regardless of whether that happened
+because of an actual crash or an incidental win in the harmless normal-
+path race described above. `actorId` is the refund's own real, affected
+`payload.userId` (matching the established
+`{actorId: <real user>, actorType: 'system'}` convention already used for
+`OrdersService`'s cancellation-triggered refunds and `PaymentsService`'s
+own system-refund audits — `actorType` lives inside `metadata`, matching
+`PaymentsService`'s own audit shape, since `AuditService`'s general
+`LogAuditInput` has no dedicated top-level field for it).

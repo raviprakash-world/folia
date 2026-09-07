@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { ReturnsService } from './returns.service';
 import type { EvidenceFileLike } from './evidence-file.util';
 import type { LogAuditInput } from '../audit/audit.types';
+import type { PaymentRefundedPayload } from '../payments/payments.events';
 
 function jpegBuffer(): Buffer {
   return Buffer.concat([
@@ -101,6 +102,7 @@ function createDeps() {
       >(),
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
     },
@@ -1964,6 +1966,96 @@ describe('ReturnsService.resolveClaim — prepaid refund', () => {
       expect(b.reason).toBeInstanceOf(ConflictException);
     }
     expect(paymentsService.refund).toHaveBeenCalledTimes(1);
+  });
+
+  it('Phase 6D-4G: does not log a duplicate RETURN_REFUND_ISSUED audit when the status-transition update loses the race to handlePaymentRefunded', async () => {
+    const { prisma, paymentsService, auditService, service } = createDeps();
+    prisma.returnRequest.findUnique
+      .mockResolvedValueOnce(makeResolutionRow())
+      .mockResolvedValueOnce(makeAdminRow({ status: 'REFUND_ISSUED' }));
+    prisma.returnRequest.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // the attempt-state freeze gate
+      .mockResolvedValueOnce({ count: 0 }); // the status-transition update loses the race
+    paymentsService.refund.mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
+    });
+
+    await service.resolveClaim('admin-1', 'rr-1', undefined);
+
+    expect(auditService.log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'RETURN_REFUND_ISSUED' }),
+    );
+  });
+});
+
+describe('ReturnsService.handlePaymentRefunded — Phase 6D-4G crash reconciliation', () => {
+  function refundedPayload(
+    overrides: Partial<PaymentRefundedPayload> = {},
+  ): PaymentRefundedPayload {
+    return {
+      orderId: 'order-1',
+      userId: 'user-1',
+      paymentId: 'pay-1',
+      amount: 45.36,
+      refundId: 'refund-1',
+      ...overrides,
+    };
+  }
+
+  it('completes the transition (REFUND_ISSUED, refundId, refundAttemptState reset) for a claim stuck IN_PROGRESS on this payment, and audits RETURN_REFUND_RECONCILED', async () => {
+    const { prisma, auditService, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue({ id: 'rr-1' });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.handlePaymentRefunded(refundedPayload());
+
+    expect(prisma.returnRequest.findFirst).toHaveBeenCalledWith({
+      where: {
+        status: 'APPROVED',
+        refundAttemptState: 'IN_PROGRESS',
+        order: { payment: { id: 'pay-1' } },
+      },
+      select: { id: true },
+    });
+    expect(prisma.returnRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'rr-1',
+        status: 'APPROVED',
+        refundAttemptState: 'IN_PROGRESS',
+      },
+      data: {
+        status: 'REFUND_ISSUED',
+        resolutionType: 'REFUND',
+        refundId: 'refund-1',
+        refundAttemptState: 'NONE',
+      },
+    });
+    const [[loggedInput]] = auditService.log.mock.calls;
+    expect(loggedInput.action).toBe('RETURN_REFUND_RECONCILED');
+    expect(loggedInput.actorId).toBe('user-1');
+    expect(loggedInput.resourceId).toBe('rr-1');
+  });
+
+  it('is a silent no-op when no claim is stuck for this payment — the overwhelmingly common case (a normal refund with no return attached, or one resolvePrepaidRefund already finished)', async () => {
+    const { prisma, auditService, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue(null);
+
+    await service.handlePaymentRefunded(refundedPayload());
+
+    expect(prisma.returnRequest.updateMany).not.toHaveBeenCalled();
+    expect(auditService.log).not.toHaveBeenCalled();
+  });
+
+  it("is a silent no-op when it loses the race to resolvePrepaidRefund's own normal completion — never logs a duplicate/false audit record", async () => {
+    const { prisma, auditService, service } = createDeps();
+    prisma.returnRequest.findFirst.mockResolvedValue({ id: 'rr-1' });
+    prisma.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.handlePaymentRefunded(refundedPayload());
+
+    expect(auditService.log).not.toHaveBeenCalled();
   });
 });
 

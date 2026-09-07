@@ -23,6 +23,7 @@ describe('NotificationEventListener.handlePaymentRefunded', () => {
       userId: 'user-1',
       paymentId: 'pay-1',
       amount: 71.3,
+      refundId: 'refund-1',
     });
 
     expect(notificationsService.create).toHaveBeenCalledWith({
@@ -42,6 +43,7 @@ describe('NotificationEventListener.handlePaymentRefunded', () => {
       userId: 'user-1',
       paymentId: 'pay-1',
       amount: 20,
+      refundId: 'refund-1',
     });
 
     expect(notificationsService.create).toHaveBeenCalledWith({
@@ -63,6 +65,7 @@ describe('NotificationEventListener.handlePaymentRefunded', () => {
         userId: 'user-1',
         paymentId: 'pay-2',
         amount: 10,
+        refundId: 'refund-2',
       }),
     ).rejects.toThrow('db unavailable');
   });

@@ -732,6 +732,7 @@ export class PaymentsService {
       userId: payment.userId,
       paymentId: payment.id,
       amount,
+      refundId: outcome.id,
     };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
     this.eventEmitter.emit(PAYMENT_EVENTS.REFUNDED, payload);
