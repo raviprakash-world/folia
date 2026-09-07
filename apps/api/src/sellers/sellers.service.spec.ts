@@ -54,6 +54,7 @@ function createDeps() {
   const prisma = {
     seller: {
       findUnique: jest.fn<Promise<unknown>, [unknown]>(),
+      findFirst: jest.fn<Promise<unknown>, [unknown]>(),
       findUniqueOrThrow: jest.fn<Promise<unknown>, [unknown]>(),
       findMany: jest.fn<Promise<unknown[]>, [unknown]>(),
       create: jest.fn<Promise<unknown>, [unknown]>(),
@@ -67,6 +68,9 @@ function createDeps() {
     sellerVerification: {
       findMany: jest.fn<Promise<unknown[]>, [unknown]>(),
       create: jest.fn<Promise<unknown>, [unknown]>(),
+    },
+    product: {
+      aggregate: jest.fn<Promise<unknown>, [unknown]>(),
     },
     user: {
       update: jest.fn<Promise<unknown>, [unknown]>(),
@@ -136,6 +140,75 @@ describe('SellersService.findByUserId', () => {
     prisma.seller.findUnique.mockResolvedValue(null);
 
     expect(await service.findByUserId('user-without-seller')).toBeNull();
+  });
+});
+
+describe('SellersService.getPublicStorefront', () => {
+  it('returns the storefront for an ACTIVE seller, with a real derived productCount/averageRating', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.findFirst.mockResolvedValue({
+      id: 'seller-1',
+      slug: 'terracotta-and-fern',
+      displayName: 'Terracotta & Fern',
+      description: 'Small-batch planters.',
+      logoUrl: null,
+    });
+    prisma.product.aggregate.mockResolvedValue({
+      _count: { _all: 3 },
+      _avg: { rating: { toNumber: () => 4.5 } },
+    });
+
+    const result = await service.getPublicStorefront('terracotta-and-fern');
+
+    expect(prisma.seller.findFirst).toHaveBeenCalledWith({
+      where: { slug: 'terracotta-and-fern', status: 'ACTIVE' },
+    });
+    expect(result.id).toBe('seller-1');
+    expect(result.productCount).toBe(3);
+    expect(result.averageRating).toBe(4.5);
+  });
+
+  it('404s for a seller that does not exist — never a distinguishing error', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.findFirst.mockResolvedValue(null);
+
+    await expect(service.getPublicStorefront('nonexistent')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('404s for a real but non-ACTIVE seller (APPLIED/SUSPENDED/etc.) — the WHERE clause itself excludes them, never leaking their private status', async () => {
+    const { prisma, service } = createDeps();
+    // The mock never returns a non-ACTIVE row because the query's own
+    // `status: 'ACTIVE'` filter would exclude it in real Postgres — this
+    // test asserts the filter is actually present in the query.
+    prisma.seller.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getPublicStorefront('a-suspended-seller'),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.seller.findFirst).toHaveBeenCalledWith({
+      where: { slug: 'a-suspended-seller', status: 'ACTIVE' },
+    });
+  });
+
+  it('returns null averageRating (not 0) when no ACTIVE product has a rating yet — never fabricated', async () => {
+    const { prisma, service } = createDeps();
+    prisma.seller.findFirst.mockResolvedValue({
+      slug: 'new-seller',
+      displayName: 'New Seller',
+      description: 'Just approved.',
+      logoUrl: null,
+    });
+    prisma.product.aggregate.mockResolvedValue({
+      _count: { _all: 0 },
+      _avg: { rating: null },
+    });
+
+    const result = await service.getPublicStorefront('new-seller');
+
+    expect(result.averageRating).toBeNull();
+    expect(result.productCount).toBe(0);
   });
 });
 

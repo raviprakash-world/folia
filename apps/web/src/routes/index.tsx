@@ -14,6 +14,7 @@ const Shop = lazy(() => import('@/pages/Shop'));
 const Category = lazy(() => import('@/pages/Category'));
 const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const Search = lazy(() => import('@/pages/Search'));
+const SellerStorefront = lazy(() => import('@/pages/SellerStorefront'));
 const Cart = lazy(() => import('@/pages/Cart'));
 const Wishlist = lazy(() => import('@/pages/Wishlist'));
 const About = lazy(() => import('@/pages/About'));
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
       { path: 'collections/:slug', element: withSuspense(<Category />) },
       { path: 'product/:slug', element: withSuspense(<ProductDetail />) },
       { path: 'search', element: withSuspense(<Search />) },
+      { path: 'sellers/:slug', element: withSuspense(<SellerStorefront />) },
       { path: 'cart', element: withSuspense(<Cart />) },
       { path: 'wishlist', element: withSuspense(<Wishlist />) },
       { path: 'about', element: withSuspense(<About />) },

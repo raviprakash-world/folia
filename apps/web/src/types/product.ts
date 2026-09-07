@@ -55,6 +55,8 @@ export interface ProductQuery {
   page?: number;
   pageSize?: number;
   search?: string;
+  /** Marketplace Phase 4 — filter to one seller's storefront. */
+  sellerId?: string;
 }
 
 export interface ProductQueryResult {

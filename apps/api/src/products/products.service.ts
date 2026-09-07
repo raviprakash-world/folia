@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   ConflictException,
@@ -74,6 +73,7 @@ export class ProductsService {
     if (query.inStockOnly) where.inStock = true;
     if (query.search)
       where.name = { contains: query.search, mode: 'insensitive' };
+    if (query.sellerId) where.sellerId = query.sellerId;
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 12;
@@ -104,7 +104,7 @@ export class ProductsService {
       include: PRODUCT_INCLUDE,
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product as ProductRecord;
+    return product;
   }
 
   /**
@@ -125,7 +125,7 @@ export class ProductsService {
       include: PRODUCT_INCLUDE,
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product as ProductRecord;
+    return product;
   }
 
   /**
@@ -182,7 +182,7 @@ export class ProductsService {
     return this.prisma.product.create({
       data: { ...input, stockCount: 0, inStock: false },
       include: PRODUCT_INCLUDE,
-    }) as Promise<ProductRecord>;
+    });
   }
 
   async adminUpdate(
@@ -216,7 +216,7 @@ export class ProductsService {
       where: { id },
       data: input,
       include: PRODUCT_INCLUDE,
-    }) as Promise<ProductRecord>;
+    });
   }
 
   /** Soft delete — matches the schema's own documented reasoning: a deleted product shouldn't vanish from historical order line items that reference it. */

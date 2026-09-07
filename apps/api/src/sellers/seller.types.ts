@@ -134,3 +134,61 @@ export function toAdminSellerRecord(
     verifications: seller.verifications.map(toSellerVerification),
   };
 }
+
+/**
+ * Marketplace Phase 4 — the public storefront shape (GET /sellers/:slug,
+ * unauthenticated). Deliberately a NARROW, hand-picked field set, not a
+ * subset carved out of SellerProfile/AdminSellerRecord by omission —
+ * every field here was added because the governing brief's "storefront
+ * should show" list asks for it, not because it happened to already
+ * exist. In particular this excludes contactEmail/contactPhone: Phase 1's
+ * own schema comment reasoned a seller's public storefront contact
+ * "may reasonably differ from the login email" and could be shown here,
+ * but this phase's own brief separately states "never expose seller
+ * email" under the storefront section specifically — reconsidered here,
+ * at the point it actually matters, in favor of the more conservative,
+ * brief-literal reading: no email of any kind (business or login) goes
+ * on the public page. A future "contact this seller" feature (not asked
+ * for here) is the right mechanism for that, not a raw exposed address.
+ * The full business address is excluded too, for the same reason — nothing
+ * in the brief's storefront list asks for it.
+ *
+ * `id` IS included, despite the brief's general "never expose internal
+ * IDs unless required" rule — its own wording carves out exactly this
+ * case: GET /products?sellerId=... (the existing, reused product-listing
+ * endpoint) has no other way to filter to this seller's catalog, and a
+ * UUID reveals nothing more than the slug already public in the page's
+ * own URL.
+ */
+export interface PublicSellerStorefront {
+  id: string;
+  slug: string;
+  displayName: string;
+  description: string;
+  logoUrl: string | null;
+  productCount: number;
+  /** Average of this seller's own ACTIVE products' existing (real,
+   * already-seeded) rating field — a genuine derived aggregate, not a
+   * fabricated number: null when no ACTIVE product of theirs has a
+   * rating yet, never defaulted to 0 or 5. */
+  averageRating: number | null;
+}
+
+export function toPublicSellerStorefront(
+  seller: Pick<
+    Seller,
+    'id' | 'slug' | 'displayName' | 'description' | 'logoUrl'
+  >,
+  productCount: number,
+  averageRating: number | null,
+): PublicSellerStorefront {
+  return {
+    id: seller.id,
+    slug: seller.slug,
+    displayName: seller.displayName,
+    description: seller.description,
+    logoUrl: seller.logoUrl,
+    productCount,
+    averageRating,
+  };
+}

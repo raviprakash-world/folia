@@ -1,5 +1,5 @@
 import { LayoutGrid, List, SlidersHorizontal, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
 import { ProductFilters } from './ProductFilters';
@@ -16,20 +16,35 @@ interface ProductListingProps {
   title: string;
   description?: string;
   fixedCategory?: string;
+  /** Marketplace Phase 4 — a seller storefront page fixes this to show
+   * only that seller's own catalog. */
+  fixedSellerId?: string;
+  /** Optional content rendered above the grid, in place of the default
+   * title/description block — the storefront page uses this for its own
+   * seller-info hero instead of a plain heading. */
+  header?: ReactNode;
 }
 
-export function ProductListing({ title, description, fixedCategory }: ProductListingProps) {
+export function ProductListing({
+  title,
+  description,
+  fixedCategory,
+  fixedSellerId,
+  header,
+}: ProductListingProps) {
   const { filters, view, updateFilters, setPage, setSort, setView, resetFilters } =
-    useProductListState(fixedCategory);
+    useProductListState(fixedCategory, fixedSellerId);
   const { data, isLoading, isError } = useProducts(filters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   return (
     <Container className="py-16">
-      <div className="mb-10">
-        <h1 className="font-display text-4xl font-semibold text-heading">{title}</h1>
-        {description && <p className="text-ink-soft mt-2 max-w-[60ch]">{description}</p>}
-      </div>
+      {header ?? (
+        <div className="mb-10">
+          <h1 className="font-display text-4xl font-semibold text-heading">{title}</h1>
+          {description && <p className="text-ink-soft mt-2 max-w-[60ch]">{description}</p>}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-[220px_1fr] gap-10">
         {/* Desktop filter sidebar */}

@@ -21,9 +21,11 @@ import {
 } from './seller-verification-file.util';
 import {
   toAdminSellerRecord,
+  toPublicSellerStorefront,
   toSellerProfile,
   toSellerVerification,
   type AdminSellerRecord,
+  type PublicSellerStorefront,
   type SellerProfile,
   type SellerVerificationRecord,
 } from './seller.types';
@@ -106,6 +108,37 @@ export class SellersService {
       ...SELLER_WITH_ADDRESS,
     });
     return toSellerProfile(seller);
+  }
+
+  /**
+   * Marketplace Phase 4 — public, unauthenticated storefront read. Only
+   * ACTIVE sellers are ever returned; an APPLIED/UNDER_REVIEW/REJECTED/
+   * SUSPENDED/DEACTIVATED seller's slug 404s exactly like a nonexistent
+   * one (the brief's own words: "Only ACTIVE seller + ACTIVE product
+   * combinations are publicly visible" — never a distinguishing error
+   * that would leak a seller's private status to a customer). productCount/
+   * averageRating are both computed live from this seller's real ACTIVE
+   * products, not cached fields — the same derive-don't-cache convention
+   * this codebase already uses throughout (StoreCreditEntry's balance,
+   * SellerLedgerEntry's balance).
+   */
+  async getPublicStorefront(slug: string): Promise<PublicSellerStorefront> {
+    const seller = await this.prisma.seller.findFirst({
+      where: { slug, status: 'ACTIVE' },
+    });
+    if (!seller) throw new NotFoundException('Seller not found.');
+
+    const aggregate = await this.prisma.product.aggregate({
+      where: { sellerId: seller.id, approvalStatus: 'ACTIVE', deletedAt: null },
+      _count: { _all: true },
+      _avg: { rating: true },
+    });
+
+    return toPublicSellerStorefront(
+      seller,
+      aggregate._count._all,
+      aggregate._avg.rating?.toNumber() ?? null,
+    );
   }
 
   /**

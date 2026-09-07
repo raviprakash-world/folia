@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Patch,
   Post,
   UploadedFiles,
@@ -18,6 +19,7 @@ import { SellersService } from './sellers.service';
 import { RequireSeller } from './decorators/require-seller.decorator';
 import { CurrentSeller } from './decorators/current-seller.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { ApplySellerDto } from './dto/apply-seller.dto';
 import { UpdateSellerDto } from './dto/update-seller.dto';
 import { UploadVerificationDto } from './dto/upload-verification.dto';
@@ -92,5 +94,19 @@ export class SellersController {
       dto.documentType,
       files ?? [],
     );
+  }
+
+  /**
+   * Marketplace Phase 4 — the public storefront read. Declared LAST and
+   * gated by @Public() so it never shadows the authenticated 'me'-prefixed
+   * routes above it (NestJS/Express match routes in declaration order —
+   * a literal '/sellers/me' segment is always matched by the handlers
+   * above before this wildcard ':slug' pattern is ever reached).
+   */
+  @Get(':slug')
+  @Public()
+  @ApiOperation({ summary: "A seller's public storefront." })
+  getStorefront(@Param('slug') slug: string) {
+    return this.sellersService.getPublicStorefront(slug);
   }
 }

@@ -95,6 +95,20 @@ describe('ProductsService.findMany', () => {
     );
   });
 
+  it('Marketplace Phase 4: filters to one seller when sellerId is provided (a storefront listing)', async () => {
+    const prisma = createMockPrisma();
+    prisma.$transaction.mockResolvedValue([0, []]);
+    const service = new ProductsService(prisma as never);
+
+    await service.findMany({ sellerId: 'seller-1', page: 1, pageSize: 12 });
+
+    expect(prisma.product.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ sellerId: 'seller-1' }),
+      }),
+    );
+  });
+
   it('Marketplace Phase 3: excludes non-ACTIVE products (a seller draft/submission never appears in the public marketplace)', async () => {
     const prisma = createMockPrisma();
     prisma.$transaction.mockResolvedValue([0, []]);

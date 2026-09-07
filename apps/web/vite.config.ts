@@ -160,6 +160,21 @@ export default defineConfig(({ mode }) => {
             },
           }
         : {}),
+      ...(env.VITE_REAL_SELLERS_API === 'true'
+        ? {
+            // Marketplace Phase 4 — the first real frontend surface for
+            // any of the seller domain built across Phases 1-3. Its own
+            // flag, not folded onto VITE_REAL_ADMIN_API/VITE_REAL_ORDERS_API:
+            // seller-facing and public-storefront pages are a genuinely
+            // separate feature a deployment could reasonably enable
+            // independently of the admin dashboard or checkout.
+            '/api/sellers': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/sellers/, '/api/v1/sellers'),
+            },
+          }
+        : {}),
       ...(env.VITE_REAL_ADMIN_API === 'true'
         ? {
             '/api/admin': {
