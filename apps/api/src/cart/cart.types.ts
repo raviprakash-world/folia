@@ -1,4 +1,6 @@
 // See users/user.types.ts's top-of-file comment for why these are hand-written.
+import type { ProductApprovalStatus } from '@prisma/client';
+
 export interface PrismaDecimal {
   toNumber(): number;
 }
@@ -15,6 +17,14 @@ export interface CartItemRecord {
     name: string;
     categoryId: string;
     category: { slug: string };
+    /** Marketplace Phase 5 — which seller owns this product (null =
+     * Folia-owned) and its current moderation status, both needed at
+     * checkout time to re-validate a cart line is still purchasable and
+     * to group order items by seller. */
+    sellerId: string | null;
+    approvalStatus: ProductApprovalStatus;
+    /** Marketplace Phase 16 — null for a Folia-owned line, matching sellerId's own nullability. */
+    seller: { displayName: string } | null;
   };
   variant: { label: string } | null;
 }
@@ -38,6 +48,7 @@ export function toPublicCartItem(item: CartItemRecord) {
     variantId: item.variantId,
     variantLabel: item.variant?.label ?? null,
     quantity: item.quantity,
+    sellerName: item.product.seller?.displayName ?? null,
   };
 }
 

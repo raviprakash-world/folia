@@ -10,7 +10,7 @@ import {
 } from '@/services/ordersApiService';
 import type { Order, CancellationReason, ReturnReason } from '@/types/order';
 
-const useRealOrdersApi = import.meta.env.VITE_REAL_ORDERS_API === 'true';
+export const useRealOrdersApi = import.meta.env.VITE_REAL_ORDERS_API === 'true';
 const LIST_QUERY_KEY = ['real-orders'];
 
 /** Order history — TanStack Query for real server state, matching this project's stated preference; the local Zustand store is used unchanged for the local path. */

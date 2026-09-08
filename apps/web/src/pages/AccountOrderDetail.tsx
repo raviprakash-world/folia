@@ -16,8 +16,12 @@ import { Modal } from '@/components/common/Modal';
 import { Alert } from '@/components/common/Alert';
 import { OrderSummary } from '@/components/order/OrderSummary';
 import { TrackingTimeline } from '@/components/order/TrackingTimeline';
+import { SellerShipments } from '@/components/order/SellerShipments';
+import { ReturnClaimForm } from '@/components/order/ReturnClaimForm';
+import { ReturnClaimStatus } from '@/components/order/ReturnClaimStatus';
 import { ShareButtons } from '@/components/product/ShareButtons';
 import { useOrder } from '@/hooks/useOrders';
+import { useReturnClaim, useRealReturnClaimsApi } from '@/hooks/useReturnClaim';
 import { useCartStore } from '@/store/cartStore';
 import { useToastStore } from '@/store/toastStore';
 import { useNotificationStore } from '@/store/notificationStore';
@@ -27,6 +31,7 @@ import { canCancelOrder, canReturnOrder, deriveRefundStatus, getEffectiveOrderSt
 import { downloadInvoice } from '@/utils/invoice';
 import { products } from '@/data/products';
 import type { CancellationReason, ReturnReason } from '@/types/order';
+import type { CreateReturnClaimInput } from '@/services/returnsApiService';
 
 const cancellationReasons: { value: CancellationReason; label: string }[] = [
   { value: 'changed-mind', label: 'Changed my mind' },
@@ -51,6 +56,7 @@ export default function AccountOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { order, cancelOrder, requestReturn, updateCustomerNotes, reorder: reorderReal } = useOrder(id);
+  const { claim, createClaim, isCreating, createError } = useReturnClaim(id);
   const addCartItem = useCartStore((s) => s.addItem);
   const loadCartFromServer = useCartStore((s) => s.loadFromServer);
   const showToast = useToastStore((s) => s.showToast);
@@ -78,7 +84,13 @@ export default function AccountOrderDetail() {
     );
   }
 
-  const status = getEffectiveOrderStatus(order);
+  const status = getEffectiveOrderStatus(order, useRealOrdersApi);
+  // Real mode: order.returnRequest is always null now (the backend no
+  // longer populates it — see types/returnClaim.ts) and the real
+  // eligibility gate is "no claim exists yet for this order" (a claim is
+  // one-per-order, enforced server-side). Mock mode keeps canReturnOrder's
+  // own order.returnRequest check unchanged.
+  const canFileClaim = useRealReturnClaimsApi ? canReturnOrder(order) && !claim : canReturnOrder(order);
 
   async function handleDownloadInvoice() {
     setGeneratingInvoice(true);
@@ -199,6 +211,21 @@ export default function AccountOrderDetail() {
     }
   }
 
+  /**
+   * Real backend only — the multi-item claim model apps/api/src/orders/
+   * orders.controller.ts's POST /orders/:id/returns implements. Errors
+   * are deliberately left uncaught here: createClaim's own mutation
+   * error state (createError) is what ReturnClaimForm reads to show an
+   * inline message, matching this codebase's existing convention of
+   * surfacing a failed mutation in the form itself rather than a toast
+   * (see AdminOrders.tsx's shipMutation.isError handling).
+   */
+  async function handleSubmitClaim(input: CreateReturnClaimInput) {
+    await createClaim(input);
+    setReturnOpen(false);
+    showToast('success', 'Return/DOA claim submitted — we’ll review it shortly.');
+  }
+
   async function handleSaveNotes() {
     await updateCustomerNotes(notesDraft);
     setNotesSaved(true);
@@ -214,8 +241,20 @@ export default function AccountOrderDetail() {
     });
   }
 
+  // Phase 6: in real mode, order.cancellation.refundStatus is the server's
+  // own real value (derived from actual Payment/Refund state, since
+  // OrdersService.requestCancellation now attempts a real refund) — trust
+  // it verbatim rather than re-deriving a second, client-side opinion from
+  // elapsed time, which would show "refunded" on a fixed timer regardless
+  // of whether the real refund actually succeeded. Mock mode has no
+  // server recomputing this over time (the local store sets it once, at
+  // request time — see orderStore.ts), so it keeps the elapsed-time
+  // simulation to still show forward progress in a demo. Returns aren't
+  // wired to a real refund yet either way, so they always simulate.
   const refundStatus = order.cancellation?.refundStatus
-    ? deriveRefundStatus(order.cancellation.requestedAt)
+    ? useRealOrdersApi
+      ? order.cancellation.refundStatus
+      : deriveRefundStatus(order.cancellation.requestedAt)
     : order.returnRequest
       ? deriveRefundStatus(order.returnRequest.requestedAt)
       : null;
@@ -228,7 +267,13 @@ export default function AccountOrderDetail() {
         action={<Tag tone={orderStatusTone[status]}>{status.replace('-', ' ')}</Tag>}
       />
 
-      {(order.cancellation ?? order.returnRequest) && refundStatus && (
+      {(order.cancellation ?? order.returnRequest) && (
+        // Deliberately NOT also gated on `refundStatus` — a COD
+        // cancellation has refundStatus: null (nothing was ever charged),
+        // and that's exactly the case this alert needs to explain, not
+        // hide. A real, previously-unnoticed bug: this alert never
+        // rendered for a COD cancellation before this fix, silently
+        // dropping the "nothing was charged" message it exists to show.
         <Alert tone={refundStatus === 'refunded' ? 'success' : 'info'} className="mb-6">
           {order.cancellation ? 'Cancellation' : 'Return'} reason:{' '}
           {(order.cancellation
@@ -240,6 +285,12 @@ export default function AccountOrderDetail() {
               ? ' — refund complete.'
               : ' — refund processing.'}
         </Alert>
+      )}
+
+      {useRealReturnClaimsApi && claim && (
+        <div className="mb-6">
+          <ReturnClaimStatus claim={claim} />
+        </div>
       )}
 
       <div className="flex flex-wrap items-center gap-3 mb-10">
@@ -257,7 +308,7 @@ export default function AccountOrderDetail() {
             Cancel order
           </Button>
         )}
-        {canReturnOrder(order) && (
+        {canFileClaim && (
           <Button variant="outline" size="sm" icon={<Undo2 size={14} />} onClick={() => setReturnOpen(true)}>
             Return order
           </Button>
@@ -270,7 +321,11 @@ export default function AccountOrderDetail() {
 
       <div className="mb-12">
         <h2 className="font-display text-lg font-semibold text-heading mb-4">Delivery tracking</h2>
-        <TrackingTimeline order={order} />
+        {order.sellerGroups && order.sellerGroups.length > 1 ? (
+          <SellerShipments groups={order.sellerGroups} />
+        ) : (
+          <TrackingTimeline order={order} />
+        )}
       </div>
 
       <div className="mb-10">
@@ -330,57 +385,69 @@ export default function AccountOrderDetail() {
         </div>
       </Modal>
 
-      <Modal open={returnOpen} onClose={() => setReturnOpen(false)} title="Return this order?">
-        <div className="flex flex-col gap-4">
-          <div>
-            <p className="text-sm font-medium text-ink-soft mb-2">Which items?</p>
+      {useRealReturnClaimsApi ? (
+        <Modal open={returnOpen} onClose={() => setReturnOpen(false)} title="File a return / DOA claim" size="lg">
+          <ReturnClaimForm
+            order={order}
+            onSubmit={handleSubmitClaim}
+            onCancel={() => setReturnOpen(false)}
+            isSubmitting={isCreating}
+            submitError={createError instanceof Error ? createError.message : null}
+          />
+        </Modal>
+      ) : (
+        <Modal open={returnOpen} onClose={() => setReturnOpen(false)} title="Return this order?">
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-sm font-medium text-ink-soft mb-2">Which items?</p>
+              <div className="flex flex-col gap-1.5">
+                {order.items.map((item, i) => (
+                  <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedReturnItems.has(i)}
+                      onChange={() => toggleReturnItem(i)}
+                      className="w-4 h-4 accent-fern"
+                    />
+                    {item.name}{item.variantLabel ? ` (${item.variantLabel})` : ''} — {formatCurrency(item.price)}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="flex flex-col gap-1.5">
-              {order.items.map((item, i) => (
-                <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedReturnItems.has(i)}
-                    onChange={() => toggleReturnItem(i)}
-                    className="w-4 h-4 accent-fern"
-                  />
-                  {item.name}{item.variantLabel ? ` (${item.variantLabel})` : ''} — {formatCurrency(item.price)}
-                </label>
-              ))}
+              <label htmlFor="return-reason" className="text-sm font-medium text-ink-soft">
+                Reason
+              </label>
+              <select
+                id="return-reason"
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value as ReturnReason)}
+                className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm"
+              >
+                {returnReasons.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            <textarea
+              value={returnNote}
+              onChange={(e) => setReturnNote(e.target.value)}
+              placeholder="Additional details (optional)"
+              rows={2}
+              className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm"
+            />
+            <p className="text-xs text-ink-soft">
+              This return covers the whole order's refund — item selection is recorded for our records but doesn't split the refund total.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setReturnOpen(false)}>Cancel</Button>
+              <Button variant="primary" disabled={selectedReturnItems.size === 0} onClick={() => void handleConfirmReturn()}>
+                Request return
+              </Button>
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="return-reason" className="text-sm font-medium text-ink-soft">
-              Reason
-            </label>
-            <select
-              id="return-reason"
-              value={returnReason}
-              onChange={(e) => setReturnReason(e.target.value as ReturnReason)}
-              className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm"
-            >
-              {returnReasons.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-          </div>
-          <textarea
-            value={returnNote}
-            onChange={(e) => setReturnNote(e.target.value)}
-            placeholder="Additional details (optional)"
-            rows={2}
-            className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm"
-          />
-          <p className="text-xs text-ink-soft">
-            This return covers the whole order's refund — item selection is recorded for our records but doesn't split the refund total.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setReturnOpen(false)}>Cancel</Button>
-            <Button variant="primary" disabled={selectedReturnItems.size === 0} onClick={() => void handleConfirmReturn()}>
-              Request return
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 }

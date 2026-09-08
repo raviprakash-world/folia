@@ -20,7 +20,7 @@ export default function AdminOverview() {
     Icon: ShoppingBag,
     title: `Order ${o.id} — ${o.status}`,
     description: `${formatCurrency(o.total)} · ${o.items.length} item${o.items.length === 1 ? '' : 's'}`,
-    timestamp: new Date(o.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+    timestamp: new Date(o.createdAt).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
   }));
 
   return (

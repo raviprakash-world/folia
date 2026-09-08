@@ -54,6 +54,14 @@ export class ProductQueryDto {
   @IsString()
   search?: string;
 
+  @ApiPropertyOptional({
+    description:
+      "Marketplace Phase 4 — filter to one seller's storefront. Never combined with a Folia-owned-only view; a seller product only ever appears here once ACTIVE, same as every other product.",
+  })
+  @IsOptional()
+  @IsString()
+  sellerId?: string;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)

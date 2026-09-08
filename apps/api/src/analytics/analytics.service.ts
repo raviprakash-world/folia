@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -38,7 +37,7 @@ export class AnalyticsService {
           userId: input.userId,
           productId: input.productId,
           orderId: input.orderId,
-          // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- Prisma.InputJsonValue doesn't exist in this pre-generation sandbox's minimal stub (verified directly: node_modules/.prisma/client/default.d.ts has no InputJsonValue member at all, only a generic TransactionClient=any fallback), so ESLint's type-aware linting sees it as an unresolved "error type" here. It's a real, correctly-named Prisma export once real generation succeeds — confirmed indirectly by the exact real-environment error this cast fixes, which could only occur if InputJsonValue genuinely exists there.
+
           metadata: input.metadata as Prisma.InputJsonValue | undefined,
         },
       });
@@ -233,5 +232,140 @@ export class AnalyticsService {
       name: nameById.get(g.productId) ?? g.productId,
       unitsSold: g._sum.quantity ?? 0,
     }));
+  }
+
+  /**
+   * Marketplace Phase 14 — real seller counts by status, same
+   * groupBy-from-the-authoritative-table shape as getOrderStats above.
+   * The admin dashboard's own "what needs my attention" queue: APPLIED +
+   * UNDER_REVIEW is the real seller-moderation backlog.
+   */
+  async getSellerStats(): Promise<{
+    total: number;
+    byStatus: Record<string, number>;
+  }> {
+    const grouped = await this.prisma.seller.groupBy({
+      by: ['status'],
+      _count: { status: true },
+    });
+    const byStatus: Record<string, number> = {};
+    let total = 0;
+    for (const g of grouped) {
+      byStatus[g.status] = g._count.status;
+      total += g._count.status;
+    }
+    return { total, byStatus };
+  }
+
+  /**
+   * Marketplace Phase 14 — real marketplace GMV, split the same way
+   * OrderSellerGroup itself already splits every order: sellerId null is
+   * Folia's own direct sales, sellerId set is real marketplace seller
+   * sales. Sourced from OrderSellerGroup.subtotal/commissionTotal (both
+   * frozen at order-creation time, Marketplace Phases 5/8) rather than
+   * Order.total, for the identical "authoritative table over a derived
+   * figure" reasoning totalRevenue's own doc comment gives — and because
+   * Order.total has no per-seller breakdown at all.
+   */
+  async getMarketplaceGmv(range: DateRange = {}): Promise<{
+    sellerGmv: number;
+    foliaGmv: number;
+    commissionCollected: number;
+  }> {
+    const groups = (await this.prisma.orderSellerGroup.findMany({
+      where: {
+        order: {
+          status: { notIn: ['CANCELLED'] },
+          ...(dateFilter(range) ? { createdAt: dateFilter(range) } : {}),
+        },
+      },
+      select: { sellerId: true, subtotal: true, commissionTotal: true },
+    })) as {
+      sellerId: string | null;
+      subtotal: { toNumber(): number };
+      commissionTotal: { toNumber(): number };
+    }[];
+
+    let sellerGmv = 0;
+    let foliaGmv = 0;
+    let commissionCollected = 0;
+    for (const group of groups) {
+      if (group.sellerId) {
+        sellerGmv += group.subtotal.toNumber();
+        commissionCollected += group.commissionTotal.toNumber();
+      } else {
+        foliaGmv += group.subtotal.toNumber();
+      }
+    }
+    return { sellerGmv, foliaGmv, commissionCollected };
+  }
+
+  /**
+   * Marketplace Phase 14 — real per-seller revenue ranking, same
+   * groupBy-then-hydrate-names shape as getTopSellingProducts above.
+   * Folia's own sales (sellerId null) are deliberately excluded — this
+   * ranks marketplace sellers against each other, not against Folia
+   * itself.
+   */
+  async getTopSellers(
+    limit = 10,
+  ): Promise<{ sellerId: string; displayName: string; revenue: number }[]> {
+    const grouped = await this.prisma.orderSellerGroup.groupBy({
+      by: ['sellerId'],
+      where: {
+        sellerId: { not: null },
+        order: { status: { notIn: ['CANCELLED'] } },
+      },
+      _sum: { subtotal: true },
+      orderBy: { _sum: { subtotal: 'desc' } },
+      take: limit,
+    });
+
+    const sellerIds = grouped
+      .map((g) => g.sellerId)
+      .filter((id): id is string => id !== null);
+    const sellers = (await this.prisma.seller.findMany({
+      where: { id: { in: sellerIds } },
+      select: { id: true, displayName: true },
+    })) as { id: string; displayName: string }[];
+    const nameById = new Map(sellers.map((s) => [s.id, s.displayName]));
+
+    return grouped
+      .filter((g) => g.sellerId !== null)
+      .map((g) => ({
+        sellerId: g.sellerId as string,
+        displayName:
+          nameById.get(g.sellerId as string) ?? (g.sellerId as string),
+        revenue:
+          (g._sum.subtotal as { toNumber(): number } | null)?.toNumber() ?? 0,
+      }));
+  }
+
+  /**
+   * Marketplace Phase 14 — the real "what needs my attention today"
+   * counts, one query per real moderation/operational queue this
+   * initiative actually built (Phases 2/3/9). Deliberately does NOT
+   * duplicate getSellerStats' own APPLIED+UNDER_REVIEW breakdown —
+   * callers needing the full per-status split should call that instead;
+   * this is just the single actionable number for each queue.
+   */
+  async getPendingModerationCounts(): Promise<{
+    sellersAwaitingReview: number;
+    productsAwaitingReview: number;
+    payoutsPending: number;
+  }> {
+    const [sellersAwaitingReview, productsAwaitingReview, payoutsPending] =
+      await Promise.all([
+        this.prisma.seller.count({
+          where: { status: { in: ['APPLIED', 'UNDER_REVIEW'] } },
+        }),
+        this.prisma.product.count({
+          where: { approvalStatus: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+        }),
+        this.prisma.sellerPayout.count({
+          where: { status: { in: ['PENDING', 'PROCESSING'] } },
+        }),
+      ]);
+    return { sellersAwaitingReview, productsAwaitingReview, payoutsPending };
   }
 }

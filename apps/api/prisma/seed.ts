@@ -19,10 +19,47 @@ const PERMISSIONS = [
   { key: 'customers:read', description: 'View customer accounts' },
   { key: 'customers:write', description: 'Edit customer accounts' },
   { key: 'analytics:read', description: 'View the admin analytics dashboard' },
+  // Marketplace Phase 1 — a real, additive permission set for the new
+  // 'seller' role. Not yet gated behind @RequirePermissions() anywhere
+  // (Marketplace Phase 1's one endpoint, GET /sellers/me, is gated by
+  // @RequireSeller() — ownership, not permission — alone); real
+  // infrastructure ahead of the write endpoints that will consume these,
+  // same status as this seed's own existing permission set was before
+  // Phase 9 wired admin RBAC up to it.
+  { key: 'seller_profile:read', description: 'View own seller profile' },
+  { key: 'seller_profile:write', description: 'Edit own seller profile' },
+  { key: 'seller_products:read', description: 'View own seller products' },
+  {
+    key: 'seller_products:write',
+    description: 'Create/edit own seller products',
+  },
+  {
+    key: 'seller_orders:read',
+    description: 'View own seller order fulfillments',
+  },
+  {
+    key: 'seller_returns:read',
+    description: 'View own seller return claims',
+  },
+  {
+    key: 'seller_earnings:read',
+    description: 'View own seller ledger/earnings',
+  },
+  { key: 'seller_payouts:read', description: 'View own seller payouts' },
 ];
 
 const CUSTOMER_PERMISSIONS = ['orders:read', 'products:read'];
 const ADMIN_PERMISSIONS = PERMISSIONS.map((p) => p.key); // admins get everything
+// A seller-role account only gets seller_* permissions — it does NOT need
+// orders:read/products:read granted this way, since every customer-facing
+// endpoint (orders, cart, wishlist, ...) already carries no @Roles()/
+// @RequirePermissions() gate at all (see
+// docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md §10) — a seller
+// keeps shopping as an ordinary customer unchanged, with no extra grant
+// needed for that.
+const SELLER_PERMISSIONS = PERMISSIONS.filter((p) =>
+  p.key.startsWith('seller_'),
+).map((p) => p.key);
 
 // Categories and collections, matching apps/web/src/data/categories.ts exactly.
 const CATEGORIES = [
@@ -129,7 +166,7 @@ const PRODUCTS: SeedProductInput[] = [
     id: 'p1',
     slug: 'monstera-deliciosa',
     name: 'Monstera Deliciosa',
-    price: 68,
+    price: 2720,
     description:
       'Monstera Deliciosa brings Cheese plant, iconic split leaves to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -141,22 +178,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 10,
     createdAt: '2026-07-29',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: false },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: false },
     ],
     specs: [
       { label: 'Light', value: 'Bright indirect' },
       { label: 'Water', value: 'Weekly' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '36in' },
+      { label: 'Mature height', value: '90cm' },
     ],
   },
   {
     id: 'p2',
     slug: 'fiddle-leaf-fig',
     name: 'Fiddle Leaf Fig',
-    price: 95,
+    price: 3800,
     description:
       'Fiddle Leaf Fig brings dramatic violin-shaped leaves, fussy about drafts to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -167,22 +204,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 13,
     createdAt: '2026-07-20',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Bright indirect' },
       { label: 'Water', value: 'Weekly' },
       { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '18in' },
+      { label: 'Mature height', value: '45cm' },
     ],
   },
   {
     id: 'p3',
     slug: 'snake-plant-laurentii',
     name: 'Snake Plant Laurentii',
-    price: 38,
+    price: 1520,
     description:
       'Snake Plant Laurentii brings upright striped leaves, tolerates neglect to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -194,22 +231,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 16,
     createdAt: '2026-07-11',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Bright indirect' },
       { label: 'Water', value: 'Weekly' },
       { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '24in' },
+      { label: 'Mature height', value: '60cm' },
     ],
   },
   {
     id: 'p4',
     slug: 'pothos-marble-queen',
     name: 'Pothos Marble Queen',
-    price: 32,
+    price: 1280,
     description:
       'Pothos Marble Queen brings trailing variegated vine, grows in low light to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -220,23 +257,23 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 19,
     createdAt: '2026-07-02',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: false },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: false },
     ],
     specs: [
       { label: 'Light', value: 'Medium indirect' },
       { label: 'Water', value: 'Every 10–14 days' },
       { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '42in' },
+      { label: 'Mature height', value: '105cm' },
     ],
   },
   {
     id: 'p5',
     slug: 'bird-s-nest-fern',
     name: "Bird's Nest Fern",
-    price: 44,
-    compareAtPrice: 55,
+    price: 1760,
+    compareAtPrice: 2200,
     description:
       "Bird's Nest Fern brings ruffled fronds, likes humidity to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.",
     categorySlug: 'plants',
@@ -248,22 +285,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 22,
     createdAt: '2026-06-23',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Medium indirect' },
       { label: 'Water', value: 'Every 10–14 days' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '24in' },
+      { label: 'Mature height', value: '60cm' },
     ],
   },
   {
     id: 'p6',
     slug: 'calathea-orbifolia',
     name: 'Calathea Orbifolia',
-    price: 58,
+    price: 2320,
     description:
       'Calathea Orbifolia brings striped round leaves, prayer-plant family to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -275,22 +312,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 2,
     createdAt: '2026-06-14',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Bright indirect' },
       { label: 'Water', value: 'Weekly' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '36in' },
+      { label: 'Mature height', value: '90cm' },
     ],
   },
   {
     id: 'p7',
     slug: 'zz-plant',
     name: 'ZZ Plant',
-    price: 46,
+    price: 1840,
     description:
       'ZZ Plant brings glossy dark leaves, drought tolerant to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -302,22 +339,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 28,
     createdAt: '2026-06-05',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: false },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: false },
     ],
     specs: [
       { label: 'Light', value: 'Low light tolerant' },
-      { label: 'Water', value: 'When top 2in dry' },
+      { label: 'Water', value: 'When top 5cm dry' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '36in' },
+      { label: 'Mature height', value: '90cm' },
     ],
   },
   {
     id: 'p8',
     slug: 'rubber-plant-burgundy',
     name: 'Rubber Plant Burgundy',
-    price: 62,
+    price: 2480,
     description:
       'Rubber Plant Burgundy brings deep maroon leaves, fast growing to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -328,22 +365,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 31,
     createdAt: '2026-05-27',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Bright indirect' },
       { label: 'Water', value: 'Weekly' },
       { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '24in' },
+      { label: 'Mature height', value: '60cm' },
     ],
   },
   {
     id: 'p9',
     slug: 'string-of-pearls',
     name: 'String of Pearls',
-    price: 26,
+    price: 1040,
     description:
       'String of Pearls brings trailing bead-like leaves, needs bright light to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -355,22 +392,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 34,
     createdAt: '2026-05-18',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Medium indirect' },
       { label: 'Water', value: 'Every 10–14 days' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '24in' },
+      { label: 'Mature height', value: '60cm' },
     ],
   },
   {
     id: 'p10',
     slug: 'peace-lily',
     name: 'Peace Lily',
-    price: 34,
+    price: 1360,
     description:
       'Peace Lily brings white blooms, signals thirst by drooping to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -381,23 +418,23 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 37,
     createdAt: '2026-05-09',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: false },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: false },
     ],
     specs: [
       { label: 'Light', value: 'Medium indirect' },
       { label: 'Water', value: 'Every 10–14 days' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '18in' },
+      { label: 'Mature height', value: '45cm' },
     ],
   },
   {
     id: 'p11',
     slug: 'boston-fern',
     name: 'Boston Fern',
-    price: 29,
-    compareAtPrice: 36,
+    price: 1160,
+    compareAtPrice: 1440,
     description:
       'Boston Fern brings classic feathery fronds, humidity lover to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -409,22 +446,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 40,
     createdAt: '2026-04-30',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Low light tolerant' },
-      { label: 'Water', value: 'When top 2in dry' },
+      { label: 'Water', value: 'When top 5cm dry' },
       { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '24in' },
+      { label: 'Mature height', value: '60cm' },
     ],
   },
   {
     id: 'p12',
     slug: 'areca-palm',
     name: 'Areca Palm',
-    price: 88,
+    price: 3520,
     description:
       'Areca Palm brings airy fronds, good for filtering air to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
     categorySlug: 'plants',
@@ -436,22 +473,22 @@ const PRODUCTS: SeedProductInput[] = [
     stockCount: 2,
     createdAt: '2026-04-21',
     variants: [
-      { label: 'Small (4in pot)', swatch: null, inStock: true },
-      { label: 'Medium (6in pot)', swatch: null, inStock: true },
-      { label: 'Large (10in pot)', swatch: null, inStock: true },
+      { label: 'Small (10cm pot)', swatch: null, inStock: true },
+      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
+      { label: 'Large (25cm pot)', swatch: null, inStock: true },
     ],
     specs: [
       { label: 'Light', value: 'Medium indirect' },
       { label: 'Water', value: 'Every 10–14 days' },
       { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '18in' },
+      { label: 'Mature height', value: '45cm' },
     ],
   },
   {
     id: 'p13',
     slug: 'ceramic-vessel-ash',
     name: 'Ceramic Vessel — Ash',
-    price: 42,
+    price: 1680,
     description:
       'Ceramic Vessel — Ash is made for plants that outgrew their nursery pot. Features hand-glazed stoneware, drainage hole + saucer, sized to work with our most popular plant varieties.',
     categorySlug: 'vessels',
@@ -469,14 +506,14 @@ const PRODUCTS: SeedProductInput[] = [
     specs: [
       { label: 'Material', value: 'Glazed ceramic' },
       { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '8in' },
+      { label: 'Diameter', value: '20cm' },
     ],
   },
   {
     id: 'p14',
     slug: 'stone-planter-round',
     name: 'Stone Planter — Round',
-    price: 64,
+    price: 2560,
     description:
       'Stone Planter — Round is made for plants that outgrew their nursery pot. Features cast concrete finish, weatherproof for patios, sized to work with our most popular plant varieties.',
     categorySlug: 'vessels',
@@ -493,14 +530,14 @@ const PRODUCTS: SeedProductInput[] = [
     specs: [
       { label: 'Material', value: 'Cast concrete' },
       { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '9in' },
+      { label: 'Diameter', value: '23cm' },
     ],
   },
   {
     id: 'p15',
     slug: 'terracotta-pot-set-of-3',
     name: 'Terracotta Pot Set of 3',
-    price: 36,
+    price: 1440,
     description:
       'Terracotta Pot Set of 3 is made for plants that outgrew their nursery pot. Features unglazed clay, breathable for root health, sized to work with our most popular plant varieties.',
     categorySlug: 'vessels',
@@ -518,14 +555,14 @@ const PRODUCTS: SeedProductInput[] = [
     specs: [
       { label: 'Material', value: 'Unglazed clay' },
       { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '11in' },
+      { label: 'Diameter', value: '28cm' },
     ],
   },
   {
     id: 'p16',
     slug: 'woven-plant-basket',
     name: 'Woven Plant Basket',
-    price: 56,
+    price: 2240,
     description:
       'Woven Plant Basket is made for plants that outgrew their nursery pot. Features natural seagrass weave, fits standard nursery pots, sized to work with our most popular plant varieties.',
     categorySlug: 'vessels',
@@ -542,15 +579,15 @@ const PRODUCTS: SeedProductInput[] = [
     specs: [
       { label: 'Material', value: 'Glazed ceramic' },
       { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '6in' },
+      { label: 'Diameter', value: '15cm' },
     ],
   },
   {
     id: 'p17',
     slug: 'matte-black-cylinder-pot',
     name: 'Matte Black Cylinder Pot',
-    price: 48,
-    compareAtPrice: 60,
+    price: 1920,
+    compareAtPrice: 2400,
     description:
       'Matte Black Cylinder Pot is made for plants that outgrew their nursery pot. Features powder-coated steel, modern minimalist profile, sized to work with our most popular plant varieties.',
     categorySlug: 'vessels',
@@ -568,14 +605,14 @@ const PRODUCTS: SeedProductInput[] = [
     specs: [
       { label: 'Material', value: 'Glazed ceramic' },
       { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '6in' },
+      { label: 'Diameter', value: '15cm' },
     ],
   },
   {
     id: 'p18',
     slug: 'fluted-ceramic-planter',
     name: 'Fluted Ceramic Planter',
-    price: 52,
+    price: 2080,
     description:
       'Fluted Ceramic Planter is made for plants that outgrew their nursery pot. Features ridged texture, available in three sizes, sized to work with our most popular plant varieties.',
     categorySlug: 'vessels',
@@ -593,14 +630,14 @@ const PRODUCTS: SeedProductInput[] = [
     specs: [
       { label: 'Material', value: 'Glazed ceramic' },
       { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '10in' },
+      { label: 'Diameter', value: '25cm' },
     ],
   },
   {
     id: 'p19',
     slug: 'brass-plant-mister',
     name: 'Brass Plant Mister',
-    price: 28,
+    price: 1120,
     description:
       'Brass Plant Mister: fine mist nozzle, solid brass, ages naturally. Built to last a few plant-parenting eras, not one season.',
     categorySlug: 'tools',
@@ -620,7 +657,7 @@ const PRODUCTS: SeedProductInput[] = [
     id: 'p20',
     slug: 'precision-pruning-shears',
     name: 'Precision Pruning Shears',
-    price: 24,
+    price: 960,
     description:
       'Precision Pruning Shears: carbon steel blade, for clean cuts that heal fast. Built to last a few plant-parenting eras, not one season.',
     categorySlug: 'tools',
@@ -639,7 +676,7 @@ const PRODUCTS: SeedProductInput[] = [
     id: 'p21',
     slug: 'soil-moisture-meter',
     name: 'Soil Moisture Meter',
-    price: 18,
+    price: 720,
     description:
       'Soil Moisture Meter: no batteries required, reads 3 depths. Built to last a few plant-parenting eras, not one season.',
     categorySlug: 'tools',
@@ -659,7 +696,7 @@ const PRODUCTS: SeedProductInput[] = [
     id: 'p22',
     slug: 'watering-can-1-5l',
     name: 'Watering Can — 1.5L',
-    price: 32,
+    price: 1280,
     description:
       'Watering Can — 1.5L: long spout for tight spaces, powder-coated finish. Built to last a few plant-parenting eras, not one season.',
     categorySlug: 'tools',
@@ -678,8 +715,8 @@ const PRODUCTS: SeedProductInput[] = [
     id: 'p23',
     slug: 'bamboo-plant-stakes-set-of-6',
     name: 'Bamboo Plant Stakes (Set of 6)',
-    price: 14,
-    compareAtPrice: 18,
+    price: 560,
+    compareAtPrice: 720,
     description:
       'Bamboo Plant Stakes (Set of 6): for climbing and top-heavy stems. Built to last a few plant-parenting eras, not one season.',
     categorySlug: 'tools',
@@ -699,7 +736,7 @@ const PRODUCTS: SeedProductInput[] = [
     id: 'p24',
     slug: 'grow-light-full-spectrum',
     name: 'Grow Light — Full Spectrum',
-    price: 74,
+    price: 2960,
     description:
       'Grow Light — Full Spectrum: clips onto shelving, timer built in. Built to last a few plant-parenting eras, not one season.',
     categorySlug: 'tools',
@@ -1397,6 +1434,20 @@ async function main() {
     },
   });
 
+  // Marketplace Phase 1 — additive, matching the customer/admin upserts'
+  // own shape exactly. A seller-role account is layered on top of being a
+  // regular user, not a replacement for 'customer' — see
+  // docs/MARKETPLACE_PHASE0_ARCHITECTURE_ASSESSMENT.md §10.
+  const sellerRole = await prisma.role.upsert({
+    where: { name: 'seller' },
+    update: {},
+    create: {
+      name: 'seller',
+      description: 'Marketplace seller — scoped to their own seller account',
+      permissions: { connect: SELLER_PERMISSIONS.map((key) => ({ key })) },
+    },
+  });
+
   // Matches apps/web's existing documented demo accounts exactly
   // (apps/web/src/data/users.ts, apps/web/README.md) — once the frontend
   // is switched from MSW to this real API, the same demo credentials
@@ -1429,6 +1480,58 @@ async function main() {
       roleId: adminRole.id,
     },
   });
+
+  // Marketplace Phase 1 — a demo seller account, seeded directly with an
+  // ACTIVE Seller row (rather than left mid-application) so every later
+  // marketplace phase can immediately exercise seller-dashboard
+  // functionality against a real account, matching how admin@folia.example
+  // is already a fully-privileged demo account rather than one stuck
+  // mid-setup. The application flow itself (Marketplace Phase 2) still
+  // gets its own real, separately-testable path — this doesn't shortcut
+  // that, it just means this ONE demo account skips needing to be run
+  // through it manually every time.
+  const demoSellerUser = await prisma.user.upsert({
+    where: { email: 'seller@folia.example' },
+    update: {},
+    create: {
+      email: 'seller@folia.example',
+      passwordHash: await hashPassword('folia-seller'),
+      firstName: 'Priya',
+      lastName: 'Menon',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      roleId: sellerRole.id,
+    },
+  });
+  await prisma.seller.upsert({
+    where: { userId: demoSellerUser.id },
+    update: {},
+    create: {
+      userId: demoSellerUser.id,
+      slug: 'terracotta-and-fern',
+      displayName: 'Terracotta & Fern',
+      description:
+        'Small-batch hand-thrown planters and easy-care houseplants, based in Pune.',
+      contactEmail: 'hello@terracottaandfern.example',
+      contactPhone: '+91 98765 43210',
+      gstin: '27ABCDE1234F1Z0',
+      status: 'ACTIVE',
+      approvedAt: new Date(),
+    },
+  });
+
+  // Marketplace Phase 8 — the marketplace-default commission rate. No
+  // natural unique key to upsert() against (versioned by effectiveFrom,
+  // like a rate change), so idempotency is a plain existence check, same
+  // pattern as the notifications block below.
+  const existingDefaultCommission = await prisma.sellerCommission.count({
+    where: { sellerId: null },
+  });
+  if (existingDefaultCommission === 0) {
+    await prisma.sellerCommission.create({
+      data: { sellerId: null, ratePercent: 10 },
+    });
+  }
 
   console.log('Seeding categories and collections...');
   const categoryBySlug = new Map<string, string>();
@@ -1586,9 +1689,9 @@ async function main() {
     create: {
       code: 'WELCOME5',
       type: 'FIXED',
-      value: 5,
-      description: '₹5 off orders over ₹25',
-      minSubtotal: 25,
+      value: 200,
+      description: '₹200 off orders over ₹1,000',
+      minSubtotal: 1000,
     },
   });
 

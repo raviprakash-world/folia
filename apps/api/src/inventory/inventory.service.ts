@@ -73,6 +73,50 @@ export class InventoryService {
   }
 
   /**
+   * Marketplace Phase 3 — creates the FIRST InventoryItem row for a
+   * product (a seller configuring initial stock for a new product). No
+   * equivalent existed before this: admin's own product-creation path
+   * (ProductsService.adminCreate) never called into InventoryService at
+   * all — an admin product starts at stockCount: 0/inStock: false with no
+   * real InventoryItem behind it, a pre-existing gap this method also
+   * happens to be able to close for that path (not retrofitted here,
+   * out of this phase's scope, but noted). Reuses syncProductCache
+   * (this service's own single write point for Product.stockCount/
+   * inStock) so the cache is correct from the moment this transaction
+   * commits — same discipline as adjustStock's real stock changes, not a
+   * second, parallel cache-update mechanism.
+   */
+  async createItem(input: {
+    productId: string;
+    variantId?: string | null;
+    warehouseId: string;
+    sku: string;
+    quantityOnHand: number;
+    reorderPoint?: number;
+  }): Promise<InventoryItemRecord> {
+    return await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const item = await tx.inventoryItem.create({
+          data: {
+            productId: input.productId,
+            variantId: input.variantId ?? null,
+            warehouseId: input.warehouseId,
+            sku: input.sku,
+            quantityOnHand: input.quantityOnHand,
+            reorderPoint: input.reorderPoint ?? 0,
+          },
+        });
+        await this.syncProductCache(
+          tx,
+          input.productId,
+          input.variantId ?? null,
+        );
+        return item;
+      },
+    );
+  }
+
+  /**
    * Locks a single InventoryItem row for the rest of the enclosing
    * transaction (Postgres `SELECT ... FOR UPDATE`) so a second, concurrent
    * transaction touching the same row genuinely blocks until this one

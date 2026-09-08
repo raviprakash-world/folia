@@ -14,6 +14,7 @@ import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
+  { label: 'Sellers', to: '/sellers' },
   { label: 'Journal', to: '/blog' },
   { label: 'About', to: '/about' },
 ];

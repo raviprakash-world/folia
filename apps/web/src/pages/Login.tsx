@@ -45,9 +45,11 @@ export default function Login() {
   return (
     <Container className="py-20 max-w-sm">
       <h1 className="font-display text-3xl font-semibold text-heading">Sign in</h1>
-      <p className="text-sm text-ink-soft mt-2">
-        Demo account: <span className="font-mono">demo@folia.example</span> / <span className="font-mono">folia-demo</span>
-      </p>
+      {import.meta.env.DEV && (
+        <p className="text-sm text-ink-soft mt-2">
+          Demo account: <span className="font-mono">demo@folia.example</span> / <span className="font-mono">folia-demo</span>
+        </p>
+      )}
 
       {error && (
         <Alert tone="error" className="mt-5">

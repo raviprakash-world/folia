@@ -1,7 +1,7 @@
 # Folia — Production Status
 
 **Baseline established:** 2026-09-06 · Phase 0
-**Last updated:** 2026-09-06 · after Phase 5 gate passed
+**Last updated:** 2026-09-07 · after Phase 6 gate passed
 **Rollback checkpoint (Phase 0 baseline):** `b617b9a` (origin/main, clean working tree at time of baseline)
 
 This document is the single source of truth for "does it actually work right now."
@@ -11,15 +11,27 @@ see `PRODUCTION_READINESS.md` at the repo root for why that discipline matters
 here specifically (it documents claims, e.g. a working CI pipeline, that turned
 out not to exist).
 
-## Build / lint / typecheck / test — measured this session, not inherited
+> **P0-A/P0-B/P0-C update (2026-09-07/08)**: a separate, later production-
+> engineering pass (audit → tooling/CI → security, tracked outside this
+> file's own Phase-N numbering) superseded the build/lint/test state
+> this table originally described. The table below is corrected to
+> match current reality; the rest of this document's Phase 1–6
+> narrative (payments/shipping/refunds/admin features) is untouched by
+> that pass and still describes those features' own state accurately as
+> of when each was written — only the tooling/lint/CI/security facts
+> below were stale.
+
+## Build / lint / typecheck / test — corrected by P0-B/P0-C, see note above
 
 | Workspace | Build | Typecheck | Lint | Test |
 |---|---|---|---|---|
-| `apps/api` | ✅ pass | ✅ pass | ❌ **FAIL** — 34 errors, 27 warnings (`--max-warnings 0`) in pre-existing files, unchanged since Phase 0; every file Phases 1–5 touched is separately confirmed lint-clean | ✅ 452/452 pass (unit, mocked Prisma; up from 375 at Phase 0 — Phases 1–5 added payments, inventory-locking, checkout-flow, email, analytics, and shipping-provider tests) |
-| `apps/api` (e2e) | — | — | — | ❌ **FAIL** — same Jest config bug as Phase 0, still not fixed (out of scope for Phases 1–3) |
-| `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged since Phase 0) |
+| `apps/api` | ✅ pass | ✅ pass | ✅ **0 errors, 0 warnings** (fixed P0-B — was 33 errors/20 warnings) | ✅ 830/830 pass (unit, mocked Prisma — P0-C added 13 new security-regression tests: register-throttle e2e, changePassword session revocation, seller-suspension authorization) |
+| `apps/api` (e2e) | — | — | — | ✅ **FIXED (P0-B)** — 6/6 pass, including a real e2e proof that register/login/forgot-password/reset-password all genuinely return 429 on their (N+1)th request (`test/auth-rate-limit.e2e-spec.ts`, P0-C) |
+| `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged — installing one was judged out of scope for a tooling/security phase; the P0-C demo-credential regression check is instead a CI-level production-bundle grep, not a unit test) |
 | `packages/*` | n/a | ⚠️ only `shared-types` has a `typecheck` script; `api-client`/`shared-utils` have none | — | — |
-| root (`turbo run *`) | ❌ **FAILS TO RESOLVE** — root `package.json` has no `packageManager` field, so Turbo can't resolve the workspace at all | — | — | — |
+| root (`turbo run *`) | ✅ **FIXED (P0-B)** — `packageManager` field added, all workspaces resolve | — | — | — |
+| CI | — | — | — | ✅ **NEW (P0-B)** — `.github/workflows/ci.yml`, real Postgres/Redis service containers, gates every PR + push to `main` |
+| `npm audit` | — | — | — | ✅ **0 vulnerabilities** (fixed P0-B, re-confirmed P0-C) |
 
 ## Phase 1 (Payments) + Phase 2 (Inventory concurrency) — what changed
 
@@ -88,6 +100,16 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`.
 - **A real bug was found and fixed during live verification**: the admin "ship" button's error handling let a raw Axios error through instead of the backend's actual message — the UI showed a generic "Request failed with status code 500" instead of the real "Shiprocket is not configured" text. Fixed and confirmed live in the same browser session.
 - **Known gap, stated plainly**: no real Shiprocket account has ever been configured in this environment — every provider-dependent path (real rate lookup, shipment creation, tracking fetch) is unit-tested against a mocked HTTP layer and live-verified only for its "not configured"/graceful-fallback behavior. **An actual real shipment, AWB, or live tracking fetch has never been exercised.** Same honest posture as Razorpay (Phase 1) and Resend (Phase 3).
 
+## Phase 6 (Refunds + returns + order lifecycle) — what changed
+
+Gate passed — full report in `PRODUCTION_ROADMAP.md`; per-sub-phase design notes in `docs/PHASE_6D_MIGRATION_DESIGN.md`.
+
+- **Refunds/cancellations/returns are no longer ad hoc.** Ten gated sub-phases (6A, 6B, 6D-1 through 6D-4H) replaced a fake cancellation-refund flip and a nonexistent return system with: a real race-safe refund/cancellation path; a from-scratch return/DOA/replacement/store-credit data model; a real return-policy engine deriving eligibility from actual order/product data; customer claim filing with evidence upload; admin approve/reject/resolve; real replacement-order creation reusing the same inventory primitives as checkout; reverse-logistics gating; safe prepaid-refund retry; notification delivery; refund-webhook reconciliation at both the payment and returns layers; and, finally, the first frontend (customer + admin) any of this ever had.
+- **A real, previously-invisible bug was found and fixed via live browser verification** (not caught by any of the extensive unit-test coverage that preceded it): the old pre-Phase-6 `Order.returnRequest` field read the same database row Phase 6D's claim system now owns, through dead logic simulating a fake "refunded" status from elapsed time — actively contradicting a real claim's real status. Fixed; the dead mapping is gone.
+- **A real migration-tooling incident was handled correctly, not worked around destructively.** `prisma migrate dev` offered to reset the entire dev database over unrelated pre-existing checksum drift; refused, and fixed with a targeted single-row SQL correction instead.
+- **A post-gate UI gap was found and fixed while closing out this phase**: the mobile account nav had no logout control at all (desktop-only). Fixed.
+- **Known gaps, stated plainly**: Razorpay webhook signature verification has still never been exercised against a real webhook (no sandbox credentials in this environment — same root cause as the Phase 1 gap); evidence-file upload was UI-verified but not exercised with a real file through the browser tool used for this pass; **none of this phase's work is merged to `main` or deployed** — the live Render deployment is still running pre-Phase-6 code.
+
 ### New findings this session (not in the prior audit)
 
 1. **Turbo can't run.** `npx turbo run build` fails immediately with `Could not resolve workspace: Missing devEngines.packageManager or legacy packageManager field`. Every `npm run <script>` at the root that delegates to Turbo (`build`, `dev`, `lint`, `test`, `test:e2e`, `typecheck`) is currently broken. Every verification in this document was run per-workspace directly instead. **Fix:** add a `packageManager` field to root `package.json` (e.g. `"packageManager": "npm@10.x.x"`). Trivial, not yet applied — deferred to whichever phase touches root tooling (candidate: Phase 8).
@@ -101,13 +123,17 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`.
 - Shipping/tracking: **the rate estimate and fulfillment are no longer mocked as of Phase 5** — real Shiprocket integration exists behind a swappable provider interface; see the Phase 5 summary above and `API_INTEGRATION_STATUS.md` for exactly what is and isn't live-verified (the real success path — an actual shipment/AWB — is not). Delivery-availability-by-postal-code (`deliveryService.checkDeliveryAvailability`, used by the checkout Delivery step and address book) remains **mocked**, with no backend endpoint at all — not touched by Phase 5, left as an explicit, honestly-stated gap for a future pass.
 - Inventory: **the race condition is fixed as of Phase 2** — real `SELECT ... FOR UPDATE` row locking, live-proven against concurrent checkouts. See the Phase 1/2 summary above.
 - Admin frontend: **wired to the real, RBAC-guarded admin API as of Phase 4** — see the Phase 4 summary above for exactly which metrics stayed honestly mock/unavailable rather than fabricated.
-- Notifications: real in-app records, plus a real email channel as of Phase 3 (code complete, not live-delivery-verified — see the Phase 3 summary above). SMS still has no provider anywhere.
+- Refunds/cancellations/returns: **no longer ad hoc as of Phase 6** — real race-safe refunds, a real return/DOA/replacement/store-credit system with admin + customer UI, reverse-logistics gating, and refund-webhook reconciliation all exist. See the Phase 6 summary above; the real Razorpay webhook success path remains unverified (same root cause as the Phase 1 gap), and none of it is merged/deployed yet.
+- Notifications: real in-app records, plus a real email channel as of Phase 3 (code complete, not live-delivery-verified — see the Phase 3 summary above), extended in Phase 6 to cover return-lifecycle events. SMS still has no provider anywhere.
 - Reviews: read-only API, no submission endpoint, all seed data.
-- CI/CD: **does not exist** despite `PRODUCTION_READINESS.md` and `apps/api/CHANGELOG.md` both describing a working GitHub Actions pipeline.
-- Backup/DR: no plan exists; the live production Postgres (Render free tier) auto-deletes ~30 days after creation.
-- Graceful shutdown: `app.enableShutdownHooks()` is never called; Dockerfile `CMD` shape likely prevents SIGTERM from reaching Node at all.
+- CI/CD: **fixed as of P0-B** (2026-09-07/08, see the note at the top of this document) — a real GitHub Actions pipeline now exists (`.github/workflows/ci.yml`), simulated end-to-end against ephemeral Postgres/Redis before being trusted, not just written and assumed correct. Prior to that, this bullet was accurate: `PRODUCTION_READINESS.md`/`apps/api/CHANGELOG.md` described a pipeline that didn't actually exist.
+- Backup/DR: **confirmed still missing as of P0-D** (2026-09-08) — no plan exists anywhere in this repo, and Render's free Postgres tier has no automated backups/PITR; the live production Postgres also auto-deletes ~30 days after creation. External-account blocker, not an engineering one — see `docs/SECURITY_STATUS.md`.
+- Graceful shutdown: **fixed as of P0-D** (2026-09-08) — `app.enableShutdownHooks()` added, and the Dockerfile `CMD` now `exec`s `node` so SIGTERM actually reaches it (previously silently swallowed by the wrapping shell). A separate real bug this surfaced — JobsModule's BullMQ Redis connection had no lifecycle hook and kept the process alive past `app.close()` — is also fixed. Verified live in Docker: `docker stop` now reaches `ExitCode 0` in under a second, versus hanging until SIGKILL every time before this fix. Full detail in `docs/SECURITY_STATUS.md`.
+- File retrieval: **fixed as of P0-D** — every uploaded file was previously a dead link (nothing served `/uploads/*`); a real authenticated `FilesController` now exists. Uploaded-file *durability across redeploys* is a separate, still-open gap (ephemeral disk, no object storage configured) — see `docs/SECURITY_STATUS.md`.
 - Zero product photography anywhere in the frontend.
-- India-market shape is wrong throughout: USD currency, mock GSTIN, flat non-slab tax rate, US ZIP validation instead of Indian PIN codes.
+- India-market shape: **largely fixed as of P0-F** (2026-09-08). What changed and what's still genuinely open — full detail in `docs/SECURITY_STATUS.md`'s P0-F section:
+  - **Fixed**: currency was already correctly INR/₹ (`Intl.NumberFormat('en-IN', {currency:'INR'})`) throughout — the real bug was underlying price *magnitudes* still being USD-shaped (a plant priced "$68" → "₹68.00" after the currency-code fix, absurdly cheap for India). Rescaled every seeded product price, coupon value, and shipping-cost constant 40x, consistently, across both the backend seed and the mirrored frontend mock catalog. Also fixed: address/phone/PIN-code validation was unenforced or US-shaped (backend address DTOs took any string; the frontend defaulted new addresses to "United States") — now enforced India-only end to end, real 6-digit-PIN + GSTIN-checksum validators, e2e-verified. Package weight/dimensions and product spec text (pot sizes, mature height) converted from lbs/inches to kg/cm. Date formatting switched `en-US` → `en-IN`. Mock/demo data (address book, geolocation, company invoice header) switched from Portland, OR to Bengaluru, Karnataka.
+  - **Still genuinely open, not fixed**: real HSN-code-based GST slab rates (0/5/12/18/28%, varying by product category) — this project has one flat hardcoded tax rate, not a real slab model; fixing that needs actual product-tax classification data from a real business/tax professional, not an engineering guess. A `Seller.gstin` field with real format+checksum validation now exists (structural readiness), and the customer-facing invoice now shows a real CGST+SGST or IGST split instead of one opaque "Tax" line — but the underlying *rate* being split is still the placeholder flat rate, and the invoice is still platform-level (Folia as the billing party), not per-seller. Do not read either fix as GST compliance — see `docs/SECURITY_STATUS.md`'s explicit note on this.
 
 ## Live deployment state
 
@@ -117,9 +143,11 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`.
 - Confirmed the live deployment is actually running Phase 2's code, not stale: the old `POST /payments/orders/:orderId/retry` route returns 404 (removed in Phase 2) and the new `POST /payments/:id/retry` route returns 401 (exists, requires auth) — and since the container's own startup command is `prisma migrate deploy && node dist/main.js` (see `apps/api/Dockerfile`), a healthy DB connection here means the Phase 2 migration applied cleanly against the live production database too, not just the local dev one.
 - Free Postgres created ~2026-09-03, auto-deletes ~2026-10-03 without a plan upgrade.
 - **Razorpay keys are NOT set on the live Render service** (`render.yaml` declares them `sync: false`, prompted-for in the dashboard, never committed) — real card/UPI/net-banking/wallet checkout will fail loudly with "not available right now" on the live site until the business owner adds real keys there. COD works end-to-end live.
+- **This section was last confirmed current as of Phase 2** (the "actually running Phase 2's code" check above) and was not re-verified for Phases 3–5. **Phase 6 is confirmed NOT live**: its branch (`feat/phase-6a-refund-race-fix`) is 15 commits ahead of `origin/main` and has never been merged, so none of the returns/refund/replacement work — or its migrations — exists on the live Render deployment.
 
 ## Git safety
 
 - Working tree was clean before the Phase 0 baseline; `docs/` additions were the only change that phase.
 - Phase 0 rollback point: `b617b9a`.
-- Current `main` after Phase 0 + Phase 1 + Phase 2 all merged: `4180b98`.
+- `origin/main` currently sits at `ccf5813` (Phase 5's merge — Phases 0–5 are all merged; this line was last updated after Phase 2 and undercounted Phases 3–5, corrected here).
+- Phase 6 (`93db0cc`..`c70cb9b`, 15 commits) is **not merged** — it lives on `feat/phase-6a-refund-race-fix`, 15 commits ahead of `origin/main`.

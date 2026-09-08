@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { ReturnsService } from './returns.service';
+import { SellerFulfillmentController } from './seller-fulfillment.controller';
 import { CartModule } from '../cart/cart.module';
 import { AddressesModule } from '../addresses/addresses.module';
 import { CouponsModule } from '../coupons/coupons.module';
@@ -9,6 +11,9 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { TrackingModule } from '../tracking/tracking.module';
 import { AppConfigModule } from '../config/config.module';
 import { ShippingModule } from '../shipping/shipping.module';
+import { StorageModule } from '../storage/storage.module';
+import { AuditModule } from '../audit/audit.module';
+import { PayoutsModule } from '../payouts/payouts.module';
 
 @Module({
   imports: [
@@ -20,9 +25,12 @@ import { ShippingModule } from '../shipping/shipping.module';
     TrackingModule,
     AppConfigModule,
     ShippingModule,
+    StorageModule,
+    AuditModule,
+    PayoutsModule,
   ],
-  controllers: [OrdersController],
-  providers: [OrdersService],
-  exports: [OrdersService],
+  controllers: [OrdersController, SellerFulfillmentController],
+  providers: [OrdersService, ReturnsService],
+  exports: [OrdersService, ReturnsService],
 })
 export class OrdersModule {}

@@ -130,6 +130,15 @@ export default function ProductDetail() {
           )}
           <h1 className="font-display text-3xl font-semibold text-heading">{product.name}</h1>
 
+          {product.seller && (
+            <p className="text-sm text-ink-soft mt-1.5">
+              Sold by{' '}
+              <Link to={`/sellers/${product.seller.slug}`} className="text-fern underline">
+                {product.seller.displayName}
+              </Link>
+            </p>
+          )}
+
           {product.rating && (
             <div className="flex items-center gap-1.5 mt-2">
               <div className="flex text-ochre">
@@ -218,7 +227,12 @@ export default function ProductDetail() {
 
       <div className="mt-16">
         <SectionHeading title="Customer reviews" />
-        <ProductReviews productId={product.id} averageRating={product.rating} reviewCount={product.reviewCount} />
+        <ProductReviews
+          productId={product.id}
+          productSlug={product.slug}
+          averageRating={product.rating}
+          reviewCount={product.reviewCount}
+        />
       </div>
 
       {similarProducts.length > 0 && (

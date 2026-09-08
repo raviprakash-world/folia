@@ -74,7 +74,38 @@ const paymentMethodToPublic: Record<PaymentMethodType, string> = {
   WALLET: 'wallet',
 };
 
+/**
+ * Marketplace Phase 16 — a customer-facing view of one OrderSellerGroup
+ * (Phase 5/12). Deliberately narrower than
+ * seller-order.types.ts's PublicSellerOrderGroup: no commissionTotal, no
+ * sellerNote (both seller-private, per that model's own schema comment),
+ * no shippingAddress (the customer already knows their own address).
+ */
+export interface OrderShipmentItemRecord {
+  id: string;
+  productId: string;
+  slug: string;
+  name: string;
+  variantId: string | null;
+  variantLabel: string | null;
+  quantity: number;
+}
+
+export interface OrderShipmentGroupRecord {
+  id: string;
+  seller: { displayName: string } | null;
+  status: OrderStatus;
+  courierId: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: Date | null;
+  deliveredAt: Date | null;
+  items: OrderShipmentItemRecord[];
+}
+
 export interface OrderItemRecord {
+  /** Phase 6D-4H — needed so a customer's return/DOA claim UI can reference a specific line (CreateReturnClaimDto.items[].orderItemId); the field always existed on the underlying OrderItem row, this was just never surfaced in the public order shape before. */
+  id: string;
   productId: string;
   slug: string;
   name: string;
@@ -110,16 +141,56 @@ export interface OrderRecord {
   trackingUrl: string | null;
   customerNotes: string | null;
   cancellation?: CancellationRequestRecord | null;
-  returnRequest?: ReturnRequestRecord | null;
+  /** Phase 6: the real Payment.status, when the caller's query included it — lets toPublicCancellation derive a real refundStatus instead of the elapsed-time simulation. Optional because not every caller needs cancellation detail (and the raw Prisma `include` shape puts this at order.payment.status, not flattened). */
+  payment?: { status: string } | null;
+  /** Marketplace Phase 16 — only present when the caller's query included it (findOneForUser); the order list view has no need for per-seller shipment detail. */
+  sellerGroups?: OrderShipmentGroupRecord[];
 }
 
-/** Matches apps/web/src/types/order.ts's Order exactly. cancellation/returnRequest are always null here — a freshly created order has neither; a later order-management phase owns setting them. */
+/** Matches apps/web/src/types/order.ts's OrderShipmentGroup exactly. */
+export function toPublicOrderShipmentGroup(group: OrderShipmentGroupRecord) {
+  return {
+    id: group.id,
+    sellerName: group.seller?.displayName ?? null,
+    status: statusToPublic[group.status],
+    courierId: group.courierId,
+    trackingNumber: group.trackingNumber,
+    trackingUrl: group.trackingUrl,
+    shippedAt: group.shippedAt ? group.shippedAt.toISOString() : null,
+    deliveredAt: group.deliveredAt ? group.deliveredAt.toISOString() : null,
+    items: group.items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      slug: item.slug,
+      name: item.name,
+      variantId: item.variantId,
+      variantLabel: item.variantLabel,
+      quantity: item.quantity,
+    })),
+  };
+}
+
+/**
+ * Matches apps/web/src/types/order.ts's Order exactly. `returnRequest`
+ * (the public field) is always null here, permanently — not just "for a
+ * freshly created order." Order.returnRequest (the DB relation) is the
+ * SAME row Phase 6D's return/DOA claim system reads and writes (see
+ * ReturnRequest's own schema comment: "Phase 6D rewrite of the original
+ * whole-order, always-auto-approved ReturnRequest"); the whole-order
+ * concept this OLD field/toPublicReturn mapping represented — elapsed-
+ * time-simulated refundStatus, no claim type, no resolution — no longer
+ * describes what that row actually means, and would show a real, possibly
+ * still-PENDING or REJECTED claim as a fake "refunded/processing" status.
+ * ReturnsService.getMyClaim (GET /orders/:id/returns, Phase 6D-4H) is the
+ * real, current, purpose-built source for a customer's own claim.
+ */
 export function toPublicOrder(order: OrderRecord) {
   return {
     id: order.id,
     createdAt: order.createdAt.toISOString(),
     status: statusToPublic[order.status],
     items: order.items.map((item) => ({
+      id: item.id,
       productId: item.productId,
       slug: item.slug,
       name: item.name,
@@ -149,11 +220,10 @@ export function toPublicOrder(order: OrderRecord) {
     trackingUrl: order.trackingUrl,
     customerNotes: order.customerNotes,
     cancellation: order.cancellation
-      ? toPublicCancellation(order.cancellation)
+      ? toPublicCancellation(order.cancellation, order.payment?.status)
       : null,
-    returnRequest: order.returnRequest
-      ? toPublicReturn(order.returnRequest)
-      : null,
+    returnRequest: null,
+    sellerGroups: order.sellerGroups?.map(toPublicOrderShipmentGroup),
   };
 }
 
@@ -169,7 +239,9 @@ export type ReturnReasonDb =
   | 'DAMAGED_IN_TRANSIT'
   | 'NOT_AS_DESCRIBED'
   | 'CHANGED_MIND'
-  | 'OTHER';
+  | 'OTHER'
+  /** Phase 6D — "arrived dead/dying," plant-claim-only. */
+  | 'DOA';
 
 export const CANCELLATION_REASON_TO_DB: Record<string, CancellationReasonDb> = {
   'changed-mind': 'CHANGED_MIND',
@@ -186,6 +258,8 @@ export const RETURN_REASON_TO_DB: Record<string, ReturnReasonDb> = {
   'not-as-described': 'NOT_AS_DESCRIBED',
   'changed-mind': 'CHANGED_MIND',
   other: 'OTHER',
+  /** Phase 6D-3 — the new claim-creation endpoint is the first customer-facing input path to accept this. */
+  doa: 'DOA',
 };
 
 const cancellationReasonToPublic: Record<CancellationReasonDb, string> = {
@@ -196,13 +270,15 @@ const cancellationReasonToPublic: Record<CancellationReasonDb, string> = {
   OTHER: 'other',
 };
 
-const returnReasonToPublic: Record<ReturnReasonDb, string> = {
+/** Exported for ReturnsService's admin/customer-facing claim responses (Phase 6D-4A/6D-4H) — the canonical DB-enum-to-public-string mapping for a return/DOA reason. */
+export const returnReasonToPublic: Record<ReturnReasonDb, string> = {
   NO_LONGER_NEEDED: 'no-longer-needed',
   WRONG_ITEM: 'wrong-item',
   DAMAGED_IN_TRANSIT: 'damaged-in-transit',
   NOT_AS_DESCRIBED: 'not-as-described',
   CHANGED_MIND: 'changed-mind',
   OTHER: 'other',
+  DOA: 'doa',
 };
 
 export interface CancellationRequestRecord {
@@ -212,27 +288,31 @@ export interface CancellationRequestRecord {
   requestedAt: Date;
 }
 
-export interface ReturnRequestRecord {
-  reason: ReturnReasonDb;
-  note: string | null;
-  requestedAt: Date;
-}
+const REFUNDED_PAYMENT_STATUSES = new Set(['REFUNDED', 'PARTIALLY_REFUNDED']);
 
-export function toPublicCancellation(c: CancellationRequestRecord) {
+/**
+ * Phase 6: refundStatus is now derived from the real Payment.status when
+ * it's known (requestCancellation synchronously attempts a real refund —
+ * see OrdersService — so by the time this order is re-read, Payment.status
+ * already reflects whatever really happened), not from
+ * refund.util.ts's elapsed-time simulation. That simulation is kept as
+ * the fallback for the rare case a caller didn't include payment.
+ */
+export function toPublicCancellation(
+  c: CancellationRequestRecord,
+  paymentStatus?: string | null,
+) {
   return {
     requestedAt: c.requestedAt.toISOString(),
     reason: cancellationReasonToPublic[c.reason],
     note: c.note,
-    refundStatus: c.hasRefund ? deriveRefundStatus(c.requestedAt) : null,
-  };
-}
-
-export function toPublicReturn(r: ReturnRequestRecord) {
-  return {
-    requestedAt: r.requestedAt.toISOString(),
-    reason: returnReasonToPublic[r.reason],
-    note: r.note,
-    refundStatus: deriveRefundStatus(r.requestedAt),
+    refundStatus: !c.hasRefund
+      ? null
+      : paymentStatus
+        ? REFUNDED_PAYMENT_STATUSES.has(paymentStatus)
+          ? 'refunded'
+          : 'processing'
+        : deriveRefundStatus(c.requestedAt),
   };
 }
 
@@ -248,6 +328,12 @@ export interface CheckoutSnapshotItem {
   quantity: number;
   inventoryItemId: string;
   reservationId: string;
+  /** Marketplace Phase 5 — which seller owns this line's product (null =
+   * Folia-owned), captured at checkout time so confirmAndCreateOrder can
+   * group items into OrderSellerGroup rows without re-querying Product
+   * (which could have changed ownership — never, in practice, but this
+   * snapshot's whole purpose is to never depend on that not happening). */
+  sellerId: string | null;
 }
 
 /**

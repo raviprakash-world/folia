@@ -9,7 +9,17 @@ export type NewsletterFormValues = z.infer<typeof newsletterSchema>;
 
 // Pragmatic phone check — allows +, spaces, dashes, parens, 7-15 digits.
 // Not full E.164 validation, which needs a real phone-number library.
+// Used by contactSchema only — a "message us" form, not tied to
+// shipping/checkout, so kept loosely international.
 const PHONE_REGEX = /^[+]?[\d\s().-]{7,20}$/;
+
+// P0-F — the address book's phone/alternatePhone previously used the
+// same loose PHONE_REGEX above, which would happily accept a
+// non-Indian number the backend's AddressInputDto (IsPhoneNumber('IN'))
+// then rejects — failing only after a round trip instead of inline.
+// Real Indian mobile numbers: 10 digits, starting 6-9, with an
+// optional +91/0 prefix.
+const INDIA_PHONE_REGEX = /^(?:\+91[\s-]?|0)?[6-9]\d{9}$/;
 
 export const contactSchema = z.object({
   name: z.string().min(1, 'Enter your name').max(80),
@@ -89,8 +99,12 @@ export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 export const addressSchema = z
   .object({
     fullName: z.string().min(1, 'Enter a full name').max(80),
-    phone: z.string().min(1, 'Enter a phone number').regex(PHONE_REGEX, 'Enter a valid phone number'),
-    alternatePhone: z.string().regex(PHONE_REGEX, 'Enter a valid phone number').optional().or(z.literal('')),
+    phone: z.string().min(1, 'Enter a phone number').regex(INDIA_PHONE_REGEX, 'Enter a valid Indian phone number'),
+    alternatePhone: z
+      .string()
+      .regex(INDIA_PHONE_REGEX, 'Enter a valid Indian phone number')
+      .optional()
+      .or(z.literal('')),
     email: z.string().email('Enter a valid email address').optional().or(z.literal('')),
     companyName: z.string().max(80).optional().or(z.literal('')),
     addressLine1: z.string().min(1, 'Enter an address').max(120),
@@ -99,8 +113,15 @@ export const addressSchema = z
     deliveryInstructions: z.string().max(200).optional().or(z.literal('')),
     city: z.string().min(1, 'Enter a city').max(60),
     state: z.string().min(1, 'Enter a state or province').max(60),
+    // P0-F — z.string() not z.literal('IN'): a literal type would narrow
+    // AddressFormValues['country'] to exactly "IN", which the wider
+    // Address/AddressInput types (types/address.ts, country: string,
+    // shared by every other address consumer in this app) don't match —
+    // that mismatch is a real type-inference conflict, not a cosmetic
+    // one. The runtime check below enforces the actual constraint either
+    // way; only the inferred TS type differs.
     country: z.string().min(1, 'Select a country'),
-    postalCode: z.string().min(1, 'Enter a postal code'),
+    postalCode: z.string().min(1, 'Enter a PIN code'),
     type: z.enum(['home', 'office', 'other']),
     label: z.string().max(40).optional().or(z.literal('')),
     preferredTimeSlot: z.enum(['morning', 'afternoon', 'evening', 'anytime']).optional(),
@@ -108,11 +129,18 @@ export const addressSchema = z
     isDefaultBilling: z.boolean(),
   })
   .superRefine((data, ctx) => {
-    if (!isValidPostalCode(data.postalCode, data.country)) {
+    if (data.country !== 'IN') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['country'],
+        message: 'Folia currently ships within India only.',
+      });
+    }
+    if (!isValidPostalCode(data.postalCode)) {
       ctx.addIssue({
         code: 'custom',
         path: ['postalCode'],
-        message: 'That postal code doesn\u2019t look right for the selected country.',
+        message: 'Enter a valid 6-digit PIN code.',
       });
     }
   });

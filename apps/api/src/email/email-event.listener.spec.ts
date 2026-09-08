@@ -75,6 +75,115 @@ describe('EmailEventListener', () => {
     },
   );
 
+  it('handlePaymentRefunded sends a real refund email with the amount and a working order link', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handlePaymentRefunded({
+      orderId: 'FOL-7',
+      userId: 'user-1',
+      paymentId: 'pay-1',
+      amount: 71.3,
+      refundId: 'refund-1',
+    });
+    const email = sentEmail(emailService);
+    expect(email.to).toBe('sam@example.com');
+    expect(email.html).toContain('/account/orders/FOL-7');
+    expect(email.text).toContain('71.30');
+  });
+
+  it('handlePaymentRefunded skips sending (does not throw) when the payload has no orderId to link to', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handlePaymentRefunded({
+      orderId: null,
+      userId: 'user-1',
+      paymentId: 'pay-1',
+      amount: 20,
+      refundId: 'refund-1',
+    });
+    expect(emailService.send).not.toHaveBeenCalled();
+  });
+
+  it('never throws when the email provider fails for a refund email — same non-fatal-side-effect contract as every other handler', async () => {
+    const { listener, emailService } = createDeps();
+    emailService.send.mockRejectedValue(new Error('Resend is down'));
+
+    await expect(
+      listener.handlePaymentRefunded({
+        orderId: 'FOL-8',
+        userId: 'user-1',
+        paymentId: 'pay-1',
+        amount: 15,
+        refundId: 'refund-1',
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  // Phase 6D-4F — the four return/DOA resolution events that previously
+  // had no email handler at all.
+  it('handleReturnApproved sends the return-approved email with a working order link', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handleReturnApproved({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-9',
+      userId: 'user-1',
+    });
+    const email = sentEmail(emailService);
+    expect(email.subject).toContain('approved');
+    expect(email.html).toContain('/account/orders/FOL-9');
+  });
+
+  it('handleReturnRejected sends the return-rejected email including the reason', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handleReturnRejected({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-10',
+      userId: 'user-1',
+      reason: 'Outside the return window',
+    });
+    const email = sentEmail(emailService);
+    expect(email.text).toContain('Outside the return window');
+    expect(email.html).toContain('/account/orders/FOL-10');
+  });
+
+  it('handleStoreCreditIssued sends the store-credit email with the exact amount', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handleStoreCreditIssued({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-11',
+      userId: 'user-1',
+      amount: 198,
+    });
+    const email = sentEmail(emailService);
+    expect(email.text).toContain('198.00');
+    expect(email.html).toContain('/account/orders/FOL-11');
+  });
+
+  it('handleReplacementIssued sends the replacement email linking to the NEW replacement order, not the original', async () => {
+    const { listener, emailService } = createDeps();
+    await listener.handleReplacementIssued({
+      returnRequestId: 'rr-1',
+      orderId: 'FOL-12',
+      replacementOrderId: 'FOL-13',
+      userId: 'user-1',
+    });
+    const email = sentEmail(emailService);
+    expect(email.html).toContain('/account/orders/FOL-13');
+    expect(email.html).not.toContain('/account/orders/FOL-12');
+    expect(email.text).toContain('FOL-12');
+  });
+
+  it('never throws when the email provider fails for any of the four new return-resolution emails', async () => {
+    const { listener, emailService } = createDeps();
+    emailService.send.mockRejectedValue(new Error('Resend is down'));
+
+    await expect(
+      listener.handleReturnApproved({
+        returnRequestId: 'rr-1',
+        orderId: 'FOL-14',
+        userId: 'user-1',
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('handlePaymentFailed links to the cart, not a nonexistent order (Phase 2: a failed attempt never produced an order)', async () => {
     const { listener, emailService } = createDeps();
     await listener.handlePaymentFailed({

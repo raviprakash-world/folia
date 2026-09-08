@@ -17,10 +17,33 @@ import { CartService } from '../cart/cart.service';
 import { AppConfigService } from '../config/app-config.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { RazorpayProvider } from './providers/razorpay.provider';
+import { SellerCommissionService } from '../sellers/seller-commission.service';
+import { SellerLedgerService } from '../payouts/seller-ledger.service';
 import { PAYMENT_EVENTS } from './payments.events';
+import type { PaymentRefundedPayload } from './payments.events';
 import { toPublicOrder } from '../orders/order.types';
 import type { CheckoutSnapshot } from '../orders/order.types';
 import { ANALYTICS_EVENTS } from '../analytics/analytics.events';
+import { AuditService } from '../audit/audit.service';
+
+/**
+ * Who/what triggered a refund — every refund path (admin-initiated via
+ * PaymentsController, cancellation-triggered via OrdersService) must
+ * supply one, so `refund()` itself can audit consistently regardless of
+ * entry point instead of leaving it to each caller to remember. 'system'
+ * covers a customer-facing action (e.g. cancellation) that this backend
+ * decided to act on automatically, with no admin in the loop — distinct
+ * from 'admin' so an audit reviewer can tell a discretionary admin refund
+ * apart from one this system triggered on its own.
+ */
+export type RefundActorType = 'admin' | 'system';
+
+export interface RefundActor {
+  actorId: string;
+  actorType: RefundActorType;
+  /** Only ever available from an authenticated admin HTTP request — a system-triggered refund has no request context to take this from. */
+  ipAddress?: string;
+}
 
 /**
  * How long a gateway payment stays retryable, and how long its stock
@@ -105,6 +128,9 @@ export class PaymentsService {
     private readonly razorpay: RazorpayProvider,
     private readonly inventoryService: InventoryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly auditService: AuditService,
+    private readonly commissionService: SellerCommissionService,
+    private readonly ledgerService: SellerLedgerService,
   ) {}
 
   async createForOrder(
@@ -408,21 +434,117 @@ export class PaymentsService {
           paymentDisplayLabel: payment.displayLabel ?? payment.method,
           paymentTransactionId: payment.providerPaymentId ?? payment.id,
           customerNotes: snapshot.customerNotes ?? undefined,
-          items: {
-            create: snapshot.items.map((item) => ({
-              productId: item.productId,
-              slug: item.slug,
-              name: item.name,
-              categorySlug: item.categorySlug,
-              variantId: item.variantId,
-              variantLabel: item.variantLabel,
-              price: item.price,
-              quantity: item.quantity,
-              inventoryItemId: item.inventoryItemId,
-            })),
-          },
         },
-        include: { items: true },
+      });
+
+      // Marketplace Phase 5 — group this order's items by seller (null =
+      // Folia-owned) into real OrderSellerGroup rows before creating the
+      // OrderItems themselves, so each item can be created already
+      // pointing at its group in one createMany rather than a nested
+      // create this grouping can't express. A single-seller-cart order
+      // (still the common case) produces exactly one group here — no
+      // special case, just this same grouping logic given input that
+      // happens to have one bucket.
+      const bySeller = new Map<string | null, typeof snapshot.items>();
+      for (const item of snapshot.items) {
+        const key = item.sellerId;
+        const bucket = bySeller.get(key);
+        if (bucket) bucket.push(item);
+        else bySeller.set(key, [item]);
+      }
+
+      // Marketplace Phase 8 — resolve each seller's commission rate once
+      // per group (seller-specific override if one exists, else the
+      // marketplace default) and freeze it onto every item in that group.
+      // Always 0 for the Folia-owned group (sellerId null): Folia does not
+      // charge itself a commission — see SellerCommissionService and
+      // OrderItem.commissionRatePercent's doc comments for why this is
+      // resolved here, inside this same transaction, rather than computed
+      // later from a possibly-since-changed rate.
+      const commissionRateBySeller = new Map<string | null, number>();
+      for (const sellerId of bySeller.keys()) {
+        if (sellerId === null) {
+          commissionRateBySeller.set(null, 0);
+          continue;
+        }
+        const resolved = await this.commissionService.resolveEffectiveRate(
+          sellerId,
+          tx,
+        );
+        commissionRateBySeller.set(sellerId, resolved.ratePercent);
+      }
+
+      // Per-item commission, computed once here so the group's own
+      // commissionTotal below is the exact SUM() of these — never
+      // independently re-derived from the group subtotal, which could
+      // drift by a cent from summed per-line rounding.
+      const commissionAmountByItem = new Map<
+        (typeof snapshot.items)[number],
+        number
+      >();
+      for (const item of snapshot.items) {
+        const ratePercent = commissionRateBySeller.get(item.sellerId)!;
+        commissionAmountByItem.set(
+          item,
+          Math.round(item.price * item.quantity * ratePercent) / 100,
+        );
+      }
+
+      const groupIdBySeller = new Map<string | null, string>();
+      for (const [sellerId, items] of bySeller) {
+        const groupSubtotal = items.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0,
+        );
+        const groupCommissionTotal = items.reduce(
+          (sum, item) => sum + commissionAmountByItem.get(item)!,
+          0,
+        );
+        const group = await tx.orderSellerGroup.create({
+          data: {
+            orderId: order.id,
+            sellerId,
+            status: 'PROCESSING',
+            subtotal: groupSubtotal,
+            commissionTotal: groupCommissionTotal,
+          },
+        });
+        groupIdBySeller.set(sellerId, group.id);
+
+        // Marketplace Phase 9 — the seller's real, persisted ledger entry
+        // for this order, written inside this same transaction (never a
+        // separate step that could commit independently of the order
+        // itself existing). Skipped for the Folia-owned group (sellerId
+        // null): SellerLedgerEntry.sellerId is required — there is no
+        // ledger for sales Folia makes to itself.
+        if (sellerId !== null) {
+          await this.ledgerService.recordOrderProceeds(
+            tx,
+            sellerId,
+            group.id,
+            groupSubtotal,
+            groupCommissionTotal,
+          );
+        }
+      }
+
+      await tx.orderItem.createMany({
+        data: snapshot.items.map((item) => ({
+          orderId: order.id,
+
+          orderSellerGroupId: groupIdBySeller.get(item.sellerId)!,
+          productId: item.productId,
+          slug: item.slug,
+          name: item.name,
+          categorySlug: item.categorySlug,
+          variantId: item.variantId,
+          variantLabel: item.variantLabel,
+          price: item.price,
+          quantity: item.quantity,
+          inventoryItemId: item.inventoryItemId,
+          commissionRatePercent: commissionRateBySeller.get(item.sellerId)!,
+          commissionAmount: commissionAmountByItem.get(item)!,
+        })),
       });
 
       await tx.payment.update({
@@ -430,7 +552,10 @@ export class PaymentsService {
         data: { orderId: order.id },
       });
 
-      return order;
+      return tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: { items: true },
+      });
     });
 
     await this.clearCartFor(payment.userId);
@@ -526,59 +651,245 @@ export class PaymentsService {
   }
 
   /**
-   * Not wired to any automatic trigger yet — Phase 6 (returns/refunds)
-   * connects cancellation/return approval to this. Built and independently
-   * callable now (admin-invoked) so the gateway-facing half of a refund
-   * is real and tested before anything upstream depends on it.
+   * Locks a single Payment row for the rest of the enclosing transaction —
+   * same Postgres `SELECT ... FOR UPDATE` technique, same reasoning, as
+   * InventoryService.lockItemForUpdate: two concurrent refund() calls for
+   * the same payment must not both read the same "amount already
+   * refunded" total before either has recorded its own claim.
+   */
+  private async lockPaymentForUpdate(
+    tx: Prisma.TransactionClient,
+    paymentId: string,
+  ): Promise<void> {
+    await tx.$queryRaw`SELECT "id" FROM "payments" WHERE "id" = ${paymentId} FOR UPDATE`;
+  }
+
+  /**
+   * Callable both directly (PaymentsController's admin-triggered refund)
+   * and automatically (OrdersService.requestCancellation, on a cancelled
+   * order that was actually charged) — see the audit-trail doc comment
+   * below for why both converge on this one method rather than each
+   * having its own refund logic.
+   *
+   * Two-phase (reserve, then confirm-or-release) rather than a single
+   * read-then-write, and deliberately does NOT hold a transaction open
+   * across the real Razorpay call below — matching this codebase's
+   * existing convention (see confirmCapture: the gateway call always
+   * happens outside any $transaction). Phase 1, under a row lock, sums
+   * every PENDING + PROCESSED refund already claimed against this payment
+   * and creates a new PENDING Refund row for the requested amount — a
+   * concurrent second call sees that PENDING claim in its own sum and is
+   * correctly rejected or reduced, closing the double-refund/over-refund
+   * race without ever holding a lock across the network call. Phase 2
+   * calls Razorpay; on success the claim is marked PROCESSED and
+   * Payment.status is derived from the real PROCESSED total (not just
+   * this one call's amount, which is what let sequential partial refunds
+   * silently over-refund past 100% before this fix). On failure the claim
+   * is marked FAILED so it stops occupying refundable headroom.
+   *
+   * Audits itself, right here, regardless of which caller reached it —
+   * PaymentsController's admin-triggered refund and
+   * OrdersService.requestCancellation's cancellation-triggered refund
+   * both funnel through this single method, so this is the one place a
+   * real refund can audit-log itself rather than each caller duplicating
+   * that logic (and each caller risking forgetting to). `actor` is what
+   * lets the resulting audit record distinguish a discretionary admin
+   * action from a system-triggered one. A genuine gateway attempt that
+   * fails (i.e. one that got as far as creating a PENDING Refund claim
+   * below) is audited too, under a distinct action, so success and
+   * failure are never ambiguous in the audit trail — a pre-flight
+   * rejection (payment not found/not captured/amount exceeds remaining)
+   * never creates a claim and is just a normal thrown exception, not a
+   * "refund attempt" worth its own audit record.
    */
   async refund(
     paymentId: string,
     input: { amount?: number; reason?: string },
+    actor: RefundActor,
   ): Promise<{ id: string; status: string; providerRefundId: string }> {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
-    if (!payment) throw new NotFoundException('Payment not found.');
-    if (
-      payment.status !== 'CAPTURED' &&
-      payment.status !== 'PARTIALLY_REFUNDED'
-    ) {
-      throw new BadRequestException('Only a captured payment can be refunded.');
-    }
-    if (!payment.providerPaymentId) {
-      throw new BadRequestException(
-        'This payment has no gateway transaction to refund.',
-      );
-    }
+    const { payment, requestedAmount, pendingRefundId } =
+      await this.prisma.$transaction(async (tx) => {
+        await this.lockPaymentForUpdate(tx, paymentId);
 
-    const result = await this.razorpay.refund({
-      providerPaymentId: payment.providerPaymentId,
-      amount: input.amount,
-      reason: input.reason,
-    });
+        const payment = await tx.payment.findUnique({
+          where: { id: paymentId },
+        });
+        if (!payment) throw new NotFoundException('Payment not found.');
+        if (
+          payment.status !== 'CAPTURED' &&
+          payment.status !== 'PARTIALLY_REFUNDED'
+        ) {
+          throw new BadRequestException(
+            'Only a captured payment can be refunded.',
+          );
+        }
+        if (!payment.providerPaymentId) {
+          throw new BadRequestException(
+            'This payment has no gateway transaction to refund.',
+          );
+        }
 
-    const refund = await this.prisma.refund.create({
-      data: {
-        paymentId: payment.id,
-        amount: input.amount ?? payment.amount,
-        status: 'PROCESSED',
-        providerRefundId: result.providerRefundId,
+        const claimed = await tx.refund.aggregate({
+          where: { paymentId, status: { in: ['PENDING', 'PROCESSED'] } },
+          _sum: { amount: true },
+        });
+        const alreadyClaimed = Number(claimed._sum.amount ?? 0);
+        const remaining = Number(payment.amount) - alreadyClaimed;
+        const requestedAmount = input.amount ?? remaining;
+
+        if (requestedAmount <= 0 || requestedAmount > remaining) {
+          throw new BadRequestException(
+            `Cannot refund ₹${requestedAmount.toFixed(2)} — only ₹${remaining.toFixed(2)} of this payment remains refundable.`,
+          );
+        }
+
+        const pending = await tx.refund.create({
+          data: {
+            paymentId: payment.id,
+            amount: requestedAmount,
+            status: 'PENDING',
+            reason: input.reason,
+          },
+        });
+
+        return { payment, requestedAmount, pendingRefundId: pending.id };
+      });
+
+    try {
+      const result = await this.razorpay.refund({
+        providerPaymentId: payment.providerPaymentId!,
+        amount: requestedAmount,
         reason: input.reason,
-      },
+      });
+
+      return await this.finalizeRefundSuccess(
+        payment,
+        pendingRefundId,
+        result.providerRefundId,
+        requestedAmount,
+        actor,
+        input.reason,
+      );
+    } catch (err) {
+      // The claim didn't pan out (gateway rejected it, network failure,
+      // etc.) — release it so it stops occupying refundable headroom on
+      // this payment. A crash between the gateway call succeeding and
+      // this catch running would leave a real Razorpay refund with no
+      // PROCESSED row here — Phase 6D-4F's handleWebhookEvent extension
+      // (see reconcileRefundEvent below) is what closes that gap, since
+      // Razorpay's own refund.processed/refund.failed webhooks arrive
+      // independently of whether this process is still alive to run this
+      // catch block at all.
+      await this.finalizeRefundFailure(
+        paymentId,
+        pendingRefundId,
+        requestedAmount,
+        actor,
+        input.reason,
+        err instanceof Error ? err.message : 'unknown error',
+      );
+
+      throw err;
+    }
+  }
+
+  /**
+   * Shared by refund()'s own synchronous success path and
+   * reconcileRefundEvent's webhook-driven recovery path — both need the
+   * exact same PROCESSED transition, isFullRefund calculation, event
+   * emission, and audit log; duplicating this logic between them would
+   * risk the two paths silently drifting apart.
+   */
+  private async finalizeRefundSuccess(
+    payment: Payment,
+    pendingRefundId: string,
+    providerRefundId: string,
+    amount: number,
+    actor: RefundActor,
+    reason?: string,
+  ): Promise<{ id: string; status: string; providerRefundId: string }> {
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      await this.lockPaymentForUpdate(tx, payment.id);
+
+      const refund = await tx.refund.update({
+        where: { id: pendingRefundId },
+        data: { status: 'PROCESSED', providerRefundId },
+      });
+
+      const processed = await tx.refund.aggregate({
+        where: { paymentId: payment.id, status: 'PROCESSED' },
+        _sum: { amount: true },
+      });
+      const isFullRefund =
+        Number(processed._sum.amount ?? 0) >= Number(payment.amount);
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
+      });
+
+      return { id: refund.id, status: refund.status, providerRefundId };
     });
 
-    const isFullRefund =
-      input.amount === undefined || input.amount >= Number(payment.amount);
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
-    });
-
-    return {
-      id: refund.id,
-      status: refund.status,
-      providerRefundId: result.providerRefundId,
+    const payload: PaymentRefundedPayload = {
+      orderId: payment.orderId,
+      userId: payment.userId,
+      paymentId: payment.id,
+      amount,
+      refundId: outcome.id,
     };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- same eventemitter2 type-resolution quirk noted throughout this codebase's other controllers/services.
+    this.eventEmitter.emit(PAYMENT_EVENTS.REFUNDED, payload);
+
+    await this.auditService.log({
+      actorId: actor.actorId,
+      action: 'PAYMENT_REFUND',
+      resource: 'payment',
+      resourceId: payment.id,
+      metadata: {
+        amount,
+        reason,
+        refundId: outcome.id,
+        actorType: actor.actorType,
+      },
+      ipAddress: actor.ipAddress,
+    });
+
+    return outcome;
+  }
+
+  /**
+   * Shared by refund()'s own catch block and reconcileRefundEvent's
+   * webhook-driven refund.failed handling — same FAILED transition
+   * (releasing the claimed headroom, per the FAILED-excluded-from-
+   * aggregate convention documented at this method's own call site) and
+   * the same distinct-from-success audit action.
+   */
+  private async finalizeRefundFailure(
+    paymentId: string,
+    pendingRefundId: string,
+    amount: number,
+    actor: RefundActor,
+    reason: string | undefined,
+    error: string,
+  ): Promise<void> {
+    await this.prisma.refund.update({
+      where: { id: pendingRefundId },
+      data: { status: 'FAILED' },
+    });
+
+    // A distinct action (not PAYMENT_REFUND) so a reviewer scanning the
+    // audit trail never mistakes an attempt for a success — this only
+    // fires once a real gateway attempt was made (a PENDING claim already
+    // exists by this point), never for the pre-flight validation errors
+    // thrown above refund()'s own try block.
+    await this.auditService.log({
+      actorId: actor.actorId,
+      action: 'PAYMENT_REFUND_FAILED',
+      resource: 'payment',
+      resourceId: paymentId,
+      metadata: { amount, reason, actorType: actor.actorType, error },
+      ipAddress: actor.ipAddress,
+    });
   }
 
   /**
@@ -599,7 +910,10 @@ export class PaymentsService {
 
     let parsed: {
       event: string;
-      payload?: { payment?: { entity?: Record<string, unknown> } };
+      payload?: {
+        payment?: { entity?: Record<string, unknown> };
+        refund?: { entity?: Record<string, unknown> };
+      };
     };
     try {
       parsed = JSON.parse(rawBody) as typeof parsed;
@@ -647,11 +961,113 @@ export class PaymentsService {
       }
     }
 
+    // Phase 6D-4F — see reconcileRefundEvent's own doc comment for why
+    // this closes the crash gap refund()'s catch block flags.
+    if (
+      parsed.event === 'refund.processed' ||
+      parsed.event === 'refund.failed'
+    ) {
+      const refundEntity = parsed.payload?.refund?.entity;
+      await this.reconcileRefundEvent(
+        parsed.event,
+        refundEntity?.payment_id as string | undefined,
+        refundEntity?.id as string | undefined,
+        typeof refundEntity?.amount === 'number'
+          ? refundEntity.amount / 100
+          : undefined,
+      );
+    }
+
     await this.prisma.paymentWebhookEvent.update({
       where: { providerEventId },
       data: { processedAt: new Date() },
     });
     return { status: 'processed' };
+  }
+
+  /**
+   * Phase 6D-4F — closes the gap refund()'s own catch-block comment
+   * documents: a crash between Razorpay confirming a refund and this
+   * system's own transaction recording it leaves a Refund row stuck at
+   * PENDING with no providerRefundId, even though the money genuinely
+   * moved. Razorpay's refund.processed/refund.failed webhooks are the
+   * authoritative, independent confirmation that closes that window —
+   * they arrive regardless of whether the process that initiated the
+   * refund survived long enough to record its own outcome.
+   *
+   * Matching a stuck PENDING refund to this webhook cannot rely on
+   * providerRefundId (the crash happened before this system ever learned
+   * it) — instead it matches by payment + amount, since refund()'s own
+   * aggregate-based remaining-headroom check prevents two PENDING claims
+   * against the same payment from ever exceeding its total, making
+   * "the one PENDING refund of this exact amount" an unambiguous match in
+   * the crash-recovery case this exists for. If more than one candidate
+   * matches (or none do — e.g. a refund issued directly through Razorpay's
+   * own dashboard, which this system never initiated), this logs and
+   * backs off rather than guessing which row to touch.
+   */
+  private async reconcileRefundEvent(
+    event: 'refund.processed' | 'refund.failed',
+    providerPaymentId: string | undefined,
+    providerRefundId: string | undefined,
+    amount: number | undefined,
+  ): Promise<void> {
+    if (!providerPaymentId || !providerRefundId || amount === undefined) {
+      this.logger.warn(
+        `Refund webhook ${event} missing payment_id/refund id/amount — cannot reconcile.`,
+      );
+      return;
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: { providerPaymentId },
+    });
+    if (!payment) {
+      this.logger.warn(
+        `Refund webhook ${event} for unknown payment ${providerPaymentId} (refund ${providerRefundId}) — nothing to reconcile.`,
+      );
+      return;
+    }
+
+    // Already reconciled — either the synchronous path completed fine
+    // after all, or Razorpay redelivered this webhook. Idempotent no-op,
+    // not an error.
+    const alreadyRecorded = await this.prisma.refund.findFirst({
+      where: { providerRefundId },
+    });
+    if (alreadyRecorded) return;
+
+    const candidates = await this.prisma.refund.findMany({
+      where: { paymentId: payment.id, status: 'PENDING', amount },
+    });
+    if (candidates.length !== 1) {
+      this.logger.warn(
+        `Refund webhook ${event} for payment ${payment.id}: expected exactly one PENDING refund of ₹${amount.toFixed(2)} to reconcile, found ${candidates.length} — skipping rather than guessing.`,
+      );
+      return;
+    }
+    const pendingRefund = candidates[0];
+    const actor: RefundActor = { actorId: payment.userId, actorType: 'system' };
+
+    if (event === 'refund.processed') {
+      await this.finalizeRefundSuccess(
+        payment,
+        pendingRefund.id,
+        providerRefundId,
+        amount,
+        actor,
+        pendingRefund.reason ?? undefined,
+      );
+    } else {
+      await this.finalizeRefundFailure(
+        payment.id,
+        pendingRefund.id,
+        amount,
+        actor,
+        pendingRefund.reason ?? undefined,
+        'Reconciled via Razorpay refund.failed webhook — this system never received its own synchronous outcome for this attempt.',
+      );
+    }
   }
 
   /**

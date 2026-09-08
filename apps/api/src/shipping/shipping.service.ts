@@ -10,9 +10,9 @@ import {
   type ShippingProviderClient,
 } from './providers/shipping-provider.interface';
 
-const FREE_SHIPPING_THRESHOLD = 75;
-const NEAR_REGION_COST = 6.5;
-const FAR_REGION_COST = 9.5;
+const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
+const NEAR_REGION_COST = 260; // P0-F: was 6.5 (USD-shaped), rescaled 40x
+const FAR_REGION_COST = 380; // P0-F: was 9.5 (USD-shaped), rescaled 40x
 /** No real per-order weight catalog exists (see apps/web/src/utils/packageDetails.ts) — a single reasonable placeholder, same reasoning as ShiprocketProvider.createShipment's placeholder parcel dimensions. */
 const DEFAULT_ESTIMATE_WEIGHT_KG = 1;
 

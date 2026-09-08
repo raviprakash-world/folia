@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -15,7 +14,7 @@ export class AddressesService {
     return this.prisma.address.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
-    }) as Promise<AddressRecord[]>;
+    });
   }
 
   /** Same ownership-verification pattern as update()/remove() — never returns an address belonging to a different user, even for a valid id. */
@@ -24,7 +23,7 @@ export class AddressesService {
     if (!address || (address as AddressRecord).userId !== userId) {
       throw new NotFoundException('Address not found.');
     }
-    return address as AddressRecord;
+    return address;
   }
 
   /** Mirrors apps/web/src/mocks/addressHandlers.ts's applyDefaultExclusivity exactly — clearing the flag on every other address for this user, in the same transaction as the write that set it. */

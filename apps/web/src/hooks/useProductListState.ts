@@ -4,7 +4,7 @@ import type { ProductQuery, SortKey } from '@/types/product';
 
 const PAGE_SIZE = 9;
 
-export function useProductListState(fixedCategory?: string) {
+export function useProductListState(fixedCategory?: string, fixedSellerId?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const filters: ProductQuery = useMemo(
@@ -16,8 +16,13 @@ export function useProductListState(fixedCategory?: string) {
       sort: (searchParams.get('sort') as SortKey | null) ?? 'featured',
       page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
       pageSize: PAGE_SIZE,
+      // Marketplace Phase 4 — a storefront page fixes sellerId the same
+      // way a category page fixes category; never taken from the URL,
+      // so a customer can't widen the query past this one seller by
+      // hand-editing query params.
+      sellerId: fixedSellerId,
     }),
-    [searchParams, fixedCategory]
+    [searchParams, fixedCategory, fixedSellerId]
   );
 
   const view = (searchParams.get('view') as 'grid' | 'list') ?? 'grid';

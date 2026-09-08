@@ -42,6 +42,7 @@ function makeProduct(overrides: Partial<ProductRecord> = {}): ProductRecord {
     specs: [{ id: 'spec-1', label: 'Light', value: 'Bright indirect' }],
     createdAt: new Date('2026-07-29T00:00:00Z'),
     deletedAt: null,
+    seller: null,
     ...overrides,
   };
 }
@@ -80,6 +81,28 @@ describe('toPublicProduct', () => {
   it('formats createdAt as a bare date string (YYYY-MM-DD), matching the existing mock data format', () => {
     const result = toPublicProduct(makeProduct());
     expect(result.createdAt).toBe('2026-07-29');
+  });
+
+  it('Marketplace Phase 16 — omits seller entirely (not null) for a Folia-owned product', () => {
+    const result = toPublicProduct(makeProduct({ seller: null }));
+    expect(result.seller).toBeUndefined();
+  });
+
+  it('Marketplace Phase 16 — surfaces id/slug/displayName for a seller-owned product', () => {
+    const result = toPublicProduct(
+      makeProduct({
+        seller: {
+          id: 'seller-1',
+          slug: 'terracotta-fern',
+          displayName: 'Terracotta & Fern',
+        },
+      }),
+    );
+    expect(result.seller).toEqual({
+      id: 'seller-1',
+      slug: 'terracotta-fern',
+      displayName: 'Terracotta & Fern',
+    });
   });
 
   it('maps variants and specs to their exact public shape', () => {

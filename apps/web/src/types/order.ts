@@ -66,6 +66,8 @@ export interface CancellationRequest {
 }
 
 export interface OrderItem {
+  /** Phase 6D-4H — needed to reference a specific line in a return/DOA claim (see types/returnClaim.ts). */
+  id: string;
   productId: string;
   slug: string;
   name: string;
@@ -81,6 +83,19 @@ export interface PaymentSummary {
   /** Masked — last 4 digits for cards, masked UPI id, bank name, etc. Never a full card/account number. Always known (Phase 2): an Order only ever exists once payment has already resolved. */
   displayLabel: string;
   transactionId: string;
+}
+
+/** Marketplace Phase 16 — one seller's own portion of a real, multi-seller order (OrderSellerGroup). `sellerName: null` is Folia's own shipment, not an unknown seller. */
+export interface OrderShipmentGroup {
+  id: string;
+  sellerName: string | null;
+  status: OrderStatus;
+  courierId: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  items: Pick<OrderItem, 'id' | 'productId' | 'slug' | 'name' | 'variantId' | 'variantLabel' | 'quantity'>[];
 }
 
 export interface Order {
@@ -111,4 +126,6 @@ export interface Order {
   customerNotes: string | null;
   cancellation: CancellationRequest | null;
   returnRequest: ReturnRequest | null;
+  /** Marketplace Phase 16 — only present on the order-detail fetch (not order history/checkout preview). Render per-seller shipment breakdown from this, not the single courierId/trackingNumber above, whenever this order has more than one group. */
+  sellerGroups?: OrderShipmentGroup[];
 }

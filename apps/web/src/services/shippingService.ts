@@ -3,7 +3,7 @@ import { apiClient } from './apiClient';
 import { isFarRegion } from '@/utils/region';
 
 const ESTIMATE_DELAY_MS = 450;
-const FREE_SHIPPING_THRESHOLD = 75;
+const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
 const useRealShippingApi = import.meta.env.VITE_REAL_SHIPPING_API === 'true';
 
 export class ShippingError extends Error {}

@@ -28,7 +28,6 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   constructor(config: AppConfigService) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     super({
       datasources: { db: { url: config.databaseUrl } },
       log: config.isProduction ? ['warn', 'error'] : ['warn', 'error'],
@@ -36,13 +35,11 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     await this.$connect();
     this.logger.log('Connected to PostgreSQL via Prisma');
   }
 
   async onModuleDestroy() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     await this.$disconnect();
   }
 }

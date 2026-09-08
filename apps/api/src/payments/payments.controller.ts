@@ -71,10 +71,26 @@ export class PaymentsController {
   @Post(':id/refund')
   @ApiOperation({
     summary:
-      'Admin-triggered refund against the real gateway. Not yet wired to the customer-facing return/cancellation flow — Phase 6 connects the two; this endpoint exists so the gateway-facing half is real and tested first.',
+      'Admin-triggered refund against the real gateway. Phase 6 wires cancellation to this same method automatically; this endpoint remains for a manual admin-triggered refund outside that flow.',
   })
-  refund(@Param('id') id: string, @Body() dto: RefundPaymentDto) {
-    return this.paymentsService.refund(id, dto);
+  async refund(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: RefundPaymentDto,
+    @Req() req: Request,
+  ) {
+    // Real money movement, triggered directly by an admin request — every
+    // other consequential admin action in this codebase is audited
+    // (AdminOrdersController's status/ship endpoints), and so is this one:
+    // PaymentsService.refund() itself writes the audit record (the same
+    // choke point OrdersService.requestCancellation's refund goes through),
+    // so every refund is audited regardless of entry point rather than
+    // each controller/service duplicating that logic.
+    return this.paymentsService.refund(id, dto, {
+      actorId: admin.id,
+      actorType: 'admin',
+      ipAddress: req.ip,
+    });
   }
 
   /**

@@ -41,8 +41,9 @@ import { STORAGE_SERVICE } from '../storage/storage.interface';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { AuthenticatedUser, PublicUser } from '../users/user.types';
 import type { StorageService } from '../storage/storage.interface';
+import { MAX_AVATAR_FILE_BYTES, validateAvatarFile } from './avatar-file.util';
 
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // matches apps/web's existing 2MB limit exactly
+const MAX_AVATAR_BYTES = MAX_AVATAR_FILE_BYTES; // matches apps/web's existing 2MB limit exactly
 
 @ApiTags('auth')
 @Controller('auth')
@@ -71,10 +72,11 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
   @ApiOperation({
     summary:
-      'Create an account. Sets an httpOnly refresh-token cookie; returns the access token in the body.',
+      'Rate-limited to 5 attempts/minute per IP — matches login, mitigates account-creation abuse.',
   })
   async register(
     @Body() dto: RegisterDto,
@@ -187,23 +189,18 @@ export class AuthController {
 
   @ApiBearerAuth()
   @Post('me/avatar')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_AVATAR_BYTES } }),
+  )
   @ApiOperation({
-    summary: `Multipart upload, max ${MAX_AVATAR_BYTES / 1024 / 1024}MB, image/* only.`,
+    summary: `Multipart upload, max ${MAX_AVATAR_BYTES / 1024 / 1024}MB, JPEG/PNG/WEBP only.`,
   })
   async uploadAvatar(
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<PublicUser> {
     if (!file) throw new BadRequestException('No file was uploaded.');
-    if (file.size > MAX_AVATAR_BYTES) {
-      throw new BadRequestException(
-        `File is too large — the limit is ${MAX_AVATAR_BYTES / 1024 / 1024}MB.`,
-      );
-    }
-    if (!file.mimetype.startsWith('image/')) {
-      throw new BadRequestException('Only image files are allowed.');
-    }
+    validateAvatarFile(file);
 
     const { url } = await this.storageService.upload({
       buffer: file.buffer,

@@ -16,8 +16,8 @@ export interface User {
   phone?: string;
   /** Data URL from a local mock file upload — never a real server-hosted image. Size-capped in the UI (2MB). */
   avatarUrl?: string;
-  /** Defaults to 'customer' when absent — only the seeded demo admin account has 'admin'. */
-  role?: 'customer' | 'admin';
+  /** Defaults to 'customer' when absent. 'seller' is a real role backed by a Seller account on the server (Marketplace Phase 1) — a seller-role user can still shop as an ordinary customer on the same account, so this is additive, not exclusive. */
+  role?: 'customer' | 'admin' | 'seller';
 }
 
 export interface AuthSession {

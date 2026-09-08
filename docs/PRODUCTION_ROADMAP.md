@@ -15,7 +15,7 @@ Status legend: 🟡 in progress · ⏸ not started · ✅ gate passed · 🛑 ga
 | 3 | Customer communications | ✅ gate passed (with a stated gap — see below) | Phase 0; a transactional email provider account |
 | 4 | Real admin frontend | ✅ gate passed | Phase 0 (backend admin API already exists) |
 | 5 | Shipping + fulfillment | ✅ gate passed (with a stated gap — see below) | Phase 2; a courier/aggregator account + API keys |
-| 6 | Refunds + returns + order lifecycle | ⏸ not started | Phase 1, Phase 5 |
+| 6 | Refunds + returns + order lifecycle | ✅ gate passed (with stated gaps — see below) | Phase 1, Phase 5 |
 | 7 | Media + product catalog + India commerce | ⏸ not started | Phase 0; an object-storage (S3-compatible) account; real product photography; real GST/business details |
 | 8 | DevOps + CI/CD + backups + observability | ⏸ not started | Phase 0 |
 | 9 | Testing + security hardening | ⏸ not started | Phases 1–6 (tests the features they add) |
@@ -148,7 +148,46 @@ None of the above were fixed in this phase — Phase 0 is inspection and safety 
 
 **Gate: passed, with that gap carried forward explicitly**, matching Phase 1/3's precedent for the same class of external-dependency gap.
 
-## Phases 6–12 — scope reference
+## Phase 6 — Refunds + returns + order lifecycle
+
+**Objective:** replace the ad hoc, gap-ridden refund/cancellation/return handling that existed before this phase with a real, race-safe, fully-resolved return/DOA/replacement/store-credit system, plus the admin and customer UI to operate it — nothing in this phase's own scope had any frontend before it started.
+
+**This phase ran as a sequence of ten gated sub-phases (6A, 6B, 6D-1 through 6D-4H), each with its own design notes in `docs/PHASE_6D_MIGRATION_DESIGN.md` and its own commit. This report rolls all ten up into one Phase 6 gate; nothing below restates what those sub-phase reports already cover in detail.**
+
+**Done this phase:**
+- **6A — closed a real concurrency bug**: cancellation refunds could double-fire or over-refund under concurrent requests; fixed with an atomic conditional update on the refund-eligibility check, the same idiom used throughout Phases 1–5.
+- **6B — cancellation refunds were fake**: `OrdersService.cancelOrder` flipped a status and never actually refunded a prepaid order. Wired to the real `PaymentsService.refund()` path and closed a missing-audit-trail gap alongside it.
+- **6D-1 — schema**: a from-scratch `ReturnRequest`/resolution/store-credit data model (the pre-existing `Order.returnRequest` field was a different, always-auto-approved, pre-Phase-6 concept — see the 6D-4H bug below for what that ambiguity eventually caused). Real Prisma migration, verified against both the existing dev database and a fresh one.
+- **6D-2 — return-policy engine**: `Order.deliveredAt` (previously never set) plus a pure `return-policy.util.ts` engine deriving claim type (DOA vs. standard return), eligibility window, and evidence requirements from real product/order data — no more hand-waved "returns are open for 7 days."
+- **6D-3 — customer claim creation**: the actual customer-facing "file a claim" backend endpoint, with real per-item quantity validation, reason/claim-type cross-validation, and evidence-file upload — none of this existed before.
+- **6D-4A — admin approval/rejection**: the first admin action against a real claim (approve/reject with a decision note), replacing what had been no admin surface at all.
+- **6D-4B — financial resolution**: real refund/credit computation with a return-shipping deduction, using the same atomic-conditional-update idiom as inventory and payments. Reported, not silently worked around, a genuine gap in the existing state model (prepaid refund retry couldn't be safely disambiguated) — closed two sub-phases later in 6D-4E.
+- **6D-4C — replacement order creation**: a third resolution type beyond refund/credit — a real zero-charge replacement order, reusing the exact reservation/commit/release inventory primitives real checkout uses, with a speculative-transaction-rollback pattern so a lost race can't half-create an order.
+- **6D-4D — reverse logistics**: `markItemReceived` and a `requiresReverseLogistics` gate applied uniformly across all three resolution types, so a refund/credit/replacement can't be granted before a returned item is confirmed received (when the claim type requires that at all — DOA claims default to not requiring it).
+- **6D-4E — closed 6D-4B's own reported gap**: a real schema migration (the first since 6D-1) adding `ReturnRefundAttemptState`, making prepaid-refund retry-after-failure safe rather than undefined. **A real incident occurred and was handled correctly during this sub-phase**: `prisma migrate dev` detected unrelated pre-existing migration-checksum drift and offered to reset the entire dev database to fix it — refused, and fixed with a targeted single-row SQL correction instead, per this project's absolute rule against unauthorized destructive database operations. Full incident writeup in `PHASE_6D_MIGRATION_DESIGN.md`.
+- **6D-4F — notification delivery + refund webhook reconciliation**: the four return lifecycle events (approved/rejected/resolved/item-received) previously had no email or in-app notification at all; and a crashed-mid-refund payment can now be reconciled from Razorpay's own webhook instead of staying stuck forever.
+- **6D-4G — closed 6D-4F's own reported residual gap**: `ReturnsService` itself now listens for the refund-completion event too, so a crash between the payment gateway confirming a refund and `ReturnsService` recording that fact locally is recoverable at the service layer, not just the payment layer. Found and fixed, during this sub-phase's own design pass (not live testing), a real harmless-but-real race the new listener introduced on every *normal* (non-crashed) resolution — closed before it could become a duplicate-audit-log bug.
+- **6D-4H — the first frontend for any of this**: a customer claim-filing form and status card, and a full admin returns queue + detail page (approve/reject/resolve/mark-item-received). Two small backend additions (`GET /orders/:id/returns`, `OrderItem.id` exposed publicly) were needed to support it. **A real, previously-invisible production bug was found and fixed via live browser verification, not by any of the preceding six sub-phases' unit tests**: the old pre-Phase-6 `Order.returnRequest` field was silently reading the *same* database row Phase 6D's claim system now owns, through dead logic that simulated a fake "refunded" status from elapsed wall-clock time — actively contradicting a real claim's real status once enough time passed. `toPublicOrder` now always returns `returnRequest: null`; the dead mapping was deleted.
+- **Post-gate UI fix (this pass)**: live-driving the finished admin flow surfaced that the shared `AccountMobileNav` (used below the `md:hidden` breakpoint) had no logout control at all — only the desktop-only `AccountSidebar` did, so there was genuinely no way to sign out from any account page on a phone-width screen. Fixed with a matching rust-toned pill in the mobile nav's scroll row, wired to the same confirm modal. Not part of the returns/refund domain, but found while closing out this phase and fixed rather than left for a separate pass.
+
+**Verified this pass (final Phase 6 gate check, not inherited from sub-phase reports):**
+- Full backend unit suite: **49/49 suites, 635/635 tests pass** (up from 452 at the Phase 5 gate — Phase 6 alone added 183 tests across return policy, claim creation, admin approval, financial resolution, replacement orders, reverse logistics, refund retry, notification delivery, webhook reconciliation, and the two new frontend-supporting endpoints).
+- `prisma migrate status` against real local Postgres: 8 migrations, **schema up to date**, zero drift.
+- Frontend: `tsc -b` and `eslint . --max-warnings 0` both pass clean across the whole app, including every file this phase touched.
+- Backend lint: **still fails** — 33 errors / 20 warnings, `@typescript-eslint/no-unnecessary-type-assertion`, confirmed via `git status` to be entirely in files this phase never touched (same pre-existing drift Phase 0 first found, unchanged in shape since; flagged as a standalone follow-up task rather than fixed inline, consistent with this project's scope discipline).
+- Docker: `docker compose up -d --build api` rebuilt clean; `GET /api/health/ready` returns `{"status":"ok", database: up, redis: up}`.
+- Secrets scan: `git diff` across the full Phase 6 commit range (93db0cc..c70cb9b, 14 commits + this pass's UI fix, 57 files) checked for hardcoded credentials/keys — none found.
+- Each sub-phase's own live-verification evidence (real browser walkthroughs, direct Postgres inspection, real `curl` calls) is recorded in its own section of `PHASE_6D_MIGRATION_DESIGN.md` and is not re-run or restated here.
+
+**Known gaps, stated plainly:**
+- **Razorpay webhook signature verification has still never been exercised against a real Razorpay webhook** — no sandbox credentials exist in this environment (same root cause as the Phase 1 gap; confirmed again this pass: no `RAZORPAY_*` keys in `apps/api/.env`). Every webhook-reconciliation code path added in 6D-4F/6D-4G is unit-tested against a mocked provider client and live-verified only for its "malformed/unrecognized event" handling. **This is IMPLEMENTED BUT UNVERIFIED for the real webhook success path**, per this project's own evidence standard — same honest posture carried since Phase 1.
+- **Evidence-file upload was UI-verified visually, not exercised with a real uploaded file through the browser automation tool used for this phase's live testing** (no file-picker capability in that tool). The `FormData` construction was verified by code review and by the extensive pre-existing backend evidence-upload test coverage, not by a real end-to-end file round-trip in a browser.
+- **None of this phase's 15 commits have been merged to `main` or deployed** — the branch (`feat/phase-6a-refund-race-fix`) is 15 commits ahead of `origin/main`. The live Render deployment referenced in `PRODUCTION_STATUS.md` is still running pre-Phase-6 code; none of the new returns/refund/replacement functionality — or its migrations — exists there yet.
+- **Repo-wide `@typescript-eslint/no-unnecessary-type-assertion` lint drift** (33 errors / 20 warnings, ~15 files, none touched by this phase) remains unfixed, flagged separately, first found at the Phase 0 baseline and still present at every gate since.
+
+**Gate: passed, with those gaps carried forward explicitly** — matching the precedent Phases 1, 3, and 5 each set for external-dependency and tooling-limitation gaps: stated plainly rather than silently claimed away, none of them blocking on work this phase actually owns.
+
+## Phases 7–12 — scope reference
 
 Full phase-by-phase scope (objective, backend/frontend/database work, required
 tests, and acceptance criteria) is as specified in the governing production-

@@ -101,4 +101,26 @@ export class AnalyticsController {
       limit ? Number(limit) : undefined,
     );
   }
+
+  /**
+   * Marketplace Phase 14 — the marketplace-specific counterpart to
+   * getOverview above: real seller-vs-Folia GMV split, commission
+   * collected, seller status counts, the top-seller ranking, and the
+   * real "needs attention today" moderation/payout queue counts, all in
+   * one call for the admin dashboard's marketplace landing view.
+   */
+  @Get('marketplace')
+  @ApiOperation({
+    summary:
+      'Real marketplace GMV split, commission collected, seller stats, top sellers, and pending moderation/payout counts in one call.',
+  })
+  async getMarketplace(@Query() range: DateRangeQueryDto) {
+    const [gmv, sellers, topSellers, pending] = await Promise.all([
+      this.analyticsService.getMarketplaceGmv(range),
+      this.analyticsService.getSellerStats(),
+      this.analyticsService.getTopSellers(),
+      this.analyticsService.getPendingModerationCounts(),
+    ]);
+    return { gmv, sellers, topSellers, pending };
+  }
 }

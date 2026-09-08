@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
-// See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   ConflictException,
   Injectable,
@@ -16,7 +14,7 @@ export class WarehousesService {
   async findAll(): Promise<WarehouseRecord[]> {
     return this.prisma.warehouse.findMany({
       orderBy: { name: 'asc' },
-    }) as Promise<WarehouseRecord[]>;
+    });
   }
 
   async findByCodeOrThrow(code: string): Promise<WarehouseRecord> {
@@ -24,7 +22,27 @@ export class WarehousesService {
       where: { code },
     });
     if (!warehouse) throw new NotFoundException('Warehouse not found');
-    return warehouse as WarehouseRecord;
+    return warehouse;
+  }
+
+  /**
+   * Marketplace Phase 3 — used wherever a caller needs "the" warehouse
+   * without asking a customer/seller to pick one (a seller's new
+   * product's initial stock has to go somewhere). Throws if none has
+   * been seeded/marked default — a real configuration error, not a
+   * normal runtime state, mirroring RolesService.getDefaultRoleOrThrow's
+   * exact shape.
+   */
+  async getDefaultOrThrow(): Promise<WarehouseRecord> {
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { isDefault: true },
+    });
+    if (!warehouse) {
+      throw new NotFoundException(
+        'No default warehouse is configured — seed one with isDefault: true.',
+      );
+    }
+    return warehouse;
   }
 
   async create(input: {
@@ -56,6 +74,6 @@ export class WarehousesService {
     }
     return this.prisma.warehouse.create({
       data: input,
-    }) as Promise<WarehouseRecord>;
+    });
   }
 }

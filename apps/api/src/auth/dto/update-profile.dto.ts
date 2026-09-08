@@ -25,18 +25,15 @@ export class UpdateProfileDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, example: '+91 98765 43210' })
   @IsOptional()
-  @IsPhoneNumber(undefined, { message: 'Enter a valid phone number' })
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   phone?: string;
 
-  @ApiProperty({
-    required: false,
-    description:
-      'Set automatically by POST /auth/me/avatar — not usually set directly',
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  avatarUrl?: string;
+  // P0-C-6 — deliberately not a DTO field. avatarUrl is set only by
+  // POST /auth/me/avatar, which validates size/MIME/magic-bytes
+  // (avatar-file.util.ts) and generates the URL server-side from the
+  // uploaded file itself. It was previously also settable via this DTO
+  // with an arbitrary client-supplied string, letting a user point their
+  // own avatar at any URL and bypass all of that upload validation.
 }

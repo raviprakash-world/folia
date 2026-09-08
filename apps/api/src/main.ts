@@ -34,8 +34,31 @@ async function bootstrap() {
   });
 
   const config = app.get(AppConfigService);
+  const logger = app.get(Logger);
+  app.useLogger(logger);
 
-  app.useLogger(app.get(Logger));
+  // P0-D — NestJS's AllExceptionsFilter only catches errors thrown during
+  // HTTP request handling. An error from a background job processor
+  // (see JobsModule) or any unawaited promise elsewhere previously had no
+  // safety net and no logged visibility at all — Node would either crash
+  // silently (uncaughtException, no listener) or print an unstructured
+  // stack trace to raw stderr (unhandledRejection), bypassing the
+  // structured Pino logging every other error goes through. Both are
+  // treated as fatal and exit deliberately: the process is in an
+  // undefined state after either (Node's own guidance), and this app has
+  // no in-process work worth risking corrupting over — Docker/Render
+  // restarts the container.
+  process.on('uncaughtException', (err) => {
+    logger.error(err, 'Uncaught exception — exiting');
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (reason) => {
+    logger.error(
+      reason instanceof Error ? reason : String(reason),
+      'Unhandled promise rejection — exiting',
+    );
+    process.exit(1);
+  });
   app.use(helmet());
   app.use(cookieParser());
   app.use(
@@ -72,6 +95,15 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());
+
+  // P0-D — without this, Nest's OnModuleDestroy lifecycle (PrismaService/
+  // RedisService's $disconnect()/quit()) never runs on SIGTERM/SIGINT,
+  // even now that the Dockerfile's CMD actually delivers the signal to
+  // this process (see Dockerfile's own comment on the `exec` fix). Both
+  // fixes were required together — this call alone does nothing if the
+  // signal never arrives, and the Dockerfile fix alone does nothing if
+  // Nest was never told to listen for it.
+  app.enableShutdownHooks();
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Folia API')

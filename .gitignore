@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Turbo's local build/task cache (apps/api/.turbo, apps/web/.turbo,
+# packages/shared-types/.turbo, and this root .turbo — this pattern has
+# no leading slash so it matches at every directory level). First
+# appeared in this repo with P0-B's Turbo/CI work; never meant to be
+# committed.
+.turbo
+
 # Secrets — root .env is read by `docker compose` for interpolation
 # (JWT_ACCESS_SECRET/JWT_REFRESH_SECRET etc.), separate from each app's
 # own apps/*/.env, which its own .gitignore already covers.
@@ -28,3 +35,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code local state — machine-local settings plus, when background
+# tasks are running, one full git worktree per task under
+# .claude/worktrees/. Never meant to be committed; discovered untracked
+# and unignored during P0-B's repository-hygiene pass.
+.claude/

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 // See users/users.service.ts's top-of-file comment for why this exemption exists.
 import {
   ConflictException,
@@ -13,6 +12,13 @@ const PRODUCT_INCLUDE = {
   category: true,
   variants: true,
   specs: true,
+  // Marketplace Phase 16 — every customer-facing product read now also
+  // carries its seller's public storefront identity (null for a
+  // Folia-owned product), so ProductDetail can attribute/link to it.
+  // Never selects anything beyond what's already public on
+  // /sellers/:slug (SellersService.getPublicStorefront) — no email/
+  // phone/internal status.
+  seller: { select: { id: true, slug: true, displayName: true } },
 } as const;
 
 /**
@@ -60,7 +66,10 @@ export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findMany(query: ProductQueryDto) {
-    const where: Record<string, unknown> = { deletedAt: null };
+    const where: Record<string, unknown> = {
+      deletedAt: null,
+      approvalStatus: 'ACTIVE',
+    };
     if (query.category) where.category = { slug: query.category };
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.price = {
@@ -71,6 +80,7 @@ export class ProductsService {
     if (query.inStockOnly) where.inStock = true;
     if (query.search)
       where.name = { contains: query.search, mode: 'insensitive' };
+    if (query.sellerId) where.sellerId = query.sellerId;
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 12;
@@ -97,20 +107,32 @@ export class ProductsService {
 
   async findBySlugOrThrow(slug: string): Promise<ProductRecord> {
     const product = await this.prisma.product.findFirst({
-      where: { slug, deletedAt: null },
+      where: { slug, deletedAt: null, approvalStatus: 'ACTIVE' },
       include: PRODUCT_INCLUDE,
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product as ProductRecord;
+    return product;
   }
 
+  /**
+   * Marketplace Phase 3 — as of this phase, a Product row can genuinely
+   * be DRAFT/SUBMITTED/UNDER_REVIEW/REJECTED/ARCHIVED (a seller's own
+   * listing, not yet or no longer live), so every read on this
+   * customer/recommendation-facing path filters to approvalStatus:
+   * 'ACTIVE' — every existing admin call site (adminUpdate's own 404
+   * pre-check) is unaffected: an admin-created product is always ACTIVE
+   * (the schema's own column default), so this filter never hides one.
+   * Seller/admin moderation reads use SEPARATE methods
+   * (SellerProductsService) that deliberately do NOT filter here, since
+   * they need to see a seller's own non-ACTIVE rows.
+   */
   async findByIdOrThrow(id: string): Promise<ProductRecord> {
     const product = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, approvalStatus: 'ACTIVE' },
       include: PRODUCT_INCLUDE,
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product as ProductRecord;
+    return product;
   }
 
   /**
@@ -127,7 +149,7 @@ export class ProductsService {
   async findManyByIds(ids: string[]): Promise<ProductRecord[]> {
     if (ids.length === 0) return [];
     const products = (await this.prisma.product.findMany({
-      where: { id: { in: ids }, deletedAt: null },
+      where: { id: { in: ids }, deletedAt: null, approvalStatus: 'ACTIVE' },
       include: PRODUCT_INCLUDE,
     })) as ProductRecord[];
     // findMany does not preserve the input array's order — re-sort to
@@ -167,7 +189,7 @@ export class ProductsService {
     return this.prisma.product.create({
       data: { ...input, stockCount: 0, inStock: false },
       include: PRODUCT_INCLUDE,
-    }) as Promise<ProductRecord>;
+    });
   }
 
   async adminUpdate(
@@ -201,7 +223,7 @@ export class ProductsService {
       where: { id },
       data: input,
       include: PRODUCT_INCLUDE,
-    }) as Promise<ProductRecord>;
+    });
   }
 
   /** Soft delete — matches the schema's own documented reasoning: a deleted product shouldn't vanish from historical order line items that reference it. */

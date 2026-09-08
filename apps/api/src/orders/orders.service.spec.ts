@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
 // Same reasoning as auth.service.spec.ts's top-of-file comment.
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { PAYMENT_EXPIRY_MINUTES } from '../payments/payments.service';
 import type { CheckoutDto } from './dto/checkout.dto';
@@ -19,6 +20,11 @@ function makeCartItem(overrides: Record<string, unknown> = {}) {
       slug: 'monstera',
       name: 'Monstera',
       category: { slug: 'plants' },
+      // Marketplace Phase 5 — every existing test's cart item is a real,
+      // purchasable Folia-owned product by default; tests that need an
+      // unapproved/seller-owned line override these explicitly.
+      approvalStatus: 'ACTIVE',
+      sellerId: null,
     },
     variant: null,
     ...overrides,
@@ -130,11 +136,29 @@ function createDeps() {
       updateMany: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
     },
     payment: { findUnique: jest.fn().mockResolvedValue(null) },
     cancellationRequest: { create: jest.fn() },
     returnRequest: { create: jest.fn() },
     orderItem: { findMany: jest.fn() },
+    // Marketplace Phase 5 — checkout's own defense-in-depth seller-status
+    // re-check. Only ever queried when the cart has at least one
+    // SELLER_OWNED line, which the default single Folia cart item never
+    // triggers — most existing tests never need this mocked at all.
+    seller: { findMany: jest.fn().mockResolvedValue([]) },
+    // Marketplace Phase 12 — shipOrder/adminUpdateStatus's own
+    // per-seller-group delegation. Defaults to the trivial single-group
+    // case (a bare Folia-only order), matching every existing test's own
+    // assumption before this phase; tests that care about the real
+    // multi-group refusal path override these directly.
+    orderSellerGroup: {
+      findMany: jest.fn().mockResolvedValue([{ id: 'group-1' }]),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
   const cartService = {
@@ -159,6 +183,11 @@ function createDeps() {
       status: 'COD_PENDING',
       requiresGatewayCheckout: false,
       order: makePublicOrder(),
+    }),
+    refund: jest.fn().mockResolvedValue({
+      id: 'refund-1',
+      status: 'PROCESSED',
+      providerRefundId: 'rfnd_1',
     }),
   };
   const inventoryService = {
@@ -249,6 +278,98 @@ describe('OrdersService.checkout', () => {
       BadRequestException,
     );
     expect(paymentsService.createForOrder).not.toHaveBeenCalled();
+  });
+
+  describe('Marketplace Phase 5 — defense-in-depth revalidation', () => {
+    it('rejects checkout when a cart item is no longer ACTIVE — even though it was addable at add-to-cart time', async () => {
+      const { cartService, inventoryService, paymentsService, service } =
+        createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [
+            makeCartItem({
+              product: {
+                slug: 'monstera',
+                name: 'Monstera',
+                category: { slug: 'plants' },
+                approvalStatus: 'ARCHIVED',
+                sellerId: null,
+              },
+            }),
+          ],
+        },
+      });
+
+      await expect(service.checkout('user-1', BASE_DTO)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(inventoryService.reserveForProduct).not.toHaveBeenCalled();
+      expect(paymentsService.createForOrder).not.toHaveBeenCalled();
+    });
+
+    it('rejects checkout when a cart item belongs to a seller who is no longer ACTIVE', async () => {
+      const { prisma, cartService, inventoryService, service } = createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [
+            makeCartItem({
+              product: {
+                slug: 'seller-plant',
+                name: 'Seller Plant',
+                category: { slug: 'plants' },
+                approvalStatus: 'ACTIVE',
+                sellerId: 'seller-1',
+              },
+            }),
+          ],
+        },
+      });
+      prisma.seller.findMany.mockResolvedValue([
+        { id: 'seller-1', status: 'SUSPENDED' },
+      ]);
+
+      await expect(service.checkout('user-1', BASE_DTO)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(inventoryService.reserveForProduct).not.toHaveBeenCalled();
+    });
+
+    it('never queries sellers at all for an all-Folia cart', async () => {
+      const { prisma, service } = createDeps();
+
+      await service.checkout('user-1', BASE_DTO);
+
+      expect(prisma.seller.findMany).not.toHaveBeenCalled();
+    });
+
+    it('allows checkout through when every seller referenced is ACTIVE', async () => {
+      const { prisma, cartService, paymentsService, service } = createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [
+            makeCartItem({
+              product: {
+                slug: 'seller-plant',
+                name: 'Seller Plant',
+                category: { slug: 'plants' },
+                approvalStatus: 'ACTIVE',
+                sellerId: 'seller-1',
+              },
+            }),
+          ],
+        },
+      });
+      prisma.seller.findMany.mockResolvedValue([
+        { id: 'seller-1', status: 'ACTIVE' },
+      ]);
+
+      await service.checkout('user-1', BASE_DTO);
+
+      expect(paymentsService.createForOrder).toHaveBeenCalled();
+    });
   });
 
   it('computes subtotal, tax (8%), and total correctly with no coupon, in the checkout snapshot handed to PaymentsService', async () => {
@@ -590,8 +711,8 @@ describe('OrdersService.requestCancellation', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('sets hasRefund to false for a COD order (nothing was ever charged)', async () => {
-    const { prisma, service } = createDeps();
+  it('sets hasRefund to false for a COD order (nothing was ever charged), and never attempts a refund', async () => {
+    const { prisma, paymentsService, service } = createDeps();
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
     prisma.order.findFirst = jest
       .fn()
@@ -599,6 +720,7 @@ describe('OrdersService.requestCancellation', () => {
         status: 'PROCESSING',
         cancellation: null,
         paymentMethod: 'COD',
+        payment: null,
       })
       .mockResolvedValueOnce(makeCreatedOrder());
 
@@ -611,16 +733,18 @@ describe('OrdersService.requestCancellation', () => {
         data: expect.objectContaining({ hasRefund: false }),
       }),
     );
+    expect(paymentsService.refund).not.toHaveBeenCalled();
   });
 
-  it('sets hasRefund to true for a real charged payment method — every order reaching this method was, by construction, actually paid for (Phase 2: an Order only exists once PaymentsService.confirmAndCreateOrder has already run)', async () => {
-    const { prisma, service } = createDeps();
+  it('sets hasRefund to true for a real charged payment method, and attempts a real refund against the real payment — every order reaching this method was, by construction, actually paid for (Phase 2: an Order only exists once PaymentsService.confirmAndCreateOrder has already run)', async () => {
+    const { prisma, paymentsService, service } = createDeps();
     prisma.order.findFirst = jest
       .fn()
       .mockResolvedValueOnce({
         status: 'PROCESSING',
         cancellation: null,
         paymentMethod: 'CREDIT_CARD',
+        payment: { id: 'pay-42' },
       })
       .mockResolvedValueOnce(makeCreatedOrder());
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
@@ -634,42 +758,58 @@ describe('OrdersService.requestCancellation', () => {
         data: expect.objectContaining({ hasRefund: true }),
       }),
     );
-  });
-});
-
-describe('OrdersService.requestReturn', () => {
-  it('rejects when the order is not delivered', async () => {
-    const { prisma, service } = createDeps();
-    prisma.order.findFirst = jest.fn().mockResolvedValue({
-      status: 'SHIPPED',
-      returnRequest: null,
-      createdAt: new Date(),
-    });
-    await expect(
-      service.requestReturn('user-1', 'order-1', { reason: 'wrong-item' }),
-    ).rejects.toThrow(BadRequestException);
+    expect(paymentsService.refund).toHaveBeenCalledWith(
+      'pay-42',
+      expect.objectContaining({
+        reason: expect.stringContaining('changed-mind'),
+      }),
+      { actorId: 'user-1', actorType: 'system' },
+    );
   });
 
-  it('succeeds for a recently delivered order with no existing return', async () => {
-    const { prisma, service } = createDeps();
+  it("still returns the cancelled order when the refund attempt itself fails — a down/unconfigured gateway must not fail the cancellation, matching this codebase's existing non-fatal-side-effect pattern for email sends", async () => {
+    const { prisma, paymentsService, service } = createDeps();
     prisma.order.findFirst = jest
       .fn()
       .mockResolvedValueOnce({
-        status: 'DELIVERED',
-        returnRequest: null,
-        createdAt: new Date(),
+        status: 'PROCESSING',
+        cancellation: null,
+        paymentMethod: 'CREDIT_CARD',
+        payment: { id: 'pay-42' },
       })
       .mockResolvedValueOnce(makeCreatedOrder());
     prisma.$transaction = jest.fn().mockResolvedValue([{}, {}]);
+    paymentsService.refund.mockRejectedValue(
+      new Error('Razorpay is not configured'),
+    );
 
     await expect(
-      service.requestReturn('user-1', 'order-1', { reason: 'wrong-item' }),
+      service.requestCancellation('user-1', 'order-1', {
+        reason: 'changed-mind',
+      }),
     ).resolves.toBeDefined();
-    expect(prisma.returnRequest.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ reason: 'WRONG_ITEM' }),
+  });
+
+  it('rejects a losing concurrent cancellation attempt with a clean BadRequestException, not a raw unique-constraint error', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst = jest.fn().mockResolvedValueOnce({
+      status: 'PROCESSING',
+      cancellation: null,
+      paymentMethod: 'COD',
+      payment: null,
+    });
+    prisma.$transaction = jest.fn().mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
       }),
     );
+
+    await expect(
+      service.requestCancellation('user-1', 'order-1', {
+        reason: 'changed-mind',
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 });
 
@@ -800,6 +940,131 @@ describe('OrdersService.getPurchasedProductIds', () => {
   });
 });
 
+describe('OrdersService.findOneForUser', () => {
+  it('Marketplace Phase 16 — includes sellerGroups (with items and the seller displayName) in the query', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(
+      makeCreatedOrder({ sellerGroups: [] }),
+    );
+
+    await service.findOneForUser('user-1', 'FOL-20260829-1234');
+
+    expect(prisma.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          sellerGroups: {
+            include: {
+              items: true,
+              seller: { select: { displayName: true } },
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it('Marketplace Phase 16 — maps each seller group to its public shape, omitting seller-private commissionTotal/sellerNote', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findFirst.mockResolvedValue(
+      makeCreatedOrder({
+        sellerGroups: [
+          {
+            id: 'group-folia',
+            seller: null,
+            status: 'DELIVERED',
+            courierId: 'swiftpost',
+            trackingNumber: 'SW1',
+            trackingUrl: 'https://track/SW1',
+            shippedAt: new Date('2026-08-01T00:00:00Z'),
+            deliveredAt: new Date('2026-08-03T00:00:00Z'),
+            items: [
+              {
+                id: 'item-1',
+                productId: 'prod-1',
+                slug: 'monstera',
+                name: 'Monstera',
+                variantId: null,
+                variantLabel: null,
+                quantity: 2,
+              },
+            ],
+          },
+          {
+            id: 'group-seller',
+            seller: { displayName: 'Terracotta & Fern' },
+            status: 'PROCESSING',
+            courierId: null,
+            trackingNumber: null,
+            trackingUrl: null,
+            shippedAt: null,
+            deliveredAt: null,
+            items: [
+              {
+                id: 'item-2',
+                productId: 'prod-2',
+                slug: 'clay-pot',
+                name: 'Clay Pot',
+                variantId: null,
+                variantLabel: null,
+                quantity: 1,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const result = await service.findOneForUser('user-1', 'FOL-20260829-1234');
+
+    expect(result.sellerGroups).toEqual([
+      {
+        id: 'group-folia',
+        sellerName: null,
+        status: 'delivered',
+        courierId: 'swiftpost',
+        trackingNumber: 'SW1',
+        trackingUrl: 'https://track/SW1',
+        shippedAt: '2026-08-01T00:00:00.000Z',
+        deliveredAt: '2026-08-03T00:00:00.000Z',
+        items: [
+          {
+            id: 'item-1',
+            productId: 'prod-1',
+            slug: 'monstera',
+            name: 'Monstera',
+            variantId: null,
+            variantLabel: null,
+            quantity: 2,
+          },
+        ],
+      },
+      {
+        id: 'group-seller',
+        sellerName: 'Terracotta & Fern',
+        status: 'processing',
+        courierId: null,
+        trackingNumber: null,
+        trackingUrl: null,
+        shippedAt: null,
+        deliveredAt: null,
+        items: [
+          {
+            id: 'item-2',
+            productId: 'prod-2',
+            slug: 'clay-pot',
+            name: 'Clay Pot',
+            variantId: null,
+            variantLabel: null,
+            quantity: 1,
+          },
+        ],
+      },
+    ]);
+    expect(result.sellerGroups?.[0]).not.toHaveProperty('commissionTotal');
+    expect(result.sellerGroups?.[0]).not.toHaveProperty('sellerNote');
+  });
+});
+
 describe('OrdersService.adminFindAll', () => {
   it('returns orders across every customer, not scoped to one user', async () => {
     const { prisma, service } = createDeps();
@@ -817,6 +1082,32 @@ describe('OrdersService.adminFindAll', () => {
     expect(prisma.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { status: 'SHIPPED' } }),
     );
+  });
+
+  /**
+   * Phase 6D-4H — a real, previously-invisible bug: toPublicOrder used to
+   * map a genuinely present Order.returnRequest row through the OLD,
+   * pre-6D toPublicReturn()/elapsed-time-simulated refundStatus, even
+   * though that row is now the SAME ReturnRequest a real 6D claim lives
+   * in — showing a still-PENDING or REJECTED claim as a fake "refunded"
+   * status once enough wall-clock time passed. Fixed by always returning
+   * null (see order.types.ts's own doc comment on this).
+   */
+  it('never exposes a real ReturnRequest row through the legacy returnRequest field, even when the include would have returned one', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findMany.mockResolvedValue([
+      makeCreatedOrder({
+        returnRequest: {
+          reason: 'CHANGED_MIND',
+          note: null,
+          requestedAt: new Date('2020-01-01T00:00:00.000Z'), // ancient — would simulate "refunded" under the old elapsed-time logic
+        },
+      }),
+    ]);
+
+    const [order] = await service.adminFindAll();
+
+    expect(order.returnRequest).toBeNull();
   });
 });
 
@@ -880,6 +1171,28 @@ describe('OrdersService.adminUpdateStatus', () => {
       status: 'SHIPPED',
       userId: 'user-42',
     });
+    // Marketplace Phase 12 — DELIVERED now delegates to
+    // markGroupDelivered for the single-group case (the default
+    // createDeps() shape), which itself rolls Order.status up once every
+    // group has independently reached DELIVERED.
+    prisma.orderSellerGroup.findUnique.mockResolvedValue({
+      id: 'group-1',
+      orderId: 'order-1',
+      status: 'SHIPPED',
+      order: { userId: 'user-42' },
+    });
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      {
+        id: 'group-1',
+        status: 'DELIVERED',
+        courierId: null,
+        trackingNumber: null,
+        trackingUrl: null,
+      },
+    ]);
+    prisma.orderSellerGroup.findUniqueOrThrow.mockResolvedValue({
+      id: 'group-1',
+    });
     prisma.order.update.mockResolvedValue({});
     prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
 
@@ -904,31 +1217,98 @@ describe('OrdersService.adminUpdateStatus', () => {
     ).rejects.toThrow(BadRequestException);
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
+
+  it('sets deliveredAt exactly once, the moment an order transitions to DELIVERED (Phase 6D-2 — the authoritative eligibility-window timestamp for return/DOA claims)', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: 'SHIPPED',
+      userId: 'user-1',
+    });
+    prisma.orderSellerGroup.findUnique.mockResolvedValue({
+      id: 'group-1',
+      orderId: 'order-1',
+      status: 'SHIPPED',
+      order: { userId: 'user-1' },
+    });
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      {
+        id: 'group-1',
+        status: 'DELIVERED',
+        courierId: null,
+        trackingNumber: null,
+        trackingUrl: null,
+      },
+    ]);
+    prisma.orderSellerGroup.findUniqueOrThrow.mockResolvedValue({
+      id: 'group-1',
+    });
+    prisma.order.update.mockResolvedValue({});
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.adminUpdateStatus('order-1', 'DELIVERED');
+
+    const call = prisma.order.update.mock.calls[0][0] as {
+      data: { status: string; deliveredAt?: Date };
+    };
+    expect(call.data.status).toBe('DELIVERED');
+    expect(call.data.deliveredAt).toBeInstanceOf(Date);
+  });
+
+  it('never sets deliveredAt for a transition to any status other than DELIVERED — preserves existing behavior', async () => {
+    const { prisma, service } = createDeps();
+    prisma.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: 'PROCESSING',
+      userId: 'user-1',
+    });
+    prisma.order.update.mockResolvedValue({});
+    prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
+
+    await service.adminUpdateStatus('order-1', 'CONFIRMED');
+
+    expect(prisma.order.update).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: { status: 'CONFIRMED' },
+    });
+  });
 });
 
 describe('OrdersService.shipOrder', () => {
-  function makeConfirmedOrder(overrides: Record<string, unknown> = {}) {
+  // Marketplace Phase 12 — shipOrder now delegates to
+  // shipOrderSellerGroup for the trivial, still-common single-group case;
+  // these fixtures match that new query shape (orderSellerGroup.findFirst
+  // with its own order relation), not the old direct order.findUnique one.
+  function makeGroupRow(overrides: Record<string, unknown> = {}) {
     return {
-      id: 'order-1',
-      status: 'CONFIRMED',
-      userId: 'user-1',
-      total: decimal(71.3),
-      paymentMethod: 'COD',
-      shippingAddressSnapshot: makeAddress({
-        fullName: 'Sam Rivera',
-        phone: '555-0100',
-        postalCode: '560001',
-      }),
+      id: 'group-1',
+      orderId: 'order-1',
+      sellerId: null,
+      status: 'PROCESSING',
       items: [{ name: 'Monstera', quantity: 2, price: decimal(30) }],
+      order: {
+        id: 'order-1',
+        userId: 'user-1',
+        status: 'CONFIRMED',
+        paymentMethod: 'COD',
+        shippingAddressSnapshot: makeAddress({
+          fullName: 'Sam Rivera',
+          phone: '555-0100',
+          postalCode: '560001',
+        }),
+      },
       ...overrides,
     };
   }
 
   it('rejects shipping an order that is not CONFIRMED', async () => {
     const { prisma, service, shippingProvider } = createDeps();
-    prisma.order.findUnique.mockResolvedValue(
-      makeConfirmedOrder({ status: 'PROCESSING' }),
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(
+      makeGroupRow({
+        order: { ...makeGroupRow().order, status: 'PROCESSING' },
+      }),
     );
+    prisma.order.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
 
     await expect(service.shipOrder('order-1')).rejects.toThrow(
       BadRequestException,
@@ -936,9 +1316,25 @@ describe('OrdersService.shipOrder', () => {
     expect(shippingProvider.createShipment).not.toHaveBeenCalled();
   });
 
-  it('creates a real shipment, persists the real courier/AWB/tracking link, and moves the order to SHIPPED', async () => {
+  it('creates a real shipment, persists the real courier/AWB/tracking link, and moves the group (and, for this single-group order, the whole order) to SHIPPED', async () => {
     const { prisma, service, shippingProvider } = createDeps();
-    prisma.order.findUnique.mockResolvedValue(makeConfirmedOrder());
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(makeGroupRow());
+    prisma.orderSellerGroup.update.mockResolvedValue({});
+    prisma.orderSellerGroup.findUniqueOrThrow.mockResolvedValue(
+      makeGroupRow({ status: 'SHIPPED' }),
+    );
+    // The roll-up's own findMany, called after the group update above —
+    // reflects the post-update state a real DB read would return.
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      {
+        id: 'group-1',
+        status: 'SHIPPED',
+        courierId: 'Delhivery Surface',
+        trackingNumber: 'AWB123456789',
+        trackingUrl: 'https://shiprocket.co/tracking/AWB123456789',
+      },
+    ]);
+    prisma.order.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     prisma.order.update.mockResolvedValue({});
     prisma.order.findFirst.mockResolvedValue(makeCreatedOrder());
 
@@ -946,13 +1342,13 @@ describe('OrdersService.shipOrder', () => {
 
     expect(shippingProvider.createShipment).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderId: 'order-1',
+        orderId: 'order-1-group-1', // group-scoped reference — group.id.slice(0,8) === 'group-1' here
         isCod: true,
         shippingAddress: expect.objectContaining({ pincode: '560001' }),
       }),
     );
-    expect(prisma.order.update).toHaveBeenCalledWith({
-      where: { id: 'order-1' },
+    expect(prisma.orderSellerGroup.update).toHaveBeenCalledWith({
+      where: { id: 'group-1' },
       data: expect.objectContaining({
         status: 'SHIPPED',
         courierId: 'Delhivery Surface',
@@ -960,11 +1356,22 @@ describe('OrdersService.shipOrder', () => {
         trackingUrl: 'https://shiprocket.co/tracking/AWB123456789',
       }),
     });
+    // The roll-up correctly copies courier fields up to the whole Order
+    // only because this order has exactly one group.
+    expect(prisma.order.update).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: expect.objectContaining({
+        status: 'SHIPPED',
+        courierId: 'Delhivery Surface',
+        trackingNumber: 'AWB123456789',
+      }),
+    });
   });
 
-  it('propagates a real shipping-provider failure without marking the order shipped', async () => {
+  it('propagates a real shipping-provider failure without marking the group or order shipped', async () => {
     const { prisma, service, shippingProvider } = createDeps();
-    prisma.order.findUnique.mockResolvedValue(makeConfirmedOrder());
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(makeGroupRow());
+    prisma.order.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     shippingProvider.createShipment.mockRejectedValue(
       new Error('Shiprocket is not configured'),
     );
@@ -972,6 +1379,128 @@ describe('OrdersService.shipOrder', () => {
     await expect(service.shipOrder('order-1')).rejects.toThrow(
       'Shiprocket is not configured',
     );
+    expect(prisma.orderSellerGroup.update).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses a genuine multi-seller order — shipping one seller's items must never be silently claimed to cover another seller's", async () => {
+    const { prisma, service, shippingProvider } = createDeps();
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      { id: 'group-1' },
+      { id: 'group-2' },
+    ]);
+
+    await expect(service.shipOrder('order-1')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(shippingProvider.createShipment).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrdersService.shipOrderSellerGroup', () => {
+  function makeGroupRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'group-a',
+      orderId: 'order-1',
+      sellerId: 'seller-a',
+      status: 'PROCESSING',
+      items: [{ name: 'Seller A Plant', quantity: 1, price: decimal(50) }],
+      order: {
+        id: 'order-1',
+        userId: 'user-1',
+        status: 'CONFIRMED',
+        paymentMethod: 'COD',
+        shippingAddressSnapshot: makeAddress({
+          fullName: 'Sam Rivera',
+          phone: '555-0100',
+          postalCode: '560001',
+        }),
+      },
+      ...overrides,
+    };
+  }
+
+  it("scopes the lookup to {id, sellerId} when a sellerId is given — a mismatched/nonexistent group 404s, matching this initiative's ownership-scoping-in-the-query convention", async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.shipOrderSellerGroup('someone-elses-group', 'seller-a'),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.orderSellerGroup.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'someone-elses-group', sellerId: 'seller-a' },
+      }),
+    );
+  });
+
+  it("omits the sellerId filter for an admin call (no sellerId argument) — can ship any group, including Folia's own", async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(
+      makeGroupRow({ sellerId: null }),
+    );
+    prisma.orderSellerGroup.update.mockResolvedValue({});
+    prisma.orderSellerGroup.findUniqueOrThrow.mockResolvedValue({
+      id: 'group-a',
+    });
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      {
+        id: 'group-a',
+        status: 'SHIPPED',
+        courierId: 'X',
+        trackingNumber: 'Y',
+        trackingUrl: null,
+      },
+    ]);
+    prisma.order.update.mockResolvedValue({});
+
+    await service.shipOrderSellerGroup('group-a');
+
+    expect(prisma.orderSellerGroup.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'group-a' } }),
+    );
+  });
+
+  it("rejects shipping a group that isn't PROCESSING — it's already shipped/delivered", async () => {
+    const { prisma, service, shippingProvider } = createDeps();
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(
+      makeGroupRow({ status: 'SHIPPED' }),
+    );
+
+    await expect(
+      service.shipOrderSellerGroup('group-a', 'seller-a'),
+    ).rejects.toThrow(BadRequestException);
+    expect(shippingProvider.createShipment).not.toHaveBeenCalled();
+  });
+
+  it("does NOT roll the whole Order up to SHIPPED while another seller's group in the same order is still PROCESSING", async () => {
+    const { prisma, service } = createDeps();
+    prisma.orderSellerGroup.findFirst.mockResolvedValue(makeGroupRow());
+    prisma.orderSellerGroup.update.mockResolvedValue({});
+    prisma.orderSellerGroup.findUniqueOrThrow.mockResolvedValue({
+      id: 'group-a',
+    });
+    // Two groups on this order: this one now SHIPPED, the other seller's
+    // own group still PROCESSING — the whole order must NOT roll up yet.
+    prisma.orderSellerGroup.findMany.mockResolvedValue([
+      {
+        id: 'group-a',
+        status: 'SHIPPED',
+        courierId: 'X',
+        trackingNumber: 'Y',
+        trackingUrl: null,
+      },
+      {
+        id: 'group-b',
+        status: 'PROCESSING',
+        courierId: null,
+        trackingNumber: null,
+        trackingUrl: null,
+      },
+    ]);
+
+    await service.shipOrderSellerGroup('group-a', 'seller-a');
+
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
 });

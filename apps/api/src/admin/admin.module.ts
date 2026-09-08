@@ -1,13 +1,20 @@
 import { Module } from '@nestjs/common';
 import { AdminProductsController } from './admin-products.controller';
 import { AdminOrdersController } from './admin-orders.controller';
+import { AdminReturnsController } from './admin-returns.controller';
 import { AdminInventoryController } from './admin-inventory.controller';
 import { AdminUsersController } from './admin-users.controller';
+import { AdminSellersController } from './admin-sellers.controller';
+import { AdminSellerProductsController } from './admin-seller-products.controller';
+import { AdminCommissionsController } from './admin-commissions.controller';
+import { AdminPayoutsController } from './admin-payouts.controller';
 import { ProductsModule } from '../products/products.module';
 import { OrdersModule } from '../orders/orders.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { UsersModule } from '../users/users.module';
 import { AuditModule } from '../audit/audit.module';
+import { SellersModule } from '../sellers/sellers.module';
+import { PayoutsModule } from '../payouts/payouts.module';
 
 @Module({
   imports: [
@@ -16,12 +23,19 @@ import { AuditModule } from '../audit/audit.module';
     InventoryModule,
     UsersModule,
     AuditModule,
+    SellersModule,
+    PayoutsModule,
   ],
   controllers: [
     AdminProductsController,
     AdminOrdersController,
+    AdminReturnsController,
     AdminInventoryController,
     AdminUsersController,
+    AdminSellersController,
+    AdminSellerProductsController,
+    AdminCommissionsController,
+    AdminPayoutsController,
   ],
 })
 export class AdminModule {}

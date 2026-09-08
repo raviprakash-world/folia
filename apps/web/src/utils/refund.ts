@@ -23,14 +23,28 @@ export function canReturnOrder(order: Order): boolean {
 
 /**
  * The stored order.status stays 'cancelled' or 'returned' — refund status
- * is derived from elapsed time, not stored, so "refunded" can't be written
- * back into the order at request time. This computes the effective status
- * for display/filtering: a cancelled or returned order whose refund has
+ * for a return (and for a cancellation in mock mode) is derived from
+ * elapsed time, not stored, so "refunded" can't be written back into the
+ * order at request time. This computes the effective status for
+ * display/filtering: a cancelled or returned order whose refund has
  * finished processing shows (and filters) as 'refunded'.
+ *
+ * Phase 6: a cancellation's refundStatus is real server-computed state in
+ * real mode (OrdersService.requestCancellation attempts an actual
+ * refund) — useReal trusts that value verbatim instead of re-deriving a
+ * second, client-side opinion from elapsed time, which would show
+ * "refunded" on a fixed 3-minute timer regardless of whether the real
+ * refund actually succeeded. Returns aren't wired to a real refund yet,
+ * so they always use the elapsed-time simulation regardless of useReal.
  */
-export function getEffectiveOrderStatus(order: Order): OrderStatus {
-  const refundRequestedAt = order.cancellation?.refundStatus ? order.cancellation.requestedAt : order.returnRequest?.requestedAt;
-  if (refundRequestedAt && deriveRefundStatus(refundRequestedAt) === 'refunded') {
+export function getEffectiveOrderStatus(order: Order, useReal = false): OrderStatus {
+  if (order.cancellation?.refundStatus) {
+    const refunded = useReal
+      ? order.cancellation.refundStatus === 'refunded'
+      : deriveRefundStatus(order.cancellation.requestedAt) === 'refunded';
+    return refunded ? 'refunded' : order.status;
+  }
+  if (order.returnRequest && deriveRefundStatus(order.returnRequest.requestedAt) === 'refunded') {
     return 'refunded';
   }
   return order.status;

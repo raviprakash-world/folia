@@ -1,0 +1,136 @@
+name: CI
+
+# P0-B — the repository's first CI pipeline. Scope is deliberately
+# tooling-only: install, lint, typecheck, unit tests, a real Postgres+Redis
+# E2E run, and a build — the same gates a human is expected to run locally
+# before this phase, now enforced automatically. No deploy step exists yet
+# (that's a later phase); this workflow's only job is to make a red build
+# visible before it reaches `main`.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push/PR update cancels whatever CI run is still in flight for the
+# same branch/PR, so GitHub-hosted minutes aren't spent finishing a run
+# that's already obsolete.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Node version matches apps/api/Dockerfile's own `FROM node:20-alpine`
+  # exactly — CI should build/test against the same major version the
+  # production image actually ships, not whatever happens to be newest.
+  NODE_VERSION: '20'
+
+jobs:
+  ci:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+
+    # Real Postgres/Redis for the API's unit tests (a handful genuinely
+    # hit a live Redis — see src/redis/redis.service.spec.ts) and its one
+    # E2E suite (test/health.e2e-spec.ts boots the real AppModule against
+    # both). Versions match docker-compose.yml exactly (postgres:16-alpine,
+    # redis:7-alpine) — same infrastructure shape as local dev, not an
+    # arbitrary CI-only substitute. Test-only credentials, scoped to this
+    # job's own ephemeral service container — never real infrastructure.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: folia_ci
+          POSTGRES_PASSWORD: folia_ci_test_only
+          POSTGRES_DB: folia_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U folia_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Test-only values, generated fresh for this job — never real secrets,
+    # never referenced from GitHub Actions secrets (per this phase's own
+    # rule: no Razorpay/Shiprocket/Resend/payout/production-DB credentials
+    # belong in this workflow at all). The app boots correctly with every
+    # third-party key entirely unset (see env.validation.ts) — this
+    # workflow deliberately leaves them unset rather than stubbing fake
+    # values for integrations no test in this phase exercises.
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://folia_ci:folia_ci_test_only@localhost:5432/folia_ci?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-test-only-access-secret-not-a-real-credential
+      JWT_REFRESH_SECRET: ci-test-only-refresh-secret-not-a-real-credential
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # Deterministic install from the committed lockfile — `npm ci`, not
+      # `npm install`, per this phase's own explicit requirement. Installs
+      # every workspace (root + apps/* + packages/*) in one pass.
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      # Explicit, not relied-upon-via-postinstall: makes the real
+      # generated Prisma client available before anything that imports
+      # @prisma/client (lint/typecheck/unit-tests/build all do, directly
+      # or transitively) runs. See apps/api/prisma/schema.prisma.
+      - name: Generate Prisma client
+        run: npm run prisma:generate --workspace apps/api
+
+      # Real schema application against the CI Postgres service above —
+      # exercises the exact migration path a real deploy would run
+      # (`prisma migrate deploy`), not `db push`. Required before the E2E
+      # suite (which hits a real /api/health that pings this database).
+      - name: Apply Prisma migrations
+        run: npm run prisma:migrate:deploy --workspace apps/api
+
+      - name: Lint
+        run: npx turbo run lint
+
+      - name: Typecheck
+        run: npx turbo run typecheck
+
+      - name: Unit tests
+        run: npx turbo run test
+
+      - name: E2E tests
+        run: npx turbo run test:e2e
+
+      - name: Build
+        run: npx turbo run build
+
+      # P0-C-2/P0-C-16 — Login.tsx/AdminLogin.tsx/SellerLogin.tsx gate their
+      # demo-credential hints behind import.meta.env.DEV, which Vite always
+      # sets false for a `vite build` output regardless of --mode. This step
+      # proves that holds for the real built bundle on every CI run, not
+      # just at the time the gate was added — a future edit that
+      # accidentally moves a credential string outside the DEV check fails
+      # the build here rather than shipping.
+      - name: Scan frontend bundle for demo credentials
+        run: |
+          if grep -rlE "demo@folia\.example|admin@folia\.example|seller@folia\.example|'folia-demo'|\"folia-demo\"|\`folia-demo|'folia-admin'|\"folia-admin\"|\`folia-admin\`|'folia-seller'|\"folia-seller\"|\`folia-seller\`" apps/web/dist/; then
+            echo "::error::Demo credential strings found in the production frontend bundle."
+            exit 1
+          fi
+          echo "Clean: no demo credential strings in apps/web/dist/"

@@ -27,6 +27,16 @@ export default defineConfig(({ mode }) => {
     // being integrated, without changing anything else. Each block is
     // OFF unless its own flag is set (see src/mocks/browser.ts).
     proxy: {
+      // P0-D — unconditional, not gated behind a VITE_REAL_*_API flag
+      // like every other block here: file retrieval never had an MSW
+      // mock to bypass in the first place (nothing served these URLs
+      // at all before this phase — see apps/api's FilesController),
+      // so there's no mock behavior this could shadow.
+      '/api/uploads': {
+        target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (requestPath: string) => requestPath.replace(/^\/api\/uploads/, '/api/v1/uploads'),
+      },
       ...(env.VITE_REAL_AUTH_API === 'true'
         ? {
             '/api/auth': {
@@ -157,6 +167,21 @@ export default defineConfig(({ mode }) => {
               target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
               changeOrigin: true,
               rewrite: (requestPath: string) => requestPath.replace(/^\/api\/payments/, '/api/v1/payments'),
+            },
+          }
+        : {}),
+      ...(env.VITE_REAL_SELLERS_API === 'true'
+        ? {
+            // Marketplace Phase 4 — the first real frontend surface for
+            // any of the seller domain built across Phases 1-3. Its own
+            // flag, not folded onto VITE_REAL_ADMIN_API/VITE_REAL_ORDERS_API:
+            // seller-facing and public-storefront pages are a genuinely
+            // separate feature a deployment could reasonably enable
+            // independently of the admin dashboard or checkout.
+            '/api/sellers': {
+              target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+              changeOrigin: true,
+              rewrite: (requestPath: string) => requestPath.replace(/^\/api\/sellers/, '/api/v1/sellers'),
             },
           }
         : {}),

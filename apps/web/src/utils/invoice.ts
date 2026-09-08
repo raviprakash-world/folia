@@ -1,15 +1,17 @@
 import { formatCurrencyForPdf as formatCurrency, formatDate } from '@/utils/currency';
 import { generateInvoiceNumber } from '@/utils/orderId';
+import { computeGstBreakdown } from '@/utils/gst';
 import type { Order } from '@/types/order';
 
 const COMPANY = {
   name: 'Folia',
   tagline: 'Living design for the home.',
-  address: '412 Alder Street, Portland, OR 97205',
+  address: '412 MG Road, Bengaluru, Karnataka 560001',
+  state: 'Karnataka',
   email: 'hello@folia.example',
-  phone: '(555) 019-2043',
+  phone: '+91 98765 43210',
   // Explicitly labeled mock — this project has no real business registration.
-  gstin: '22AAAAA0000A1Z5 (mock GSTIN)',
+  gstin: '29AAAAA0000A1ZY (mock GSTIN)',
 };
 
 const PINE = [31, 51, 41] as const;
@@ -143,7 +145,15 @@ export async function downloadInvoice(order: Order): Promise<void> {
     totalRow(`Discount${order.couponCode ? ` (${order.couponCode})` : ''}`, `-${formatCurrency(order.discount)}`);
   }
   totalRow('Shipping', order.shippingCost === 0 ? 'Free' : formatCurrency(order.shippingCost));
-  totalRow('Tax', formatCurrency(order.tax));
+  // P0-F — a real GST invoice splits tax into CGST+SGST (intra-state) or
+  // IGST (inter-state), never one undifferentiated "Tax" line.
+  const gst = computeGstBreakdown(order.tax, order.shippingAddress.state, COMPANY.state);
+  if (gst.intraState) {
+    totalRow('CGST', formatCurrency(gst.cgst));
+    totalRow('SGST', formatCurrency(gst.sgst));
+  } else {
+    totalRow('IGST', formatCurrency(gst.igst));
+  }
   doc.setDrawColor(...STONE_DARK);
   doc.line(totalsLabelX, y, totalsX, y);
   y += 14;

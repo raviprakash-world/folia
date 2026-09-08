@@ -23,7 +23,6 @@ export function deriveRefundStatus(requestedAt: Date): RefundStatus {
  * PaymentsService.expireStalePayments), not an Order-level cancellation.
  */
 const CANCELLABLE_STATUSES = ['PROCESSING', 'CONFIRMED', 'SHIPPED'];
-const RETURN_WINDOW_DAYS = 30;
 
 /** Matches apps/web/src/utils/refund.ts's canCancelOrder exactly. */
 export function canCancelOrder(
@@ -33,14 +32,9 @@ export function canCancelOrder(
   return CANCELLABLE_STATUSES.includes(status) && !hasExistingCancellation;
 }
 
-/** Matches apps/web/src/utils/refund.ts's canReturnOrder exactly. */
-export function canReturnOrder(
-  status: string,
-  hasExistingReturn: boolean,
-  orderCreatedAt: Date,
-): boolean {
-  if (status !== 'DELIVERED' || hasExistingReturn) return false;
-  const daysSinceOrder =
-    (Date.now() - orderCreatedAt.getTime()) / (1000 * 60 * 60 * 24);
-  return daysSinceOrder <= RETURN_WINDOW_DAYS;
-}
+// The generic 30-day canReturnOrder that used to live here was removed in
+// Phase 6D-3, along with the whole-order, always-auto-approved
+// OrdersService.requestReturn() it backed — return/DOA eligibility is now
+// claim-type-aware (return-policy.util.ts's isWithinReturnWindow, keyed
+// off the real Order.deliveredAt, not order creation time) and enforced
+// by ReturnsService.createClaim. See docs/PHASE_6D_MIGRATION_DESIGN.md.

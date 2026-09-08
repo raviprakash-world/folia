@@ -1,6 +1,12 @@
 // See users/user.types.ts's top-of-file comment for why these are hand-written.
 export type NotificationType =
-  'ORDER' | 'SHIPPING' | 'PROMOTION' | 'WISHLIST' | 'ACCOUNT' | 'SECURITY';
+  | 'ORDER'
+  | 'SHIPPING'
+  | 'PROMOTION'
+  | 'WISHLIST'
+  | 'ACCOUNT'
+  | 'SECURITY'
+  | 'SELLER';
 
 export interface NotificationRecord {
   id: string;

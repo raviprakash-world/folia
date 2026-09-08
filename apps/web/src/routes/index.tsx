@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AccountLayout } from '@/components/account/AccountLayout';
 import { CheckoutLayout } from '@/components/checkout/CheckoutLayout';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { SellerLayout } from '@/components/seller/SellerLayout';
 
 // Every route component is lazy-loaded so the initial bundle only pays for
 // the layout shell + whichever page was requested (route-level code splitting).
@@ -14,6 +15,8 @@ const Shop = lazy(() => import('@/pages/Shop'));
 const Category = lazy(() => import('@/pages/Category'));
 const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const Search = lazy(() => import('@/pages/Search'));
+const Sellers = lazy(() => import('@/pages/Sellers'));
+const SellerStorefront = lazy(() => import('@/pages/SellerStorefront'));
 const Cart = lazy(() => import('@/pages/Cart'));
 const Wishlist = lazy(() => import('@/pages/Wishlist'));
 const About = lazy(() => import('@/pages/About'));
@@ -46,12 +49,31 @@ const CheckoutPayment = lazy(() => import('@/pages/CheckoutPayment'));
 const CheckoutReview = lazy(() => import('@/pages/CheckoutReview'));
 const OrderConfirmation = lazy(() => import('@/pages/OrderConfirmation'));
 
+// Seller dashboard
+const SellerLogin = lazy(() => import('@/pages/SellerLogin'));
+const SellerApply = lazy(() => import('@/pages/SellerApply'));
+const SellerOverview = lazy(() => import('@/pages/SellerOverview'));
+const SellerProfile = lazy(() => import('@/pages/SellerProfile'));
+const SellerProducts = lazy(() => import('@/pages/SellerProducts'));
+const SellerProductEditor = lazy(() => import('@/pages/SellerProductEditor'));
+const SellerOrders = lazy(() => import('@/pages/SellerOrders'));
+const SellerOrderDetail = lazy(() => import('@/pages/SellerOrderDetail'));
+const SellerEarnings = lazy(() => import('@/pages/SellerEarnings'));
+
 // Admin
 const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
 const AdminOverview = lazy(() => import('@/pages/AdminOverview'));
 const AdminRevenue = lazy(() => import('@/pages/AdminRevenue'));
 const AdminOrders = lazy(() => import('@/pages/AdminOrders'));
+const AdminReturns = lazy(() => import('@/pages/AdminReturns'));
+const AdminReturnDetail = lazy(() => import('@/pages/AdminReturnDetail'));
 const AdminProducts = lazy(() => import('@/pages/AdminProducts'));
+const AdminMarketplace = lazy(() => import('@/pages/AdminMarketplace'));
+const AdminSellers = lazy(() => import('@/pages/AdminSellers'));
+const AdminSellerDetail = lazy(() => import('@/pages/AdminSellerDetail'));
+const AdminSellerProducts = lazy(() => import('@/pages/AdminSellerProducts'));
+const AdminCommissions = lazy(() => import('@/pages/AdminCommissions'));
+const AdminPayouts = lazy(() => import('@/pages/AdminPayouts'));
 const AdminCustomers = lazy(() => import('@/pages/AdminCustomers'));
 const AdminSearch = lazy(() => import('@/pages/AdminSearch'));
 
@@ -69,6 +91,8 @@ export const router = createBrowserRouter([
       { path: 'collections/:slug', element: withSuspense(<Category />) },
       { path: 'product/:slug', element: withSuspense(<ProductDetail />) },
       { path: 'search', element: withSuspense(<Search />) },
+      { path: 'sellers', element: withSuspense(<Sellers />) },
+      { path: 'sellers/:slug', element: withSuspense(<SellerStorefront />) },
       { path: 'cart', element: withSuspense(<Cart />) },
       { path: 'wishlist', element: withSuspense(<Wishlist />) },
       { path: 'about', element: withSuspense(<About />) },
@@ -111,6 +135,31 @@ export const router = createBrowserRouter([
             ],
           },
           { path: 'checkout/confirmation/:orderId', element: withSuspense(<OrderConfirmation />) },
+          // Marketplace Phase 15 — any logged-in customer can apply; this
+          // is deliberately NOT inside the requireRole="seller" block
+          // below, since applying is what assigns that role in the first
+          // place (see SellerApply.tsx's own doc comment).
+          { path: 'seller/apply', element: withSuspense(<SellerApply />) },
+        ],
+      },
+      { path: 'seller/login', element: withSuspense(<SellerLogin />) },
+      {
+        element: <ProtectedRoute requireRole="seller" redirectTo="/seller/login" />,
+        children: [
+          {
+            path: 'seller',
+            element: <SellerLayout />,
+            children: [
+              { index: true, element: withSuspense(<SellerOverview />) },
+              { path: 'profile', element: withSuspense(<SellerProfile />) },
+              { path: 'products', element: withSuspense(<SellerProducts />) },
+              { path: 'products/new', element: withSuspense(<SellerProductEditor />) },
+              { path: 'products/:id', element: withSuspense(<SellerProductEditor />) },
+              { path: 'orders', element: withSuspense(<SellerOrders />) },
+              { path: 'orders/:id', element: withSuspense(<SellerOrderDetail />) },
+              { path: 'earnings', element: withSuspense(<SellerEarnings />) },
+            ],
+          },
         ],
       },
       { path: 'admin/login', element: withSuspense(<AdminLogin />) },
@@ -124,7 +173,15 @@ export const router = createBrowserRouter([
               { index: true, element: withSuspense(<AdminOverview />) },
               { path: 'revenue', element: withSuspense(<AdminRevenue />) },
               { path: 'orders', element: withSuspense(<AdminOrders />) },
+              { path: 'returns', element: withSuspense(<AdminReturns />) },
+              { path: 'returns/:id', element: withSuspense(<AdminReturnDetail />) },
               { path: 'products', element: withSuspense(<AdminProducts />) },
+              { path: 'marketplace', element: withSuspense(<AdminMarketplace />) },
+              { path: 'marketplace/sellers', element: withSuspense(<AdminSellers />) },
+              { path: 'marketplace/sellers/:id', element: withSuspense(<AdminSellerDetail />) },
+              { path: 'marketplace/products', element: withSuspense(<AdminSellerProducts />) },
+              { path: 'marketplace/commissions', element: withSuspense(<AdminCommissions />) },
+              { path: 'marketplace/payouts', element: withSuspense(<AdminPayouts />) },
               { path: 'customers', element: withSuspense(<AdminCustomers />) },
               { path: 'search', element: withSuspense(<AdminSearch />) },
             ],
