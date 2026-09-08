@@ -3,7 +3,11 @@ import { deliveryMethodDefs } from '@/data/deliveryMethods';
 import type { DeliveryOptionBase } from '@/data/deliveryMethods';
 
 const DELIVERY_CHECK_DELAY_MS = 500;
-const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
+// Exported so DeliveryInfo.tsx's product-page copy can't drift from the
+// actual threshold used here again — it used to say "orders over ₹75"
+// (stale USD-shaped text left behind when this number was rescaled 40x)
+// while checkout silently required ₹3,000.
+export const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
 
 export interface DeliveryAvailability {
   postalCode: string;
