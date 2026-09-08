@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Store } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
@@ -79,6 +79,13 @@ export default function SellerLogin() {
           {status === 'pending' ? 'Signing in…' : 'Sign in to your seller account'}
         </Button>
       </form>
+
+      <p className="text-sm text-ink-soft mt-6 text-center">
+        Want to sell on Folia?{' '}
+        <Link to="/seller/apply" className="text-fern hover:text-heading transition-colors">
+          Apply to become a seller
+        </Link>
+      </p>
     </Container>
   );
 }
