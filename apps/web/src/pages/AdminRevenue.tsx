@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, TrendingUp, Tag, Truck } from 'lucide-react';
+import { IndianRupee, TrendingUp, Tag, Truck } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/admin/StatCard';
 import { LineChartWidget } from '@/components/admin/charts/LineChartWidget';
@@ -60,12 +60,12 @@ export default function AdminRevenue() {
 
       {useRealAdminApi ? (
         <div className="grid sm:grid-cols-2 gap-4 mb-10">
-          <StatCard label="Revenue" value={formatCurrency(totals.grossRevenue)} Icon={DollarSign} />
+          <StatCard label="Revenue" value={formatCurrency(totals.grossRevenue)} Icon={IndianRupee} />
           <StatCard label="Avg per day" value={formatCurrency(series.length ? totals.grossRevenue / series.length : 0)} Icon={TrendingUp} />
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <StatCard label="Gross revenue" value={formatCurrency(totals.grossRevenue)} Icon={DollarSign} />
+          <StatCard label="Gross revenue" value={formatCurrency(totals.grossRevenue)} Icon={IndianRupee} />
           <StatCard label="Net revenue" value={formatCurrency(totals.netRevenue)} Icon={TrendingUp} />
           <StatCard label="Discounts given" value={formatCurrency(totals.totalDiscounts)} Icon={Tag} />
           <StatCard label="Shipping revenue" value={formatCurrency(totals.shippingRevenue)} Icon={Truck} />

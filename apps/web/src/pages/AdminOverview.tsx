@@ -1,4 +1,4 @@
-import { DollarSign, ShoppingBag, Users, TrendingUp, Package, Search, RotateCcw } from 'lucide-react';
+import { IndianRupee, ShoppingBag, Users, TrendingUp, Package, Search, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/admin/StatCard';
 import { MetricCard } from '@/components/admin/MetricCard';
@@ -38,7 +38,7 @@ export default function AdminOverview() {
         <MetricCard
           label="Gross revenue (30d)"
           value={formatCurrency(totals.grossRevenue)}
-          Icon={DollarSign}
+          Icon={IndianRupee}
           trend={revenueTrend ?? undefined}
           positiveDirection="up"
         />

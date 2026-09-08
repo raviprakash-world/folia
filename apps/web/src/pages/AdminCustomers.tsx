@@ -1,4 +1,4 @@
-import { Users, UserCheck, UserPlus, Repeat, DollarSign, Award, ShieldCheck } from 'lucide-react';
+import { Users, UserCheck, UserPlus, Repeat, IndianRupee, Award, ShieldCheck } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/admin/StatCard';
@@ -54,7 +54,7 @@ export default function AdminCustomers() {
             <StatCard label="New customers (30d)" value={customers.newCustomers} Icon={UserPlus} />
           </>
         )}
-        <StatCard label="Average order value" value={formatCurrency(customers.averageOrderValue)} Icon={DollarSign} />
+        <StatCard label="Average order value" value={formatCurrency(customers.averageOrderValue)} Icon={IndianRupee} />
         {!useRealAdminApi && <StatCard label="Lifetime value (mock)" value={formatCurrency(customers.lifetimeValue)} Icon={Award} />}
       </div>
 

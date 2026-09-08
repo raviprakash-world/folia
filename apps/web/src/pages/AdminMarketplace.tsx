@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { DollarSign, Percent, Users, Package, Wallet, TrendingUp } from 'lucide-react';
+import { IndianRupee, Percent, Users, Package, Wallet, TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/admin/StatCard';
 import { TableWidget } from '@/components/admin/TableWidget';
@@ -41,7 +41,7 @@ export default function AdminMarketplace() {
       <PageHeader title="Marketplace" description="Real GMV split, seller status, and everything awaiting your review." />
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <StatCard label="Seller GMV" value={formatCurrency(data.gmv.sellerGmv)} Icon={DollarSign} />
+        <StatCard label="Seller GMV" value={formatCurrency(data.gmv.sellerGmv)} Icon={IndianRupee} />
         <StatCard label="Folia GMV" value={formatCurrency(data.gmv.foliaGmv)} Icon={TrendingUp} />
         <StatCard label="Commission collected" value={formatCurrency(data.gmv.commissionCollected)} Icon={Percent} />
         <StatCard label="Active sellers" value={data.sellers.byStatus.ACTIVE ?? 0} Icon={Users} />
