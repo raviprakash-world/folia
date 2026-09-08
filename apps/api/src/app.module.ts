@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'crypto';
@@ -77,8 +78,25 @@ import { SellerGuard } from './sellers/guards/seller.guard';
         },
       }),
     }),
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 100 }], // generous global default; sensitive auth endpoints set their own tighter @Throttle()
+    // P0-F follow-up — rate limiting previously used @nestjs/throttler's
+    // default in-memory storage: correct at one replica, but each
+    // instance would track its own separate counter the moment this is
+    // ever scaled past one — silently defeating the whole point of the
+    // register/login/reset-password throttles P0-C added. Backed by
+    // Redis now (already running, already used elsewhere in this app),
+    // via a purpose-built package rather than a hand-rolled Redis
+    // client: ThrottlerStorage's increment() has to be atomic under
+    // concurrent requests (check-count-then-increment is a real race
+    // otherwise), which this package does with a Lua script — the kind
+    // of correctness a from-scratch implementation risks getting subtly
+    // wrong in exactly the code path meant to prevent abuse.
+    ThrottlerModule.forRootAsync({
+      imports: [AppConfigModule],
+      inject: [AppConfigService],
+      useFactory: (config: AppConfigService) => ({
+        throttlers: [{ ttl: 60_000, limit: 100 }], // generous global default; sensitive auth endpoints set their own tighter @Throttle()
+        storage: new ThrottlerStorageRedisService(config.redisUrl),
+      }),
     }),
     PrismaModule,
     RedisModule,
