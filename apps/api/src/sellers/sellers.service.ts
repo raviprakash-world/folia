@@ -242,6 +242,7 @@ export class SellersService {
             logoUrl: dto.logoUrl,
             contactEmail: dto.contactEmail,
             contactPhone: dto.contactPhone,
+            gstin: dto.gstin,
             address: { create: { ...dto.address } },
           },
           include: { address: true },
@@ -330,6 +331,7 @@ export class SellersService {
         ...(dto.contactPhone !== undefined && {
           contactPhone: dto.contactPhone,
         }),
+        ...(dto.gstin !== undefined && { gstin: dto.gstin }),
         ...(resubmitting && {
           status: 'APPLIED' as const,
           rejectedAt: null,

@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
+import {
+  INDIA_PIN_CODE_MESSAGE,
+  INDIA_PIN_CODE_PATTERN,
+} from '../../common/validators/india-locale';
 
 /** Mirrors AddressInputDto's field shape/validation exactly — this is a
  * seller's business address, not a customer shipping address, so it's its
@@ -27,13 +37,16 @@ export class SellerAddressInputDto {
   @MinLength(1)
   state!: string;
 
-  @ApiProperty()
-  @IsString()
-  @MinLength(1)
+  // P0-F — same reasoning as AddressInputDto: this marketplace's GST
+  // model, PIN-code shipping estimate, and Shiprocket integration are
+  // all India-only already; this makes that explicit instead of
+  // silently accepting a value that breaks downstream.
+  @ApiProperty({ enum: ['IN'], example: 'IN' })
+  @IsIn(['IN'], { message: 'Folia currently operates within India only.' })
   country!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '560001' })
   @IsString()
-  @MinLength(1)
+  @Matches(INDIA_PIN_CODE_PATTERN, { message: INDIA_PIN_CODE_MESSAGE })
   postalCode!: string;
 }

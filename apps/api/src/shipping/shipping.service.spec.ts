@@ -79,7 +79,7 @@ describe('ShippingService.estimate', () => {
       }),
     });
 
-    const result = await service.estimate('560001', 75);
+    const result = await service.estimate('560001', 3000);
     expect(result.cost).toBe(0);
   });
 
@@ -90,8 +90,8 @@ describe('ShippingService.estimate', () => {
         .mockRejectedValue(new Error('Shiprocket is not configured')),
     });
 
-    const result = await service.estimate('560001', 20);
-    expect(result).toEqual({ cost: 6.5, etaDays: '2–4 business days' });
+    const result = await service.estimate('560001', 1000);
+    expect(result).toEqual({ cost: 260, etaDays: '2–4 business days' });
   });
 
   it('falls back to the flat-rate heuristic when Shiprocket reports the pincode unserviceable', async () => {
@@ -101,17 +101,17 @@ describe('ShippingService.estimate', () => {
         .mockResolvedValue({ serviceable: true, couriers: [] }),
     });
 
-    const result = await service.estimate('560001', 20);
-    expect(result).toEqual({ cost: 6.5, etaDays: '2–4 business days' });
+    const result = await service.estimate('560001', 1000);
+    expect(result).toEqual({ cost: 260, etaDays: '2–4 business days' });
   });
 
-  it('is free once subtotal clears the ₹75 threshold via the fallback heuristic, regardless of region', async () => {
+  it('is free once subtotal clears the ₹3,000 threshold via the fallback heuristic, regardless of region', async () => {
     const { service } = createDeps();
-    await expect(service.estimate('902100', 75)).resolves.toEqual({
+    await expect(service.estimate('902100', 3000)).resolves.toEqual({
       cost: 0,
       etaDays: '3–5 business days',
     });
-    await expect(service.estimate('100010', 100)).resolves.toEqual({
+    await expect(service.estimate('100010', 3500)).resolves.toEqual({
       cost: 0,
       etaDays: '3–5 business days',
     });
@@ -119,13 +119,13 @@ describe('ShippingService.estimate', () => {
 
   it('near-region fallback rate below the threshold', async () => {
     const { service } = createDeps();
-    const result = await service.estimate('560001', 20);
-    expect(result).toEqual({ cost: 6.5, etaDays: '2–4 business days' });
+    const result = await service.estimate('560001', 1000);
+    expect(result).toEqual({ cost: 260, etaDays: '2–4 business days' });
   });
 
   it('far-region fallback rate below the threshold', async () => {
     const { service } = createDeps();
-    const result = await service.estimate('110001', 20);
-    expect(result).toEqual({ cost: 9.5, etaDays: '4–6 business days' });
+    const result = await service.estimate('110001', 1000);
+    expect(result).toEqual({ cost: 380, etaDays: '4–6 business days' });
   });
 });

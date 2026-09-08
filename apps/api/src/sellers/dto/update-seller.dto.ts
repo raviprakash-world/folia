@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsEmail,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   IsUrl,
   MaxLength,
@@ -10,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { SellerAddressInputDto } from './seller-address-input.dto';
+import { IsGstin } from '../../common/validators/india-locale';
 
 /**
  * Every field optional — a partial update, not a full re-submission.
@@ -42,12 +44,15 @@ export class UpdateSellerDto {
   @IsEmail()
   contactEmail?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '9876543210' })
   @IsOptional()
-  @IsString()
-  @MinLength(6)
-  @MaxLength(20)
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   contactPhone?: string;
+
+  @ApiPropertyOptional({ example: '29AAAAA0000A1ZY' })
+  @IsOptional()
+  @IsGstin()
+  gstin?: string;
 
   @ApiPropertyOptional({ type: SellerAddressInputDto })
   @IsOptional()

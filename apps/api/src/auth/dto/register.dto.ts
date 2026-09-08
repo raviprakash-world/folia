@@ -33,8 +33,8 @@ export class RegisterDto {
   @IsStrongPassword()
   password!: string;
 
-  @ApiProperty({ required: false, example: '+1 555 019 2043' })
+  @ApiProperty({ required: false, example: '+91 98765 43210' })
   @IsOptional()
-  @IsPhoneNumber(undefined, { message: 'Enter a valid phone number' })
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   phone?: string;
 }

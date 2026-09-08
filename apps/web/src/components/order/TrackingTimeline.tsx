@@ -40,7 +40,7 @@ const stageIcons: Record<TrackingStage, typeof Package> = {
 };
 
 function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', {
+  return new Date(iso).toLocaleString('en-IN', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -145,7 +145,7 @@ export function TrackingTimeline({ order }: { order: Order }) {
             )}
             <span className="flex items-center gap-1">
               <Weight size={11} />
-              {packageDetails.weightLbs} lbs · {packageDetails.dimensions}
+              {packageDetails.weightKg} kg · {packageDetails.dimensions}
             </span>
           </div>
         </Card>

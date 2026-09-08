@@ -43,6 +43,9 @@ export interface SellerProfile {
   logoUrl: string | null;
   contactEmail: string;
   contactPhone: string;
+  /** P0-F — never on the public storefront type below, same reasoning as
+   * contactEmail/contactPhone: real business/tax identity data. */
+  gstin: string | null;
   status: Seller['status'];
   address: SellerAddressRecord | null;
   appliedAt: Date;
@@ -69,6 +72,7 @@ export function toSellerProfile(
     logoUrl: seller.logoUrl,
     contactEmail: seller.contactEmail,
     contactPhone: seller.contactPhone,
+    gstin: seller.gstin,
     status: seller.status,
     address: toSellerAddress(seller.address),
     appliedAt: seller.appliedAt,

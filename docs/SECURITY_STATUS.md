@@ -59,6 +59,107 @@ tracks status at a glance and layers in what that document doesn't cover
   returned outside development, and never itself exploitable in production
   (production returns `{}`, same as before).
 
+## P0-F — India-commerce correctness (2026-09-08)
+
+Scoped after P0-E (external integration verification) was blocked — no
+sandbox credentials exist in this environment for Razorpay/Shiprocket/
+Resend, and creating third-party accounts isn't something this session
+does unilaterally. India-commerce correctness needed no external
+account and was fully engineering-scoped, so it ran instead.
+
+**Fixed and verified:**
+- **Currency magnitude** (not currency code — that was already right).
+  `formatCurrency` was already `Intl.NumberFormat('en-IN', {currency:
+  'INR'})` throughout, and the backend already hardcoded `currency:
+  'INR'` at every Razorpay call site — but every seeded product price
+  was a literal USD-shaped number ($14-$95), so the storefront showed
+  "₹68.00" for a Monstera, ~40-50x too cheap for a real Indian price.
+  Rescaled all 24 seeded products' `price`/`compareAtPrice` (and the
+  mirrored `apps/web/src/data/products.ts`), the `WELCOME5` coupon,
+  and every shipping-cost constant (`FREE_SHIPPING_THRESHOLD`,
+  `NEAR_REGION_COST`/`FAR_REGION_COST`, `deliveryMethodDefs`) by the
+  same 40x factor, consistently, backend and frontend, so relative
+  pricing (a "premium" item still costs more than a basic one) and
+  discount ratios are preserved exactly. Verified against a real,
+  freshly-reseeded Postgres database, not just read from source.
+- **Address/phone/PIN-code validation.** Backend `AddressInputDto`/
+  `SellerAddressInputDto` previously validated `postalCode` as
+  `@IsString() @MinLength(1)` — any non-empty string reached
+  `ShiprocketProvider`'s `billing_pincode`, which requires a real
+  Indian PIN. `country` was unvalidated too. Now: a real 6-digit-PIN
+  regex (`common/validators/india-locale.ts`, first digit 1-9 — a
+  real PIN never starts with 0), `country` constrained to `'IN'`
+  (nothing else in this system — GST model, Shiprocket, PIN
+  validation — ever supported another country in practice; this makes
+  that honest instead of accepting a value guaranteed to fail
+  downstream), and phone fields switched from region-agnostic
+  `IsPhoneNumber(undefined, ...)` to `IsPhoneNumber('IN', ...)`.
+  Frontend's address form previously defaulted new addresses to
+  `country: 'US'` and offered a 5-country dropdown even though nothing
+  but India ever worked end-to-end — now defaults to and only offers
+  India, with a matching India-specific phone regex and PIN check.
+  e2e/unit-tested: `addresses/dto/address-input.dto.spec.ts` (new),
+  `auth/dto/dto.spec.ts` (updated to also reject a structurally-valid
+  US number, not just a malformed one).
+- **GSTIN** — real format AND checksum validation added
+  (`common/validators/india-locale.ts`'s `IsGstin()`), not just a
+  shape regex: implements the actual publicly-documented GST-council
+  mod-36 check-digit algorithm, verified against a real, well-known
+  example GSTIN (`27AAPFU0939F1ZV`) in `india-locale.spec.ts`. New
+  nullable, unique `Seller.gstin` column (migration
+  `20260908061144_add_seller_gstin`) — nullable because a seller below
+  GST's real registration turnover threshold legitimately has none yet
+  (a business fact, not an engineering shortcut). Never exposed on the
+  public seller storefront type, same policy as `contactEmail`/
+  `contactPhone`.
+- **CGST/SGST/IGST invoice split** — the customer-facing PDF invoice
+  (`apps/web/src/utils/invoice.ts`) previously showed one
+  undifferentiated "Tax" line; a real GST invoice must split it into
+  CGST+SGST (buyer and seller/platform in the same state) or IGST
+  (different states). New `utils/gst.ts` does this split — a
+  mechanical, well-defined calculation given an already-computed tax
+  amount and the two parties' states, not a rate decision.
+- **Units** — package weight/dimensions (`utils/packageDetails.ts`)
+  converted from lbs/inches to kg/cm; product spec text (pot sizes,
+  "mature height", vessel "diameter") converted the same way across
+  both the seed data and its frontend mirror.
+- **Locale** — date formatting (`utils/currency.ts`'s `formatDate`,
+  `TrackingTimeline.tsx`, `AdminOverview.tsx`) switched `'en-US'` →
+  `'en-IN'`. Mock/demo data that was still American-shaped (the
+  address-book seed address, the "detect my location" geolocation
+  jitter, the invoice's own mock company address/phone) switched from
+  Portland, OR to Bengaluru, Karnataka — including keeping the mock
+  GSTIN's state-code prefix (29, Karnataka's real code) consistent
+  with that.
+
+**Explicitly NOT fixed — a documented gap, not a claim of compliance:**
+Real HSN-code-based GST slab rates (India's actual GST has category-
+dependent rates — 0/5/12/18/28% — not one flat percentage). This
+project has a single hardcoded `TAX_RATE = 0.08` constant applied
+uniformly to every order regardless of what's in it
+(`apps/api/src/orders/order.types.ts`, mirrored in
+`apps/web/src/utils/pricing.ts`) — 8% isn't even a real GST slab.
+Fixing this needs real product-tax classification data (which HSN
+chapter a "ceramic planter" vs. a "live plant" vs. a "pruning shears"
+falls under, and that category's real rate) from an actual business/
+tax professional — not something to invent as an engineering guess,
+per this whole effort's standing rule against inventing business/
+compliance claims. The GSTIN and CGST/SGST/IGST-split work above are
+real structural improvements independent of this gap (a correct split
+of *whatever* the tax amount is, and a place to store a seller's real
+GSTIN once they have one) — but they do not make this a GST-compliant
+system, and neither this document nor the invoice itself claims that
+(the invoice keeps its existing "This is a portfolio project — not a
+real business" footer unchanged).
+
+Also carried forward, unrelated to GST specifically: this project's
+seller-payout/commission model, and whether individual sellers (not
+just the platform) need their own GST registration and invoicing
+identity in a real multi-seller marketplace, is a genuine business/
+legal question this phase did not attempt to answer — the invoice
+remains platform-level (Folia as the billing party) for every order
+regardless of which seller actually fulfilled it.
+
 ## P0-D finding, not fixed — out of infrastructure scope
 
 While verifying the new avatar-retrieval endpoint live in the browser,

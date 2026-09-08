@@ -61,10 +61,10 @@ describe('RegisterDto', () => {
     expect(errors.some((e) => e.property === 'firstName')).toBe(true);
   });
 
-  it('accepts a valid optional phone number and rejects an invalid one', async () => {
+  it('accepts a valid Indian phone number and rejects a non-Indian or invalid one', async () => {
     const withGoodPhone = plainToInstance(RegisterDto, {
       ...validRegister,
-      phone: '+14155552671',
+      phone: '+919876543210',
     });
     expect(await validate(withGoodPhone)).toHaveLength(0);
 
@@ -74,6 +74,16 @@ describe('RegisterDto', () => {
     });
     const errors = await validate(withBadPhone);
     expect(errors.some((e) => e.property === 'phone')).toBe(true);
+
+    // P0-F — phone validation is now India-specific (IsPhoneNumber('IN')),
+    // matching this marketplace's actual shipping/tax/PIN-code scope. A
+    // structurally valid US number must now be rejected too.
+    const withUsPhone = plainToInstance(RegisterDto, {
+      ...validRegister,
+      phone: '+14155552671',
+    });
+    const usErrors = await validate(withUsPhone);
+    expect(usErrors.some((e) => e.property === 'phone')).toBe(true);
   });
 });
 

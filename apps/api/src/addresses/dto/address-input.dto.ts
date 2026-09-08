@@ -3,9 +3,15 @@ import {
   IsBoolean,
   IsIn,
   IsOptional,
+  IsPhoneNumber,
   IsString,
+  Matches,
   MinLength,
 } from 'class-validator';
+import {
+  INDIA_PIN_CODE_MESSAGE,
+  INDIA_PIN_CODE_PATTERN,
+} from '../../common/validators/india-locale';
 
 export class AddressInputDto {
   @ApiProperty()
@@ -13,14 +19,13 @@ export class AddressInputDto {
   @MinLength(1)
   fullName!: string;
 
-  @ApiProperty()
-  @IsString()
-  @MinLength(1)
+  @ApiProperty({ example: '9876543210' })
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   phone!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '9876543210' })
   @IsOptional()
-  @IsString()
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   alternatePhone?: string;
 
   @ApiPropertyOptional()
@@ -63,14 +68,20 @@ export class AddressInputDto {
   @MinLength(1)
   state!: string;
 
-  @ApiProperty()
-  @IsString()
-  @MinLength(1)
+  // P0-F — was free @IsString(), so any value (or a leftover 'US'/'CA'/
+  // 'GB'/'AU' from the frontend's now-removed multi-country dropdown)
+  // silently reached ShiprocketProvider, which only ever does India-
+  // domestic shipping. This whole marketplace (GST tax model, PIN-code
+  // shipping estimate, Shiprocket) already only worked for Indian
+  // addresses in practice — this makes that honest instead of silently
+  // accepting an address that would fail downstream.
+  @ApiProperty({ enum: ['IN'], example: 'IN' })
+  @IsIn(['IN'], { message: 'Folia currently ships within India only.' })
   country!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '560001' })
   @IsString()
-  @MinLength(1)
+  @Matches(INDIA_PIN_CODE_PATTERN, { message: INDIA_PIN_CODE_MESSAGE })
   postalCode!: string;
 
   @ApiProperty({ enum: ['home', 'office', 'other'] })

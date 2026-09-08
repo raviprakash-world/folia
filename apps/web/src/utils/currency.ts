@@ -14,5 +14,5 @@ export function formatCurrencyForPdf(amount: number): string {
 
 /** Formats a stored ISO timestamp for human display — order.createdAt is a full timestamp (needed for tracking math), not just a date. */
 export function formatDate(isoString: string): string {
-  return new Date(isoString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  return new Date(isoString).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
 }

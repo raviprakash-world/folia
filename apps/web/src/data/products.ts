@@ -11,7 +11,7 @@ export const products: Product[] = [
     "id": "p1",
     "slug": "monstera-deliciosa",
     "name": "Monstera Deliciosa",
-    "price": 68,
+    "price": 2720,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "Bestseller",
@@ -24,17 +24,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": false
       }
     ],
@@ -53,7 +53,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "36in"
+        "value": "90cm"
       }
     ],
     "createdAt": "2026-07-29"
@@ -62,7 +62,7 @@ export const products: Product[] = [
     "id": "p2",
     "slug": "fiddle-leaf-fig",
     "name": "Fiddle Leaf Fig",
-    "price": 95,
+    "price": 3800,
     "category": "Plants",
     "categorySlug": "plants",
     "rating": 4.5,
@@ -74,17 +74,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -103,7 +103,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "18in"
+        "value": "45cm"
       }
     ],
     "createdAt": "2026-07-20"
@@ -112,7 +112,7 @@ export const products: Product[] = [
     "id": "p3",
     "slug": "snake-plant-laurentii",
     "name": "Snake Plant Laurentii",
-    "price": 38,
+    "price": 1520,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "New",
@@ -125,17 +125,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -154,7 +154,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "24in"
+        "value": "60cm"
       }
     ],
     "createdAt": "2026-07-11"
@@ -163,7 +163,7 @@ export const products: Product[] = [
     "id": "p4",
     "slug": "pothos-marble-queen",
     "name": "Pothos Marble Queen",
-    "price": 32,
+    "price": 1280,
     "category": "Plants",
     "categorySlug": "plants",
     "rating": 4,
@@ -175,17 +175,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": false
       }
     ],
@@ -204,7 +204,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "42in"
+        "value": "105cm"
       }
     ],
     "createdAt": "2026-07-02"
@@ -213,8 +213,8 @@ export const products: Product[] = [
     "id": "p5",
     "slug": "bird-s-nest-fern",
     "name": "Bird's Nest Fern",
-    "price": 44,
-    "compareAtPrice": 55,
+    "price": 1760,
+    "compareAtPrice": 2200,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "Sale",
@@ -227,17 +227,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -256,7 +256,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "24in"
+        "value": "60cm"
       }
     ],
     "createdAt": "2026-06-23"
@@ -265,7 +265,7 @@ export const products: Product[] = [
     "id": "p6",
     "slug": "calathea-orbifolia",
     "name": "Calathea Orbifolia",
-    "price": 58,
+    "price": 2320,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "Low stock",
@@ -278,17 +278,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -307,7 +307,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "36in"
+        "value": "90cm"
       }
     ],
     "createdAt": "2026-06-14"
@@ -316,7 +316,7 @@ export const products: Product[] = [
     "id": "p7",
     "slug": "zz-plant",
     "name": "ZZ Plant",
-    "price": 46,
+    "price": 1840,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "Bestseller",
@@ -329,17 +329,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": false
       }
     ],
@@ -350,7 +350,7 @@ export const products: Product[] = [
       },
       {
         "label": "Water",
-        "value": "When top 2in dry"
+        "value": "When top 5cm dry"
       },
       {
         "label": "Pet safe",
@@ -358,7 +358,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "36in"
+        "value": "90cm"
       }
     ],
     "createdAt": "2026-06-05"
@@ -367,7 +367,7 @@ export const products: Product[] = [
     "id": "p8",
     "slug": "rubber-plant-burgundy",
     "name": "Rubber Plant Burgundy",
-    "price": 62,
+    "price": 2480,
     "category": "Plants",
     "categorySlug": "plants",
     "rating": 4.3,
@@ -379,17 +379,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -408,7 +408,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "24in"
+        "value": "60cm"
       }
     ],
     "createdAt": "2026-05-27"
@@ -417,7 +417,7 @@ export const products: Product[] = [
     "id": "p9",
     "slug": "string-of-pearls",
     "name": "String of Pearls",
-    "price": 26,
+    "price": 1040,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "New",
@@ -430,17 +430,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -459,7 +459,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "24in"
+        "value": "60cm"
       }
     ],
     "createdAt": "2026-05-18"
@@ -468,7 +468,7 @@ export const products: Product[] = [
     "id": "p10",
     "slug": "peace-lily",
     "name": "Peace Lily",
-    "price": 34,
+    "price": 1360,
     "category": "Plants",
     "categorySlug": "plants",
     "rating": 4.3,
@@ -480,17 +480,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": false
       }
     ],
@@ -509,7 +509,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "18in"
+        "value": "45cm"
       }
     ],
     "createdAt": "2026-05-09"
@@ -518,8 +518,8 @@ export const products: Product[] = [
     "id": "p11",
     "slug": "boston-fern",
     "name": "Boston Fern",
-    "price": 29,
-    "compareAtPrice": 36,
+    "price": 1160,
+    "compareAtPrice": 1440,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "Sale",
@@ -532,17 +532,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -553,7 +553,7 @@ export const products: Product[] = [
       },
       {
         "label": "Water",
-        "value": "When top 2in dry"
+        "value": "When top 5cm dry"
       },
       {
         "label": "Pet safe",
@@ -561,7 +561,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "24in"
+        "value": "60cm"
       }
     ],
     "createdAt": "2026-04-30"
@@ -570,7 +570,7 @@ export const products: Product[] = [
     "id": "p12",
     "slug": "areca-palm",
     "name": "Areca Palm",
-    "price": 88,
+    "price": 3520,
     "category": "Plants",
     "categorySlug": "plants",
     "badge": "Low stock",
@@ -583,17 +583,17 @@ export const products: Product[] = [
     "variants": [
       {
         "id": "sm",
-        "label": "Small (4in pot)",
+        "label": "Small (10cm pot)",
         "inStock": true
       },
       {
         "id": "md",
-        "label": "Medium (6in pot)",
+        "label": "Medium (15cm pot)",
         "inStock": true
       },
       {
         "id": "lg",
-        "label": "Large (10in pot)",
+        "label": "Large (25cm pot)",
         "inStock": true
       }
     ],
@@ -612,7 +612,7 @@ export const products: Product[] = [
       },
       {
         "label": "Mature height",
-        "value": "18in"
+        "value": "45cm"
       }
     ],
     "createdAt": "2026-04-21"
@@ -621,7 +621,7 @@ export const products: Product[] = [
     "id": "p13",
     "slug": "ceramic-vessel-ash",
     "name": "Ceramic Vessel \u2014 Ash",
-    "price": 42,
+    "price": 1680,
     "category": "Vessels",
     "categorySlug": "vessels",
     "badge": "Bestseller",
@@ -661,7 +661,7 @@ export const products: Product[] = [
       },
       {
         "label": "Diameter",
-        "value": "8in"
+        "value": "20cm"
       }
     ],
     "createdAt": "2026-07-29"
@@ -670,7 +670,7 @@ export const products: Product[] = [
     "id": "p14",
     "slug": "stone-planter-round",
     "name": "Stone Planter \u2014 Round",
-    "price": 64,
+    "price": 2560,
     "category": "Vessels",
     "categorySlug": "vessels",
     "rating": 4.3,
@@ -709,7 +709,7 @@ export const products: Product[] = [
       },
       {
         "label": "Diameter",
-        "value": "9in"
+        "value": "23cm"
       }
     ],
     "createdAt": "2026-07-20"
@@ -718,7 +718,7 @@ export const products: Product[] = [
     "id": "p15",
     "slug": "terracotta-pot-set-of-3",
     "name": "Terracotta Pot Set of 3",
-    "price": 36,
+    "price": 1440,
     "category": "Vessels",
     "categorySlug": "vessels",
     "badge": "New",
@@ -758,7 +758,7 @@ export const products: Product[] = [
       },
       {
         "label": "Diameter",
-        "value": "11in"
+        "value": "28cm"
       }
     ],
     "createdAt": "2026-07-11"
@@ -767,7 +767,7 @@ export const products: Product[] = [
     "id": "p16",
     "slug": "woven-plant-basket",
     "name": "Woven Plant Basket",
-    "price": 56,
+    "price": 2240,
     "category": "Vessels",
     "categorySlug": "vessels",
     "rating": 4.4,
@@ -806,7 +806,7 @@ export const products: Product[] = [
       },
       {
         "label": "Diameter",
-        "value": "6in"
+        "value": "15cm"
       }
     ],
     "createdAt": "2026-07-02"
@@ -815,8 +815,8 @@ export const products: Product[] = [
     "id": "p17",
     "slug": "matte-black-cylinder-pot",
     "name": "Matte Black Cylinder Pot",
-    "price": 48,
-    "compareAtPrice": 60,
+    "price": 1920,
+    "compareAtPrice": 2400,
     "category": "Vessels",
     "categorySlug": "vessels",
     "badge": "Sale",
@@ -856,7 +856,7 @@ export const products: Product[] = [
       },
       {
         "label": "Diameter",
-        "value": "6in"
+        "value": "15cm"
       }
     ],
     "createdAt": "2026-06-23"
@@ -865,7 +865,7 @@ export const products: Product[] = [
     "id": "p18",
     "slug": "fluted-ceramic-planter",
     "name": "Fluted Ceramic Planter",
-    "price": 52,
+    "price": 2080,
     "category": "Vessels",
     "categorySlug": "vessels",
     "badge": "Low stock",
@@ -905,7 +905,7 @@ export const products: Product[] = [
       },
       {
         "label": "Diameter",
-        "value": "10in"
+        "value": "25cm"
       }
     ],
     "createdAt": "2026-06-14"
@@ -914,7 +914,7 @@ export const products: Product[] = [
     "id": "p19",
     "slug": "brass-plant-mister",
     "name": "Brass Plant Mister",
-    "price": 28,
+    "price": 1120,
     "category": "Tools",
     "categorySlug": "tools",
     "badge": "Bestseller",
@@ -940,7 +940,7 @@ export const products: Product[] = [
     "id": "p20",
     "slug": "precision-pruning-shears",
     "name": "Precision Pruning Shears",
-    "price": 24,
+    "price": 960,
     "category": "Tools",
     "categorySlug": "tools",
     "rating": 4.2,
@@ -965,7 +965,7 @@ export const products: Product[] = [
     "id": "p21",
     "slug": "soil-moisture-meter",
     "name": "Soil Moisture Meter",
-    "price": 18,
+    "price": 720,
     "category": "Tools",
     "categorySlug": "tools",
     "badge": "New",
@@ -991,7 +991,7 @@ export const products: Product[] = [
     "id": "p22",
     "slug": "watering-can-1-5l",
     "name": "Watering Can \u2014 1.5L",
-    "price": 32,
+    "price": 1280,
     "category": "Tools",
     "categorySlug": "tools",
     "rating": 4,
@@ -1016,8 +1016,8 @@ export const products: Product[] = [
     "id": "p23",
     "slug": "bamboo-plant-stakes-set-of-6",
     "name": "Bamboo Plant Stakes (Set of 6)",
-    "price": 14,
-    "compareAtPrice": 18,
+    "price": 560,
+    "compareAtPrice": 720,
     "category": "Tools",
     "categorySlug": "tools",
     "badge": "Sale",
@@ -1043,7 +1043,7 @@ export const products: Product[] = [
     "id": "p24",
     "slug": "grow-light-full-spectrum",
     "name": "Grow Light \u2014 Full Spectrum",
-    "price": 74,
+    "price": 2960,
     "category": "Tools",
     "categorySlug": "tools",
     "badge": "Low stock",

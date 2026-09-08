@@ -69,7 +69,7 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
           isDefaultShipping: initialValues.isDefaultShipping,
           isDefaultBilling: initialValues.isDefaultBilling,
         }
-      : { country: 'US', type: 'home', preferredTimeSlot: 'anytime', isDefaultShipping: false, isDefaultBilling: false },
+      : { country: 'IN', type: 'home', preferredTimeSlot: 'anytime', isDefaultShipping: false, isDefaultBilling: false },
   });
 
   const type = useWatch({ control, name: 'type' });
@@ -107,10 +107,11 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
 
   function handleDetectLocation() {
     // Explicitly a placeholder — no real browser geolocation permission is
-    // requested. A small jitter around a fixed point keeps it from looking
-    // hard-coded while staying clearly labeled as mock.
-    const lat = 45.52 + (Math.random() - 0.5) * 0.02;
-    const lng = -122.68 + (Math.random() - 0.5) * 0.02;
+    // requested. A small jitter around a fixed point (Bengaluru — P0-F,
+    // was Portland, OR) keeps it from looking hard-coded while staying
+    // clearly labeled as mock.
+    const lat = 12.9716 + (Math.random() - 0.5) * 0.02;
+    const lng = 77.5946 + (Math.random() - 0.5) * 0.02;
     setGeo({ lat: Math.round(lat * 10000) / 10000, lng: Math.round(lng * 10000) / 10000, source: 'mock' });
   }
 

@@ -1640,6 +1640,17 @@ model Seller {
   contactEmail String
   contactPhone String
 
+  /// P0-F — India-commerce correctness. Nullable, not required: a seller
+  /// below GST's real registration turnover threshold (a business
+  /// decision, not something this schema should hardcode) legitimately
+  /// has no GSTIN yet. Format-validated at the DTO layer
+  /// (common/validators/india-locale.ts) against the real, publicly
+  /// documented 15-character GSTIN structure — this is a stable,
+  /// well-defined format, not a business-policy guess. Distinct from
+  /// SellerVerification's free-text "gst-certificate" document upload
+  /// (an unstructured file); this is the structured, queryable value.
+  gstin String? @unique
+
   status        SellerStatus @default(APPLIED)
   appliedAt     DateTime     @default(now())
   approvedAt    DateTime?

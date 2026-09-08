@@ -25,9 +25,9 @@ export class UpdateProfileDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, example: '+91 98765 43210' })
   @IsOptional()
-  @IsPhoneNumber(undefined, { message: 'Enter a valid phone number' })
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   phone?: string;
 
   // P0-C-6 — deliberately not a DTO field. avatarUrl is set only by

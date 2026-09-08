@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsEmail,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   IsUrl,
   MaxLength,
@@ -10,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { SellerAddressInputDto } from './seller-address-input.dto';
+import { IsGstin } from '../../common/validators/india-locale';
 
 export class ApplySellerDto {
   @ApiProperty({ description: 'Public storefront/store name.' })
@@ -36,11 +38,17 @@ export class ApplySellerDto {
   @IsEmail()
   contactEmail!: string;
 
-  @ApiProperty()
-  @IsString()
-  @MinLength(6)
-  @MaxLength(20)
+  @ApiProperty({ example: '9876543210' })
+  @IsPhoneNumber('IN', { message: 'Enter a valid Indian phone number.' })
   contactPhone!: string;
+
+  // P0-F — optional: a seller below GST's real registration turnover
+  // threshold legitimately has none yet. Format+checksum validated
+  // (india-locale.ts) when provided, not merely shape-checked.
+  @ApiPropertyOptional({ example: '29AAAAA0000A1ZY' })
+  @IsOptional()
+  @IsGstin()
+  gstin?: string;
 
   @ApiProperty({ type: SellerAddressInputDto })
   @ValidateNested()

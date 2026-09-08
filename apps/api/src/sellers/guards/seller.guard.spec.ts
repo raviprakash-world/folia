@@ -46,6 +46,7 @@ function makeSeller(overrides: Partial<Seller> = {}): Seller {
     logoUrl: null,
     contactEmail: 'seller@example.com',
     contactPhone: '+91 90000 00000',
+    gstin: null,
     status: 'ACTIVE',
     appliedAt: new Date(),
     approvedAt: new Date(),

@@ -11,6 +11,7 @@ function makeSeller(overrides: Partial<Seller> = {}): Seller {
     logoUrl: null,
     contactEmail: 'seller@example.com',
     contactPhone: '+91 90000 00000',
+    gstin: null,
     status: 'APPLIED',
     appliedAt: new Date('2026-01-01'),
     approvedAt: null,
@@ -74,6 +75,7 @@ describe('toSellerProfile', () => {
       logoUrl: seller.logoUrl,
       contactEmail: seller.contactEmail,
       contactPhone: seller.contactPhone,
+      gstin: seller.gstin,
       status: 'ACTIVE',
       address: {
         addressLine1: '12 MG Road',

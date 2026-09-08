@@ -3,7 +3,7 @@ import { deliveryMethodDefs } from '@/data/deliveryMethods';
 import type { DeliveryOptionBase } from '@/data/deliveryMethods';
 
 const DELIVERY_CHECK_DELAY_MS = 500;
-const FREE_SHIPPING_THRESHOLD = 75;
+const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
 
 export interface DeliveryAvailability {
   postalCode: string;
@@ -17,7 +17,7 @@ export interface DeliveryAvailability {
  * function, two call sites, so they can never disagree about what "far
  * region" means (src/utils/region.ts).
  *
- * Same-Day is only offered for postal codes near the (fictional) Portland
+ * Same-Day is only offered for PIN codes near the (fictional) Bengaluru
  * depot; Standard/Express/Pickup are always offered. Free-shipping-threshold
  * logic mirrors the cart's shippingService for consistency, though the two
  * remain separate services since a checkout delivery *choice* and a cart
