@@ -108,6 +108,7 @@ function createDeps() {
       key: 'product-media/fake.jpg',
     }),
     delete: jest.fn(),
+    createReadStream: jest.fn(),
   };
 
   const service = new SellerProductsService(

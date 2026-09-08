@@ -27,6 +27,16 @@ export default defineConfig(({ mode }) => {
     // being integrated, without changing anything else. Each block is
     // OFF unless its own flag is set (see src/mocks/browser.ts).
     proxy: {
+      // P0-D — unconditional, not gated behind a VITE_REAL_*_API flag
+      // like every other block here: file retrieval never had an MSW
+      // mock to bypass in the first place (nothing served these URLs
+      // at all before this phase — see apps/api's FilesController),
+      // so there's no mock behavior this could shadow.
+      '/api/uploads': {
+        target: env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (requestPath: string) => requestPath.replace(/^\/api\/uploads/, '/api/v1/uploads'),
+      },
       ...(env.VITE_REAL_AUTH_API === 'true'
         ? {
             '/api/auth': {

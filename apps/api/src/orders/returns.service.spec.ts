@@ -140,6 +140,7 @@ function createDeps() {
       key: 'return-evidence/fake.jpg',
     }),
     delete: jest.fn(),
+    createReadStream: jest.fn(),
   };
   const eventEmitter = { emit: jest.fn() };
   const auditService = {

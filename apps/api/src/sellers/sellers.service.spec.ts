@@ -101,6 +101,7 @@ function createDeps() {
       key: 'seller-verifications/fake.pdf',
     }),
     delete: jest.fn(),
+    createReadStream: jest.fn(),
   };
 
   const service = new SellersService(

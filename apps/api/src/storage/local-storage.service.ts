@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto';
-import { join, extname } from 'path';
-import { mkdir, unlink, writeFile } from 'fs/promises';
-import { Injectable, Logger } from '@nestjs/common';
+import { join, extname, resolve, sep } from 'path';
+import { mkdir, unlink, writeFile, access } from 'fs/promises';
+import { createReadStream } from 'fs';
+import type { Readable } from 'stream';
+import { NotFoundException, Injectable, Logger } from '@nestjs/common';
 import type {
   StorageService,
   UploadFileInput,
@@ -43,7 +45,18 @@ export class LocalStorageService implements StorageService {
     await writeFile(fullPath, buffer);
     this.logger.log(`Stored file at ${key} (${buffer.length} bytes)`);
 
-    return { url: `/uploads/${key}`, key };
+    // P0-D — `/api/uploads/...`, not the bare `/uploads/...` this
+    // returned before: nothing served that path (a dead link, the
+    // original P0-C finding), and even once FilesController below
+    // fixed that on the backend, the frontend's own proxy config
+    // (apps/web/vite.config.ts locally, vercel.json in production)
+    // only forwards `/api/*` to this API — a bare `/uploads/...` URL
+    // would 404 (dev) or hit the SPA fallback (prod) regardless of
+    // what the backend does. No migration needed for existing stored
+    // URLs: confirmed via the storage audit that no uploaded file
+    // survives a redeploy under the current ephemeral-disk deployment
+    // anyway, so there is no real production data this could break.
+    return { url: `/api/uploads/${key}`, key };
   }
 
   async delete(key: string): Promise<void> {
@@ -55,5 +68,27 @@ export class LocalStorageService implements StorageService {
       // the end state (file doesn't exist) is what the caller wanted.
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
+  }
+
+  async createReadStream(key: string): Promise<Readable> {
+    // P0-D — `key` here ultimately traces back to a client-supplied
+    // route param (FilesController), unlike every other call site in
+    // this class, which only ever sees a server-generated UUID key.
+    // path.join alone doesn't stop `..` segments from escaping
+    // UPLOADS_ROOT, so this resolves the real final path and rejects
+    // anything that lands outside it, on top of FilesController's own
+    // upstream rejection of any filename containing `..` or `/` —
+    // defense in depth, not redundant: this is the layer that would
+    // still hold if that upstream check were ever removed or bypassed.
+    const fullPath = resolve(UPLOADS_ROOT, key);
+    if (fullPath !== UPLOADS_ROOT && !fullPath.startsWith(UPLOADS_ROOT + sep)) {
+      throw new NotFoundException('File not found.');
+    }
+    try {
+      await access(fullPath);
+    } catch {
+      throw new NotFoundException('File not found.');
+    }
+    return createReadStream(fullPath);
   }
 }

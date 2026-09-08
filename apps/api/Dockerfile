@@ -71,4 +71,12 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:3000/api/health/ready || exit 1
 
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/src/main.js"]
+# P0-D — `exec` here matters: without it, `node` runs as a CHILD of this
+# shell (PID 1), and Alpine's ash does not forward SIGTERM to children by
+# default — the container would sit until Docker's stop-grace-period
+# expires and then get SIGKILLed, with the app never seeing the signal
+# at all (confirmed the failure mode before this fix, not assumed).
+# `exec` replaces the shell process image with `node`, so `node` itself
+# becomes PID 1 and receives SIGTERM directly — required for
+# app.enableShutdownHooks() (main.ts) to ever run.
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=apps/api/prisma/schema.prisma && exec node apps/api/dist/src/main.js"]

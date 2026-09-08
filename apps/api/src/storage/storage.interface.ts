@@ -1,3 +1,5 @@
+import type { Readable } from 'stream';
+
 export interface UploadedFileResult {
   /** Publicly reachable URL for the stored file. */
   url: string;
@@ -28,6 +30,17 @@ export interface UploadFileInput {
 export interface StorageService {
   upload(input: UploadFileInput): Promise<UploadedFileResult>;
   delete(key: string): Promise<void>;
+  /**
+   * P0-D — added alongside the first real file-retrieval endpoint
+   * (files.controller.ts). Returns a real Node readable stream so the
+   * controller can pipe it straight to the HTTP response without
+   * buffering the whole file in memory; rejects (ENOENT-style) if the
+   * key doesn't exist, which the controller maps to a 404. Kept
+   * interface-level, not LocalStorageService-specific, so a future S3
+   * implementation (GetObjectCommand's response body is also a
+   * Node-compatible readable stream) needs no controller changes.
+   */
+  createReadStream(key: string): Promise<Readable>;
 }
 
 export const STORAGE_SERVICE = Symbol('STORAGE_SERVICE');

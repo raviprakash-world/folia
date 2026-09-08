@@ -209,24 +209,40 @@ memory — a real, if minor, unbounded-buffering surface. Fixed: all
 three now also pass `limits: { fileSize: ... }` to their
 `File(s)Interceptor`, matching the evidence endpoint's pattern.
 
-**Known blocker, not fixed in this phase (explicitly out of scope —
-storage/serving architecture belongs to a later phase): no endpoint
-anywhere in this codebase serves an uploaded file back over HTTP.**
-`LocalStorageService.upload()` writes to disk and returns a
-`/uploads/<key>` URL, but no `ServeStaticModule`, `useStaticAssets`
-call, or dedicated download route exists — every such URL is currently
-a dead link. This is a functional bug today, but it is also the exact
-fork in the road that determines whether verification documents and
-return evidence (the most sensitive files this system stores — KYC-type
-business documents) become a serious unauthenticated public leak or
-stay properly access-controlled once retrieval is built: **the "obvious"
-fix — a bare static mount (`app.useStaticAssets(UPLOADS_ROOT, {prefix:
-'/uploads'})`) — must NOT be used for these two upload types.** A UUID
-filename is not access control. Whoever builds retrieval next needs a
-real authenticated endpoint (seller-owner-or-admin for verification
-docs, claim-owner-or-admin for evidence) that streams the file after an
-ownership check — a plain static mount is acceptable only for avatars
-and product photos, which are meant to be public anyway.
+**Update (P0-D): fixed.** The retrieval gap described in this section
+when it was written — no endpoint anywhere served an uploaded file
+back over HTTP — is closed. `FilesController`
+(`apps/api/src/storage/files.controller.ts`), mounted at
+`/api/uploads/:directory/:filename` (matching
+`LocalStorageService.upload()`'s own returned URL exactly, so it rides
+the frontend's existing `/api/*` proxy without needing a new one).
+Avatars and product-media are public, no ownership check, exactly as
+this section originally specified. Return-evidence and
+seller-verifications are **not** a bare static mount — each request
+looks up the owning `ReturnRequest`/`Seller` row by the file's URL and
+requires the caller to be the owning customer/seller or an admin,
+verified in `files.controller.spec.ts` (12 tests, including that a
+different customer/seller gets 403 not 404, proving this is a real
+ownership check and not just an existence check) and live against a
+running server (unauthenticated request to a private path → 401; a
+constructed path-traversal filename → 400, defended at both the
+controller and `LocalStorageService.createReadStream` layers
+independently).
+
+**Known residual gap, not fixed here: uploaded files still don't
+survive a redeploy.** The P0-D infrastructure audit confirmed Render's
+free web service has no persistent disk declared — every file in all
+four directories, including the two private ones above, is lost on
+the next deploy, and wouldn't be shared across replicas if ever scaled
+past one instance. `StorageService` is written as a swappable
+interface specifically so a real object-storage backend (S3/R2/etc.)
+can replace `LocalStorageService` as a single new class with zero
+caller changes — but writing and shipping that implementation
+unverified, with no real bucket/credentials to test against in this
+environment, was judged worse than clearly documenting the gap. This
+needs either a paid Render tier with a persistent disk, or real
+object-storage credentials — an external-account blocker, not an
+engineering one.
 
 ## Webhook security (P0-C-8)
 

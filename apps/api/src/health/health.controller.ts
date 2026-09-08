@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import { VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import {
@@ -11,6 +11,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { Public } from '../auth/decorators/public.decorator';
+import { STORAGE_SERVICE } from '../storage/storage.interface';
+import type { StorageService } from '../storage/storage.interface';
 
 /**
  * Excluded from the public Swagger doc (infra/ops endpoint, not part of
@@ -33,6 +35,7 @@ export class HealthController {
     private readonly prismaIndicator: PrismaHealthIndicator,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
   ) {}
 
   @Get()
@@ -83,6 +86,7 @@ export class HealthController {
     return [
       () => this.prismaIndicator.pingCheck('database', this.prisma),
       () => this.checkRedis(),
+      () => this.checkStorage(),
     ];
   }
 
@@ -93,6 +97,34 @@ export class HealthController {
       if (pong !== 'PONG') {
         return indicator.down({ message: 'Unexpected PING response' });
       }
+      return indicator.up();
+    } catch (error) {
+      return indicator.down({
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * P0-D — no health signal previously existed for the storage backend
+   * at all; a full or unwritable disk (today) or bad credentials/an
+   * unreachable bucket (once this moves to object storage) would report
+   * "ok" regardless. A real round-trip write+delete through the actual
+   * StorageService interface, not a static flag — deliberately
+   * interface-level rather than reaching into LocalStorageService's own
+   * internals, so this check keeps working unchanged whichever
+   * StorageService implementation is configured.
+   */
+  private async checkStorage() {
+    const indicator = this.indicatorService.check('storage');
+    try {
+      const { key } = await this.storage.upload({
+        buffer: Buffer.from('ok'),
+        originalName: 'health-check.txt',
+        mimetype: 'text/plain',
+        directory: 'health-check',
+      });
+      await this.storage.delete(key);
       return indicator.up();
     } catch (error) {
       return indicator.down({
