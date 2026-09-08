@@ -95,7 +95,21 @@ import { SellerGuard } from './sellers/guards/seller.guard';
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => ({
         throttlers: [{ ttl: 60_000, limit: 100 }], // generous global default; sensitive auth endpoints set their own tighter @Throttle()
-        storage: new ThrottlerStorageRedisService(config.redisUrl),
+        // P0-G — found by deliberately taking Redis down during the
+        // production-readiness rehearsal: ioredis's own defaults
+        // (maxRetriesPerRequest: 20, each retry potentially waiting up
+        // to connectTimeout) meant EVERY request stalled for ~30+
+        // seconds before failing whenever Redis was unreachable —
+        // because ThrottlerGuard runs globally, ahead of every route
+        // handler, a Redis outage looked indistinguishable from the
+        // whole API being down. Bounded to the same maxRetriesPerRequest
+        // RedisService already uses (redis/redis.service.ts) — an
+        // existing convention in this codebase, not a new number
+        // invented for this fix — so a real Redis outage now fails each
+        // request in well under a second instead of ~30.
+        storage: new ThrottlerStorageRedisService(config.redisUrl, {
+          maxRetriesPerRequest: 3,
+        }),
       }),
     }),
     PrismaModule,
