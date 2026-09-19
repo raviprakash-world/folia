@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import Razorpay from 'razorpay';
 import { AppConfigService } from '../../config/app-config.service';
 import type {
@@ -31,6 +35,7 @@ import type {
  */
 @Injectable()
 export class RazorpayProvider implements PaymentProviderClient {
+  private readonly logger = new Logger(RazorpayProvider.name);
   private client: Razorpay | null = null;
 
   constructor(private readonly config: AppConfigService) {}
@@ -50,12 +55,47 @@ export class RazorpayProvider implements PaymentProviderClient {
   }
 
   async createOrder(input: CreateGatewayOrderInput): Promise<GatewayOrder> {
-    const order = await this.getClient().orders.create({
-      amount: Math.round(input.amount * 100),
-      currency: input.currency,
-      receipt: input.receipt,
-    });
-    return { providerOrderId: order.id };
+    const client = this.getClient();
+    try {
+      const order = await client.orders.create({
+        amount: Math.round(input.amount * 100),
+        currency: input.currency,
+        receipt: input.receipt,
+      });
+      return { providerOrderId: order.id };
+    } catch (err) {
+      return this.failGatewayCall('order creation', err);
+    }
+  }
+
+  /**
+   * The Razorpay SDK rejects with a plain object ({ statusCode, error: { code,
+   * description } }), not an Error, which would surface as an opaque 500 with
+   * nothing in the logs. Log what Razorpay actually said (never the keys) and
+   * answer with a 500 the shopper can act on.
+   *
+   * A rejected key (Razorpay 401) is deliberately NOT returned as a 401: to
+   * this API's clients a 401 means "your login expired", and the web app
+   * reacts by trying to refresh the session and signing the shopper out.
+   * Bad gateway credentials are our problem, not theirs.
+   */
+  private failGatewayCall(action: string, err: unknown): never {
+    const e = err as {
+      statusCode?: number;
+      error?: { code?: string; description?: string };
+    };
+    if (e?.statusCode === 401) {
+      this.logger.error(
+        `Razorpay rejected our API credentials during ${action} (401). Check RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET and that they are a matching test or live pair.`,
+      );
+    } else {
+      this.logger.error(
+        `Razorpay ${action} failed: status=${e?.statusCode ?? 'n/a'} code=${e?.error?.code ?? 'n/a'} description=${e?.error?.description ?? (err instanceof Error ? err.message : 'unknown')}`,
+      );
+    }
+    throw new InternalServerErrorException(
+      'Payments are temporarily unavailable. Please try again shortly, or choose Cash on Delivery.',
+    );
   }
 
   verifyPaymentSignature(input: VerifyPaymentSignatureInput): boolean {

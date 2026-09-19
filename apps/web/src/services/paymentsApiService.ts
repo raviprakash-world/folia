@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { apiClient } from './apiClient';
 import type { Order } from '@/types/order';
 
@@ -44,8 +45,17 @@ const RAZORPAY_SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
 
 declare global {
   interface Window {
-    Razorpay?: new (options: RazorpayOptions) => { open: () => void };
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
   }
+}
+
+interface RazorpayFailureResponse {
+  error: { code?: string; description?: string; reason?: string };
+}
+
+interface RazorpayInstance {
+  open: () => void;
+  on: (event: 'payment.failed', callback: (response: RazorpayFailureResponse) => void) => void;
 }
 
 interface RazorpayOptions {
@@ -89,16 +99,25 @@ export class PaymentCancelledError extends Error {}
  * which arrives as a resolved handler call with a payment_id that
  * verify() then rejects) so the caller can show "cancelled, try again"
  * rather than a generic error.
+ *
+ * Razorpay's `payment.failed` event fires when an attempt is declined but
+ * leaves the modal open so the shopper can try another method. It must
+ * therefore NOT settle this promise (a later successful attempt in the same
+ * modal still has to resolve it). It is reported through `onPaymentFailed`,
+ * and remembered so that closing the modal afterwards says why the payment
+ * failed instead of just "cancelled".
  */
 export async function openRazorpayCheckout(
   gateway: GatewayCheckoutInfo,
   orderDescription: string,
+  onPaymentFailed?: (reason: string) => void,
 ): Promise<VerifyPaymentInput> {
   await loadRazorpayScript();
   if (!window.Razorpay) {
     throw new Error('Could not load the payment provider. Check your connection and try again.');
   }
 
+  let lastFailure: string | null = null;
   return new Promise<VerifyPaymentInput>((resolve, reject) => {
     const razorpay = new window.Razorpay!({
       key: gateway.keyId,
@@ -116,9 +135,32 @@ export async function openRazorpayCheckout(
         });
       },
       modal: {
-        ondismiss: () => reject(new PaymentCancelledError('Payment was cancelled.')),
+        ondismiss: () =>
+          reject(new PaymentCancelledError(lastFailure ? `Payment failed: ${lastFailure}` : 'Payment was cancelled.')),
       },
+    });
+    razorpay.on('payment.failed', (response) => {
+      // Read as a sentence in the UI, so make sure it ends like one.
+      lastFailure = `${(response.error.description ?? response.error.reason ?? 'the payment was declined').replace(/[.\s]+$/, '')}.`;
+      onPaymentFailed?.(lastFailure);
     });
     razorpay.open();
   });
+}
+
+/**
+ * Plain-language text for anything that goes wrong around a payment. The API
+ * already sends shopper-safe messages ("Payment verification failed.", "Not
+ * enough stock..."); show those. Never show axios's own wording ("Request
+ * failed with status code 400") or a raw network error.
+ */
+export function paymentErrorMessage(err: unknown, fallback = "We couldn't complete that payment. Please try again."): string {
+  if (err instanceof PaymentCancelledError) return err.message;
+  if (isAxiosError<{ message?: string | string[] }>(err)) {
+    const message = err.response?.data?.message;
+    const text = Array.isArray(message) ? message[0] : message;
+    return text || fallback;
+  }
+  if (err instanceof Error && err.message && !/status code|network error|timeout/i.test(err.message)) return err.message;
+  return fallback;
 }

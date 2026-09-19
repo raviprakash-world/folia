@@ -785,6 +785,42 @@ describe('PaymentsService.createForOrder — Razorpay', () => {
     expect(prisma.payment.create).not.toHaveBeenCalled();
   });
 
+  it('rejects an online payment under 100 paise before calling Razorpay or creating a Payment', async () => {
+    const { prisma, razorpay, service } = createDeps();
+
+    await expect(
+      service.createForOrder({
+        paymentId: 'pay-1',
+        userId: 'user-1',
+        method: 'CREDIT_CARD',
+        amount: 0.99,
+        displayLabel: 'Visa •••• 4242',
+        checkoutSnapshot: makeSnapshot(),
+      }),
+    ).rejects.toThrow(/at least ₹1\.00/);
+    expect(razorpay.createOrder).not.toHaveBeenCalled();
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts exactly 100 paise (Rs 1.00)', async () => {
+    const { prisma, razorpay, service } = createDeps();
+    razorpay.createOrder.mockResolvedValue({ providerOrderId: 'order_min' });
+    prisma.payment.create.mockResolvedValue(
+      makePayment({ providerOrderId: 'order_min' }),
+    );
+
+    const result = await service.createForOrder({
+      paymentId: 'pay-1',
+      userId: 'user-1',
+      method: 'CREDIT_CARD',
+      amount: 1,
+      displayLabel: 'Visa •••• 4242',
+      checkoutSnapshot: makeSnapshot(),
+    });
+
+    expect(result.requiresGatewayCheckout).toBe(true);
+  });
+
   it('propagates a gateway failure (e.g. a timeout) rather than silently creating a Payment with no real gateway order behind it', async () => {
     const { prisma, razorpay, service } = createDeps();
     razorpay.createOrder.mockRejectedValue(new Error('ETIMEDOUT'));

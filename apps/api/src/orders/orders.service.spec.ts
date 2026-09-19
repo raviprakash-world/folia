@@ -280,6 +280,53 @@ describe('OrdersService.checkout', () => {
     expect(paymentsService.createForOrder).not.toHaveBeenCalled();
   });
 
+  describe('delivery charge matches what the web shows (free Standard delivery from Rs 999)', () => {
+    async function chargedAmount(
+      unitPrice: number,
+      quantity: number,
+      deliveryMethod: CheckoutDto['deliveryMethod'],
+    ) {
+      const { cartService, paymentsService, service } = createDeps();
+      cartService.resolveCart.mockResolvedValue({
+        cart: {
+          id: 'cart-1',
+          items: [makeCartItem({ unitPrice: decimal(unitPrice), quantity })],
+        },
+      });
+      await service.checkout('user-1', { ...BASE_DTO, deliveryMethod });
+      const call = paymentsService.createForOrder.mock.calls[0]?.[0] as {
+        amount: number;
+      };
+      return call.amount;
+    }
+
+    it('charges no shipping on Standard delivery when the subtotal is Rs 999 or more', async () => {
+      // 1200 subtotal + 0 shipping + 8% tax
+      expect(await chargedAmount(600, 2, 'standard')).toBeCloseTo(1296, 2);
+      // exactly at the threshold counts as free
+      expect(await chargedAmount(999, 1, 'standard')).toBeCloseTo(
+        999 * 1.08,
+        2,
+      );
+    });
+
+    it('still charges Rs 79 on Standard delivery below Rs 999', async () => {
+      // 800 subtotal + 79 shipping + 8% tax
+      expect(await chargedAmount(400, 2, 'standard')).toBeCloseTo(
+        800 + 79 + 64,
+        2,
+      );
+    });
+
+    it('does not make Express free just because the subtotal is high', async () => {
+      // 1200 subtotal + 199 express + 8% tax
+      expect(await chargedAmount(600, 2, 'express')).toBeCloseTo(
+        1200 + 199 + 96,
+        2,
+      );
+    });
+  });
+
   describe('Marketplace Phase 5 — defense-in-depth revalidation', () => {
     it('rejects checkout when a cart item is no longer ACTIVE — even though it was addable at add-to-cart time', async () => {
       const { cartService, inventoryService, paymentsService, service } =

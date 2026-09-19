@@ -14,7 +14,13 @@ import { formatCurrency } from '@/utils/currency';
 import { generateOrderId } from '@/utils/orderId';
 import { assignCourier, generateTrackingNumber } from '@/utils/tracking';
 import { checkoutReal } from '@/services/ordersApiService';
-import { openRazorpayCheckout, retryPayment, verifyPayment, PaymentCancelledError } from '@/services/paymentsApiService';
+import {
+  openRazorpayCheckout,
+  paymentErrorMessage,
+  retryPayment,
+  verifyPayment,
+  PaymentCancelledError,
+} from '@/services/paymentsApiService';
 import type { GatewayCheckoutInfo } from '@/services/paymentsApiService';
 import type { Order, OrderItem } from '@/types/order';
 
@@ -165,7 +171,9 @@ export default function CheckoutReview() {
     setPendingPaymentId(paymentId);
     setPendingGateway({ paymentId, gateway });
     try {
-      const verifyInput = await openRazorpayCheckout(gateway, 'Your Folia order');
+      const verifyInput = await openRazorpayCheckout(gateway, 'Your Folia order', (reason) =>
+        setError(`Payment failed: ${reason} You can try another method in the payment window.`)
+      );
       const { order } = await verifyPayment(paymentId, verifyInput);
       setPendingGateway(null);
       navigateToConfirmation(order);
@@ -174,13 +182,13 @@ export default function CheckoutReview() {
         // Still the same, still-valid gateway order (never attempted) —
         // pendingGateway stays set so "Try again" reopens it directly,
         // no backend call needed.
-        setError('Payment was cancelled. You can try again below.');
+        setError(`${err.message} You can try again below.`);
       } else {
         // A real decline (verifyPayment threw) — this gateway order may
         // now be spent/invalid, so "Try again" must fetch a fresh one via
         // retryPayment rather than reopening this one.
         setPendingGateway(null);
-        setError(err instanceof Error ? err.message : 'Payment failed. You can try again below.');
+        setError(`${paymentErrorMessage(err, 'Payment failed.')} You can try again below.`);
       }
       setPlacing(false);
     }
@@ -203,7 +211,7 @@ export default function CheckoutReview() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not restart payment. Please try again.');
+      setError(paymentErrorMessage(err, 'We could not restart the payment. Please try again.'));
       setPlacing(false);
     }
   }
@@ -264,8 +272,8 @@ export default function CheckoutReview() {
         href: `/account/orders/${previewOrder.id}`,
       });
       navigateToConfirmation(previewOrder);
-    } catch {
-      setError("Couldn't place your order — try again.");
+    } catch (err) {
+      setError(paymentErrorMessage(err, "Couldn't place your order — try again."));
       setPlacing(false);
     }
   }

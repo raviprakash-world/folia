@@ -5,13 +5,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { isFarRegion } from './region.util';
+import { FREE_STANDARD_SHIPPING_THRESHOLD } from '../orders/order.types';
 import {
   SHIPPING_PROVIDER,
   type ShippingProviderClient,
 } from './providers/shipping-provider.interface';
 
 // Placeholder rate card (not a negotiated Shiprocket rate) — see docs/MANUAL_SETUP_GUIDE.md. Rescaled from the earlier USD-derived numbers to fit a demo catalog priced ₹199–₹1,499.
-const FREE_SHIPPING_THRESHOLD = 999;
+const FREE_SHIPPING_THRESHOLD = FREE_STANDARD_SHIPPING_THRESHOLD;
 const NEAR_REGION_COST = 79;
 const FAR_REGION_COST = 129;
 /** No real per-order weight catalog exists (see apps/web/src/utils/packageDetails.ts) — a single reasonable placeholder, same reasoning as ShiprocketProvider.createShipment's placeholder parcel dimensions. */

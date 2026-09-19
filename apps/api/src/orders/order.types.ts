@@ -15,6 +15,19 @@ export const DELIVERY_METHOD_DEFS: Record<
   PICKUP: { cost: 0, etaDays: 'Ready in 2 hours' },
 };
 
+/** Standard delivery is free once the cart subtotal reaches this. Mirrors apps/web/src/services/deliveryService.ts, so the total the shopper reviews is the total they are charged. */
+export const FREE_STANDARD_SHIPPING_THRESHOLD = 999;
+
+/** The delivery charge for a method at a given cart subtotal (before any coupon). One place, so checkout cannot disagree with what the web shows. */
+export function deliveryCost(
+  method: DeliveryMethodType,
+  subtotal: number,
+): number {
+  return method === 'STANDARD' && subtotal >= FREE_STANDARD_SHIPPING_THRESHOLD
+    ? 0
+    : DELIVERY_METHOD_DEFS[method].cost;
+}
+
 export const TAX_RATE = 0.08; // matches apps/web/src/utils/pricing.ts's TAX_RATE exactly
 
 /** Snapshotted into Order.shippingAddressSnapshot/billingAddressSnapshot as-is at checkout time — this IS apps/web's Address shape (the exact output of addresses/address.types.ts's toPublicAddress), stored verbatim rather than reconstructed later from partial fields. */

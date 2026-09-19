@@ -66,6 +66,9 @@ export interface RefundActor {
  */
 export const PAYMENT_EXPIRY_MINUTES = 20;
 
+/** Razorpay's floor for an order: 100 paise (Rs 1). */
+const MIN_GATEWAY_AMOUNT_PAISE = 100;
+
 const COD_METHOD: PaymentMethodType = 'COD';
 
 export interface CreatePaymentInput {
@@ -188,6 +191,13 @@ export class PaymentsService {
       // a Payment stuck at CREATED with no way to ever resolve it.
       throw new BadRequestException(
         'Card/UPI/net-banking/wallet payments are not available right now. Please choose Cash on Delivery, or try again shortly.',
+      );
+    }
+
+    // Razorpay rejects orders under 100 paise (Rs 1); say so plainly instead of surfacing its error.
+    if (Math.round(input.amount * 100) < MIN_GATEWAY_AMOUNT_PAISE) {
+      throw new BadRequestException(
+        'Online payment needs an order total of at least ₹1.00. Please choose Cash on Delivery.',
       );
     }
 

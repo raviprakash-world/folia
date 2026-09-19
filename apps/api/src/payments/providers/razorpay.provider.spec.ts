@@ -150,3 +150,65 @@ describe('RazorpayProvider — amount unit conversion (rupees in this codebase, 
     expect(refund).toHaveBeenCalledWith('pay_abc', {});
   });
 });
+
+describe('RazorpayProvider — Razorpay API errors', () => {
+  function providerWithClient(create: jest.Mock) {
+    const provider = new RazorpayProvider({
+      razorpayKeyId: 'rzp_test_x',
+      razorpayKeySecret: 'secret',
+    } as never);
+    (provider as unknown as { client: unknown }).client = {
+      orders: { create },
+    };
+    return provider;
+  }
+
+  it('sends the amount in paise and returns the Razorpay order id', async () => {
+    const create = jest.fn().mockResolvedValue({ id: 'order_123' });
+    const provider = providerWithClient(create);
+
+    await expect(
+      provider.createOrder({ amount: 71.3, currency: 'INR', receipt: 'FOL-1' }),
+    ).resolves.toEqual({ providerOrderId: 'order_123' });
+    expect(create).toHaveBeenCalledWith({
+      amount: 7130,
+      currency: 'INR',
+      receipt: 'FOL-1',
+    });
+  });
+
+  it('turns a Razorpay auth failure into a 500 (never a 401, which would sign the shopper out) with a safe message', async () => {
+    const create = jest.fn().mockRejectedValue({
+      statusCode: 401,
+      error: {
+        code: 'BAD_REQUEST_ERROR',
+        description: 'Authentication failed',
+      },
+    });
+    const provider = providerWithClient(create);
+
+    const call = provider.createOrder({
+      amount: 10,
+      currency: 'INR',
+      receipt: 'FOL-1',
+    });
+    await expect(call).rejects.toThrow(InternalServerErrorException);
+    await expect(call).rejects.toThrow(/temporarily unavailable/);
+    await expect(call).rejects.not.toThrow(/Authentication failed|secret/);
+  });
+
+  it('turns any other Razorpay error (plain object, not an Error) into the same safe 500', async () => {
+    const create = jest.fn().mockRejectedValue({
+      statusCode: 400,
+      error: {
+        code: 'BAD_REQUEST_ERROR',
+        description: 'Order amount less than minimum amount allowed',
+      },
+    });
+    const provider = providerWithClient(create);
+
+    await expect(
+      provider.createOrder({ amount: 0.5, currency: 'INR', receipt: 'FOL-1' }),
+    ).rejects.toThrow(InternalServerErrorException);
+  });
+});

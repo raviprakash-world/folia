@@ -145,7 +145,16 @@ The API boots fine with the third-party keys unset; those features then fail lou
 
 ## 4. Razorpay
 
-Not configured; never exercised against a real gateway. COD is the only payment method that works today. Do this in **Test Mode** first. A sandbox transaction is not a production payment.
+Test-mode keys are set **locally only** (in the gitignored `apps/api/.env` and the root `.env` that docker-compose reads); **production (Render) still has none**, so online payment is off there and COD is the only method that works on the live site. Do this in **Test Mode** first. A sandbox transaction is not a production payment.
+
+**Verified locally on 2026-09-20 with Razorpay test keys** (real API + real database + Razorpay's real test servers):
+- The keys are valid; the API creates real Razorpay test orders, and a wrong secret returns a clean HTTP 500 (never a 401, which would sign the shopper out).
+- Checkout opens Razorpay's own window; the amount it shows equals the review page total and the stored payment amount to the paisa.
+- Closing the window, a decline, and a forged signature each behave correctly: a forged payment is rejected by the verify endpoint, recorded as a failed attempt, and creates **no order**.
+- Not yet verified: a real **successful** test payment (needs you to complete one in the window), webhook delivery, and refunds.
+
+Bug found while testing: checkout charged Rs 79 Standard shipping on orders of Rs 999 or more while the page showed "Free" (the API had no free-shipping rule). Fixed in the API (`deliveryCost` in `order.types.ts`) with tests.
+
 
 1. Create/open a Razorpay account (business KYC is needed for Live Mode, not for Test Mode). Switch the dashboard to **Test Mode**.
 2. Dashboard → **Account & Settings → API Keys → Generate Test Key**. Copy the **Key Id** (`rzp_test_…`) and **Key Secret** (shown once).

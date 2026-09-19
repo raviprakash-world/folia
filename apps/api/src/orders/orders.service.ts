@@ -29,6 +29,7 @@ import { toPublicAddress } from '../addresses/address.types';
 import { generateOrderId } from './order-id.util';
 import {
   DELIVERY_METHOD_DEFS,
+  deliveryCost,
   TAX_RATE,
   toPublicOrder,
   CANCELLATION_REASON_TO_DB,
@@ -217,8 +218,9 @@ export class OrdersService {
     }
 
     const deliveryMethodDb = DELIVERY_METHOD_TO_DB[dto.deliveryMethod];
-    const { cost: shippingCost, etaDays: estimatedDelivery } =
+    const { etaDays: estimatedDelivery } =
       DELIVERY_METHOD_DEFS[deliveryMethodDb];
+    const shippingCost = deliveryCost(deliveryMethodDb, subtotal);
 
     const taxableAmount = Math.max(0, subtotal - discount);
     const tax = taxableAmount * TAX_RATE;
