@@ -25,9 +25,9 @@ export const benefits = [
 ];
 
 export const testimonials = [
-  { id: 't1', quote: 'The moss pole came pre-installed and the plant was bigger than the photos suggested. Rare for online plant orders.', author: 'Priya M.', location: 'Austin, TX' },
-  { id: 't2', quote: "I've killed three fiddle leaf figs from big-box stores. This one came with actual care instructions for my light conditions.", author: 'Daniel K.', location: 'Portland, OR' },
-  { id: 't3', quote: 'Ordered a vessel and plant together and they were sized to match — small detail, but it meant I didn\u2019t have to guess.', author: 'Amara O.', location: 'Chicago, IL' },
+  { id: 't1', quote: 'The moss pole came pre-installed and the plant was bigger than the photos suggested. Rare for online plant orders.', author: 'Priya M.', location: 'Bengaluru' },
+  { id: 't2', quote: "I've killed three fiddle leaf figs from big-box stores. This one came with actual care instructions for my light conditions.", author: 'Rohan K.', location: 'Pune' },
+  { id: 't3', quote: 'Ordered a vessel and plant together and they were sized to match — small detail, but it meant I didn\u2019t have to guess.', author: 'Ananya O.', location: 'Hyderabad' },
 ];
 
 export const blogPreview = [

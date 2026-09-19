@@ -2,13 +2,13 @@ import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 
 const cards = [
   { Icon: Mail, label: 'Email', value: 'hello@folia.example' },
-  { Icon: Phone, label: 'Phone', value: '(555) 019-2043' },
-  { Icon: MapPin, label: 'Studio', value: '412 Alder Street, Portland, OR' },
+  { Icon: Phone, label: 'Phone', value: '+91 98765 43210' },
+  { Icon: MapPin, label: 'Studio', value: '412, 1st Main Road, Indiranagar, Bengaluru 560038' },
 ];
 
 const hours = [
-  { day: 'Monday – Friday', time: '9am – 6pm PT' },
-  { day: 'Saturday', time: '10am – 4pm PT' },
+  { day: 'Monday – Friday', time: '9am – 6pm IST' },
+  { day: 'Saturday', time: '10am – 4pm IST' },
   { day: 'Sunday', time: 'Closed' },
 ];
 
@@ -44,7 +44,7 @@ export function ContactInfo() {
 
       <div className="aspect-[4/3] rounded-[var(--radius-card)] bg-stone-dark flex flex-col items-center justify-center gap-2 text-ink-soft">
         <MapPin size={24} />
-        <p className="font-mono text-xs uppercase tracking-wider">Map placeholder — Portland, OR</p>
+        <p className="font-mono text-xs uppercase tracking-wider">Map placeholder — Bengaluru</p>
       </div>
     </div>
   );

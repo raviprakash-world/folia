@@ -8,7 +8,7 @@ export const faqEntries: FaqEntry[] = [
   {
     category: 'Orders & Shipping',
     question: 'How long does shipping take?',
-    answer: 'Most orders ship within 1–2 business days. Delivery is typically 2–4 business days for closer regions and 4–6 for farther ones — you can get an exact estimate at checkout by entering your ZIP code.',
+    answer: 'Most orders ship within 1–2 business days. Delivery is typically 2–4 business days for closer regions and 4–6 for farther ones — you can get an exact estimate at checkout by entering your PIN code.',
   },
   {
     category: 'Orders & Shipping',

@@ -5,7 +5,7 @@ import type { TrackingStage } from '@/types/order';
 
 const TRACKING_DELAY_MS = 350;
 
-const hubCities = ['Sacramento, CA', 'Reno, NV', 'Boise, ID'];
+const hubCities = ['Nagpur, MH', 'Hyderabad, TS', 'Vijayawada, AP'];
 const deliveryLocations = ['front door', 'building lobby', 'mailroom', 'side entrance'];
 const signatureNames = ['S. Rivera', 'A. Chen', 'M. Osei', 'J. Park'];
 
@@ -72,7 +72,7 @@ export const trackingHandlers = [
       currentStageIndex >= stageCount - 2
         ? `Near ${destinationCity}`
         : currentStageIndex <= 1
-          ? 'Origin facility, Portland, OR'
+          ? 'Origin facility, Bengaluru, KA'
           : (hubCities[currentStageIndex % hubCities.length] ?? hubCities[0]!);
 
     const delivered = stages[stageCount - 1]?.completed ?? false;

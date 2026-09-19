@@ -7,7 +7,7 @@ import {
 } from './tracking.types';
 import type { DeliveryMethodType } from '../orders/order.types';
 
-const HUB_CITIES = ['Sacramento, CA', 'Reno, NV', 'Boise, ID'];
+const HUB_CITIES = ['Nagpur, MH', 'Hyderabad, TS', 'Vijayawada, AP'];
 const DELIVERY_LOCATIONS = [
   'front door',
   'building lobby',
@@ -87,7 +87,7 @@ export class TrackingService {
       currentStageIndex >= stageCount - 2
         ? `Near ${input.destinationCity}`
         : currentStageIndex <= 1
-          ? 'Origin facility, Portland, OR'
+          ? 'Origin facility, Bengaluru, KA'
           : (HUB_CITIES[currentStageIndex % HUB_CITIES.length] ??
             HUB_CITIES[0]);
 

@@ -25,7 +25,7 @@ export const policies: Policy[] = [
       },
       {
         heading: 'Delivery estimates',
-        body: 'Delivery windows depend on your ZIP code — enter it at checkout or in your cart for an exact estimate. As a rough guide, most orders arrive within 2–6 business days.',
+        body: 'Delivery windows depend on your PIN code — enter it at checkout or in your cart for an exact estimate. As a rough guide, most orders arrive within 2–6 business days.',
       },
       {
         heading: 'Free shipping threshold',

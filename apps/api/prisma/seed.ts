@@ -4,6 +4,7 @@
 // pre-generation), applies here too since this file also can't run until
 // `prisma generate` has succeeded (see the root README's Known Issues).
 import { PrismaClient } from '@prisma/client';
+import { randomBytes } from 'crypto';
 import { hashPassword } from '../src/auth/password.util';
 
 const prisma = new PrismaClient();
@@ -1403,6 +1404,24 @@ const REVIEWS: SeedReviewInput[] = [
     verified: true,
   },
 ];
+// Demo accounts carry publicly known passwords (they're printed in the
+// README and on the login pages in dev). Fine on a laptop; a real
+// vulnerability on a public API. Outside production they behave as always.
+// In production they're created with an unguessable random password
+// (still usable as catalog owners/notification targets, but nobody can log
+// in as them) unless SEED_DEMO_ACCOUNTS=true is set explicitly, and the
+// admin account is only created when SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD
+// are supplied — see docs/MANUAL_SETUP_GUIDE.md.
+const knownPasswordsAllowed =
+  process.env.NODE_ENV !== 'production' ||
+  process.env.SEED_DEMO_ACCOUNTS === 'true';
+
+function demoPasswordHash(knownPassword: string): Promise<string> {
+  return hashPassword(
+    knownPasswordsAllowed ? knownPassword : randomBytes(32).toString('hex'),
+  );
+}
+
 async function main() {
   console.log('Seeding permissions...');
   for (const permission of PERMISSIONS) {
@@ -1458,7 +1477,7 @@ async function main() {
     update: {},
     create: {
       email: 'demo@folia.example',
-      passwordHash: await hashPassword('folia-demo'),
+      passwordHash: await demoPasswordHash('folia-demo'),
       firstName: 'Sam',
       lastName: 'Rivera',
       emailVerified: true,
@@ -1467,19 +1486,34 @@ async function main() {
     },
   });
 
-  await prisma.user.upsert({
-    where: { email: 'admin@folia.example' },
-    update: {},
-    create: {
-      email: 'admin@folia.example',
-      passwordHash: await hashPassword('folia-admin'),
-      firstName: 'Admin',
-      lastName: 'User',
-      emailVerified: true,
-      emailVerifiedAt: new Date(),
-      roleId: adminRole.id,
-    },
-  });
+  const adminEmail = knownPasswordsAllowed
+    ? 'admin@folia.example'
+    : process.env.SEED_ADMIN_EMAIL;
+  const adminPassword = knownPasswordsAllowed
+    ? 'folia-admin'
+    : process.env.SEED_ADMIN_PASSWORD;
+  if (adminEmail && adminPassword) {
+    if (adminPassword.length < 12) {
+      throw new Error('SEED_ADMIN_PASSWORD must be at least 12 characters.');
+    }
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {},
+      create: {
+        email: adminEmail,
+        passwordHash: await hashPassword(adminPassword),
+        firstName: 'Admin',
+        lastName: 'User',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        roleId: adminRole.id,
+      },
+    });
+  } else {
+    console.log(
+      'Production seed: no admin created (set SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD to create one).',
+    );
+  }
 
   // Marketplace Phase 1 — a demo seller account, seeded directly with an
   // ACTIVE Seller row (rather than left mid-application) so every later
@@ -1495,7 +1529,7 @@ async function main() {
     update: {},
     create: {
       email: 'seller@folia.example',
-      passwordHash: await hashPassword('folia-seller'),
+      passwordHash: await demoPasswordHash('folia-seller'),
       firstName: 'Priya',
       lastName: 'Menon',
       emailVerified: true,
@@ -1514,7 +1548,6 @@ async function main() {
         'Small-batch hand-thrown planters and easy-care houseplants, based in Pune.',
       contactEmail: 'hello@terracottaandfern.example',
       contactPhone: '+91 98765 43210',
-      gstin: '27ABCDE1234F1Z0',
       status: 'ACTIVE',
       approvedAt: new Date(),
     },
