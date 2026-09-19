@@ -6,29 +6,13 @@ import { products } from '@/data/products';
  * homepage and the shop listing.
  */
 
-export const bestSellers = products.filter((p) => p.badge === 'Bestseller').slice(0, 6);
+export const bestSellers = products.filter((p) => p.badge === 'Bestseller').slice(0, 4);
 
-export const trending = [...products]
+export const newArrivals = [...products]
   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  .slice(0, 6);
+  .slice(0, 8);
 
-export const featuredCollections = [
-  { slug: 'low-light-plants', name: 'Low-light Plants', description: 'For north-facing rooms and shadier corners.', image: '/demo/products/snake-plant-laurentii.jpg' },
-  { slug: 'statement-vessels', name: 'Statement Vessels', description: 'Ceramics and stoneware built to be seen.', image: '/demo/products/fluted-ceramic-planter.jpg' },
-  { slug: 'gifting', name: 'Gifting', description: 'Ready to arrive boxed, no assembly required.', image: '/demo/products/peace-lily.jpg' },
-];
-
-export const benefits = [
-  { title: 'Grown, not shipped from a warehouse', description: 'Every plant comes from a partner nursery, not cold storage.' },
-  { title: '30-day health guarantee', description: 'Arrives unwell or dies within 30 days — we replace it, no questions.' },
-  { title: 'Packed to survive transit', description: 'Custom internal bracing keeps soil and stems intact in the box.' },
-];
-
-export const testimonials = [
-  { id: 't1', quote: 'The moss pole came pre-installed and the plant was bigger than the photos suggested. Rare for online plant orders.', author: 'Priya M.', location: 'Bengaluru' },
-  { id: 't2', quote: "I've killed three fiddle leaf figs from big-box stores. This one came with actual care instructions for my light conditions.", author: 'Rohan K.', location: 'Pune' },
-  { id: 't3', quote: 'Ordered a vessel and plant together and they were sized to match — small detail, but it meant I didn\u2019t have to guess.', author: 'Ananya O.', location: 'Hyderabad' },
-];
+export const planters = products.filter((p) => p.categorySlug === 'vessels' || p.categorySlug === 'home-decor').slice(0, 8);
 
 export const blogPreview = [
   { slug: 'winter-light-guide', title: 'A realistic guide to winter light', excerpt: 'Most plants don\u2019t die in winter from cold — they die from a light budget nobody accounted for.' },

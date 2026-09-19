@@ -15,12 +15,13 @@ const options: { value: SortKey; label: string }[] = [
 
 export function ProductSort({ value, onChange }: ProductSortProps) {
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="text-ink-soft hidden sm:inline">Sort</span>
+    <label className="flex min-w-0 flex-1 items-center gap-2 text-sm lg:flex-none">
+      <span className="hidden text-ink-soft lg:inline">Sort</span>
       <select
         value={value}
+        aria-label="Sort products"
         onChange={(e) => onChange(e.target.value as SortKey)}
-        className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3 py-2 text-sm text-ink"
+        className="h-11 w-full min-w-0 rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3 text-[15px] text-ink lg:h-10 lg:w-auto"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>

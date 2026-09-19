@@ -5,12 +5,12 @@ import { services } from '@/data/services';
 
 export function ServiceCards() {
   return (
-    <div className="grid sm:grid-cols-2 gap-6">
+    <div className="grid sm:grid-cols-2 gap-5 sm:p-6">
       {services.map((service) => (
         <Link
           key={service.slug}
           to={service.to}
-          className="group relative aspect-[4/3] rounded-[var(--radius-card)] bg-fern/25 border border-stone-dark overflow-hidden flex flex-col justify-end p-6"
+          className="group relative aspect-[16/10] sm:aspect-[4/3] rounded-[var(--radius-card)] bg-fern/25 border border-stone-dark overflow-hidden flex flex-col justify-end p-6"
         >
           <ProductImage src={service.image} alt="" className="transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" aria-hidden="true" />

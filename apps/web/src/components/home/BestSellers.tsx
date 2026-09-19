@@ -1,22 +1,18 @@
-import { Link } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/common/SectionHeading';
-import { ProductCarousel } from '@/components/product/ProductCarousel';
+import { SectionLink } from '@/components/common/SectionLink';
+import { ProductCard } from '@/components/product/ProductCard';
 import { bestSellers } from '@/data/homepage';
 
 export function BestSellers() {
   return (
-    <Container className="py-20">
-      <SectionHeading
-        eyebrow="Most loved"
-        title="Best sellers"
-        action={
-          <Link to="/shop" className="text-sm font-medium text-fern hover:text-heading transition-colors">
-            View all
-          </Link>
-        }
-      />
-      <ProductCarousel products={bestSellers} />
+    <Container className="py-8 sm:py-12">
+      <SectionHeading title="Best sellers" action={<SectionLink to="/shop">View all</SectionLink>} />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-4 sm:gap-x-5">
+        {bestSellers.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </div>
     </Container>
   );
 }

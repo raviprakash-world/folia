@@ -1,59 +1,23 @@
-import { Link } from 'react-router-dom';
-import { Container } from '@/components/ui/Container';
-import { Button } from '@/components/ui/Button';
-import { ProductImage } from '@/components/product/ProductImage';
-import { Tag } from '@/components/ui/Tag';
-import { ArrowRight } from 'lucide-react';
-import { FeaturedCollections } from '@/components/home/FeaturedCollections';
+import { Hero } from '@/components/home/Hero';
+import { CategoryTiles } from '@/components/home/CategoryTiles';
+import { NewArrivals } from '@/components/home/NewArrivals';
+import { ShopByNeed } from '@/components/home/ShopByNeed';
 import { BestSellers } from '@/components/home/BestSellers';
-import { RecommendedForYou } from '@/components/home/RecommendedForYou';
-import { TrendingProducts } from '@/components/home/TrendingProducts';
-import { Benefits } from '@/components/home/Benefits';
-import { Testimonials } from '@/components/home/Testimonials';
-import { PromoBanners } from '@/components/home/PromoBanners';
+import { Planters } from '@/components/home/Planters';
+import { WhyFolia } from '@/components/home/WhyFolia';
 import { ServicesSegment } from '@/components/home/ServicesSegment';
 import { BlogPreview } from '@/components/home/BlogPreview';
 
 export default function Home() {
   return (
     <>
-      <section className="bg-pine text-cream-light">
-        <Container className="py-24 md:py-32 grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <Tag tone="ochre" tilted>New season</Tag>
-            <h1 className="font-display text-5xl md:text-6xl font-semibold leading-[1.05] mt-5">
-              Living design for the home.
-            </h1>
-            <p className="mt-5 text-cream/75 text-lg max-w-[42ch]">
-              Considered plants and vessels, chosen for how they hold light in a room —
-              not just how they photograph.
-            </p>
-            <div className="mt-8 flex gap-3">
-              <Button variant="secondary" size="lg" icon={<ArrowRight size={18} />} iconPosition="right">
-                <Link to="/shop">Shop the collection</Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                className="!text-cream-light !border-cream-light hover:!bg-stone-light hover:!text-heading"
-              >
-                <Link to="/about">Our approach</Link>
-              </Button>
-            </div>
-          </div>
-          <div className="relative aspect-[4/5] rounded-[var(--radius-card)] bg-fern/30 border border-stone-light/10 overflow-hidden">
-            <ProductImage src="/demo/products/monstera-deliciosa.jpg" alt="A healthy Monstera deliciosa with large split leaves" />
-          </div>
-        </Container>
-      </section>
-
-      <FeaturedCollections />
+      <Hero />
+      <CategoryTiles />
+      <NewArrivals />
+      <ShopByNeed />
       <BestSellers />
-      <RecommendedForYou />
-      <TrendingProducts />
-      <Benefits />
-      <Testimonials />
-      <PromoBanners />
+      <Planters />
+      <WhyFolia />
       <ServicesSegment />
       <BlogPreview />
     </>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Crosshair, Loader2, MapPin } from 'lucide-react';
+import { ChevronRight, Crosshair, Loader2, MapPin } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Container';
@@ -19,38 +19,60 @@ export function LocationBar() {
   const openPicker = useLocationStore((s) => s.openPicker);
   const openPickerAndDetect = useLocationStore((s) => s.openPickerAndDetect);
   return (
-    <div className="border-t border-stone-dark bg-stone-dark/40">
-      <Container className="py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <MapPin size={14} className="text-fern-dark shrink-0" aria-hidden="true" />
-        {location ? (
-          <>
-            <span className="text-ink-soft">
-              Delivering to <span className="text-ink font-medium">{location.pincode}</span>
+    <div className="border-b border-stone-dark bg-stone-dark/40">
+      <Container>
+        <button
+          type="button"
+          onClick={openPicker}
+          className="flex min-h-11 w-full items-center gap-2 text-left text-sm sm:hidden"
+        >
+          <MapPin size={16} className="shrink-0 text-fern-dark" aria-hidden="true" />
+          {location ? (
+            <span className="truncate text-ink-soft">
+              Delivering to <span className="font-medium text-ink">{location.pincode}</span>
               {location.city && `, ${location.city}`}
             </span>
-            <button type="button" onClick={openPicker} className="text-fern-dark hover:text-heading underline font-medium">
-              Change
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="text-ink-soft">See what ships to your area.</span>
-            <button
-              type="button"
-              onClick={openPickerAndDetect}
-              className="flex items-center gap-1 text-fern-dark hover:text-heading underline font-medium"
-            >
-              <Crosshair size={12} aria-hidden="true" />
-              Use my current location
-            </button>
-            <span className="text-ink-soft" aria-hidden="true">
-              or
-            </span>
-            <button type="button" onClick={openPicker} className="text-fern-dark hover:text-heading underline font-medium">
-              enter PIN code
-            </button>
-          </>
-        )}
+          ) : (
+            <span className="truncate text-ink">Enter PIN code to check delivery</span>
+          )}
+          <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-fern-dark">
+            {location ? 'Change' : 'Set'}
+            <ChevronRight size={16} aria-hidden="true" />
+          </span>
+        </button>
+
+        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-xs sm:flex">
+          <MapPin size={14} className="shrink-0 text-fern-dark" aria-hidden="true" />
+          {location ? (
+            <>
+              <span className="text-ink-soft">
+                Delivering to <span className="font-medium text-ink">{location.pincode}</span>
+                {location.city && `, ${location.city}`}
+              </span>
+              <button type="button" onClick={openPicker} className="font-medium text-fern-dark underline hover:text-heading">
+                Change
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-ink-soft">See what ships to your area.</span>
+              <button
+                type="button"
+                onClick={openPickerAndDetect}
+                className="flex items-center gap-1 font-medium text-fern-dark underline hover:text-heading"
+              >
+                <Crosshair size={12} aria-hidden="true" />
+                Use my current location
+              </button>
+              <span className="text-ink-soft" aria-hidden="true">
+                or
+              </span>
+              <button type="button" onClick={openPicker} className="font-medium text-fern-dark underline hover:text-heading">
+                enter PIN code
+              </button>
+            </>
+          )}
+        </div>
       </Container>
       <LocationDialog />
     </div>

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Clock, TrendingUp, Eye, ArrowRight, Package, Tag as TagIcon, Newspaper } from 'lucide-react';
+import { Search, X, Clock, Sparkles, Eye, ArrowRight, Package, Tag as TagIcon, Newspaper } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
-import { Tag } from '@/components/ui/Tag';
 import { HighlightText } from '@/components/common/HighlightText';
 import { formatCurrency } from '@/utils/currency';
 import { useSearchResults } from '@/hooks/useSearchResults';
 import { useSearchStore } from '@/store/searchStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
-import { getTrendingSearches } from '@/data/trendingSearches';
+import { POPULAR_SEARCHES } from '@/data/popularSearches';
+import { categories } from '@/data/categories';
 import { products as allProducts } from '@/data/products';
 import { ProductImage } from '@/components/product/ProductImage';
 import { cn } from '@/utils/cn';
@@ -47,7 +47,7 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
     didYouMean,
   } = useSearchResults(rawQuery);
 
-  const trendingSearches = useMemo(() => getTrendingSearches(), []);
+  const trendingSearches = POPULAR_SEARCHES;
   const recentlyViewedIds = useMemo(() => recentlyViewedItems.map((i) => i.productId), [recentlyViewedItems]);
   const recentlyViewedProducts = useMemo(
     () =>
@@ -127,35 +127,37 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const rowBase = 'flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-control)] transition-colors cursor-pointer';
+  const rowBase = 'flex min-h-14 items-center gap-3 px-3 py-2 rounded-[var(--radius-control)] transition-colors cursor-pointer';
   function rowClass(key: string) {
     const index = navItems.findIndex((i) => i.key === key);
     return cn(rowBase, index === activeIndex ? 'bg-fern/10' : 'hover:bg-stone-dark/40');
   }
 
   return (
-    <Container className="py-6">
-      <div className="flex items-center gap-3 border-b-2 border-pine pb-3">
-        <Search size={22} className="text-ink-soft shrink-0" />
+    <Container className="pb-8 pt-3 sm:py-6">
+      <div className="sticky top-0 z-10 -mx-4 flex items-center gap-2 border-b-2 border-pine bg-stone-light px-4 pb-2 pt-1 sm:static sm:mx-0 sm:gap-3 sm:px-0 sm:pb-3 sm:pt-0">
+        <Search size={22} className="shrink-0 text-ink-soft" aria-hidden="true" />
         <input
           ref={inputRef}
           type="search"
           value={rawQuery}
           onChange={(e) => setRawQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search plants, vessels, tools, articles…"
+          placeholder="Search plants, planters & more"
+          enterKeyHint="search"
+          autoComplete="off"
           aria-label="Search"
           aria-activedescendant={navItems[activeIndex]?.key}
           role="combobox"
           aria-expanded={navItems.length > 0}
           aria-controls="search-results-list"
-          className="flex-1 bg-transparent text-xl font-display text-ink placeholder:text-ink-soft/40 focus:outline-none"
+          className="h-12 min-w-0 flex-1 bg-transparent font-display text-lg text-ink placeholder:text-ink-soft/60 focus:outline-none sm:text-xl"
         />
         <kbd className="hidden sm:inline-block font-mono text-[10px] text-ink-soft border border-stone-dark rounded px-1.5 py-0.5">
           ESC
         </kbd>
-        <button type="button" onClick={onClose} aria-label="Close search" className="p-1.5 text-ink-soft hover:text-heading">
-          <X size={20} />
+        <button type="button" onClick={onClose} aria-label="Close search" className="flex size-11 shrink-0 items-center justify-center text-ink-soft hover:text-heading">
+          <X size={22} />
         </button>
       </div>
 
@@ -169,7 +171,7 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
                     <Clock size={12} />
                     Recent searches
                   </p>
-                  <button type="button" onClick={clearRecentSearches} className="text-xs text-ink-soft hover:text-rust underline">
+                  <button type="button" onClick={clearRecentSearches} className="min-h-10 px-1 text-sm text-ink-soft hover:text-rust underline">
                     Clear
                   </button>
                 </div>
@@ -180,7 +182,7 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
                       type="button"
                       onClick={() => goToFullResults(term)}
                       className={cn(
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-colors',
+                        'flex min-h-10 items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[15px] transition-colors',
                         navItems[activeIndex]?.key === `recent-${term}`
                           ? 'border-fern text-heading bg-fern/10'
                           : 'border-stone-dark text-ink-soft hover:border-fern'
@@ -195,9 +197,9 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
             )}
 
             <div>
-              <p className="font-mono text-xs uppercase tracking-wider text-ink-soft mb-3 flex items-center gap-1.5">
-                <TrendingUp size={12} />
-                Trending searches
+              <p className="mb-3 flex items-center gap-1.5 font-mono text-xs uppercase tracking-wider text-ink-soft">
+                <Sparkles size={12} aria-hidden="true" />
+                Popular searches
               </p>
               <div className="flex flex-wrap gap-2">
                 {trendingSearches.map((term) => (
@@ -206,13 +208,32 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
                     type="button"
                     onClick={() => goToFullResults(term)}
                     className={cn(
-                      'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                      'min-h-10 rounded-full border px-3.5 py-1.5 text-[15px] transition-colors',
                       navItems[activeIndex]?.key === `trending-${term}`
-                        ? 'border-fern text-heading bg-fern/10'
+                        ? 'border-fern bg-fern/10 text-heading'
                         : 'border-stone-dark text-ink-soft hover:border-fern'
                     )}
                   >
                     {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-3 flex items-center gap-1.5 font-mono text-xs uppercase tracking-wider text-ink-soft">
+                <TagIcon size={12} aria-hidden="true" />
+                Browse by category
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((c) => (
+                  <button
+                    key={c.slug}
+                    type="button"
+                    onClick={() => selectHref(`/collections/${c.slug}`)}
+                    className="min-h-10 rounded-full border border-stone-dark px-3.5 py-1.5 text-[15px] text-ink-soft transition-colors hover:border-fern"
+                  >
+                    {c.name}
                   </button>
                 ))}
               </div>
@@ -256,45 +277,42 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
         )}
 
         {query && !isLoading && totalResultCount === 0 && (
-          <div className="py-4">
-            <p className="text-ink font-medium">No results for "{query}"</p>
+          <div className="py-2">
+            <p className="font-display text-xl font-semibold text-heading">We couldn&apos;t find &ldquo;{query}&rdquo;</p>
             {didYouMean && (
-              <button
-                type="button"
-                onClick={() => setRawQuery(didYouMean)}
-                className="text-sm text-fern hover:text-heading mt-1 underline"
-              >
-                Did you mean "{didYouMean}"?
+              <button type="button" onClick={() => setRawQuery(didYouMean)} className="mt-2 min-h-10 text-[15px] text-fern-dark underline hover:text-heading">
+                Did you mean &ldquo;{didYouMean}&rdquo;?
               </button>
             )}
-            <p className="text-sm text-ink-soft mt-4 mb-2">Try one of these instead:</p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {trendingSearches.slice(0, 4).map((term) => (
+            <p className="mb-2 mt-4 text-[15px] text-ink-soft">Check the spelling, or try one of these:</p>
+            <div className="mb-6 flex flex-wrap gap-2">
+              {trendingSearches.slice(0, 5).map((term) => (
                 <button
                   key={term}
                   type="button"
                   onClick={() => goToFullResults(term)}
-                  className="px-3 py-1.5 rounded-full border border-stone-dark text-sm text-ink-soft hover:border-fern transition-colors"
+                  className="min-h-10 rounded-full border border-stone-dark px-3.5 py-1.5 text-[15px] text-ink-soft transition-colors hover:border-fern"
                 >
                   {term}
                 </button>
               ))}
             </div>
-            <p className="text-sm text-ink-soft mb-2">Popular categories:</p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {[...allProducts.reduce((set, p) => set.add(p.category), new Set<string>())].map((cat) => (
-                <Tag key={cat} tone="stone">
-                  {cat}
-                </Tag>
+            <p className="mb-2 text-[15px] text-ink-soft">Or browse a category:</p>
+            <div className="mb-6 flex flex-wrap gap-2">
+              {categories.map((c) => (
+                <button
+                  key={c.slug}
+                  type="button"
+                  onClick={() => selectHref(`/collections/${c.slug}`)}
+                  className="min-h-10 rounded-full border border-stone-dark px-3.5 py-1.5 text-[15px] text-ink-soft transition-colors hover:border-fern"
+                >
+                  {c.name}
+                </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => selectHref('/shop')}
-              className="inline-flex items-center gap-1.5 text-sm text-fern hover:text-heading transition-colors"
-            >
+            <button type="button" onClick={() => selectHref('/shop')} className="inline-flex min-h-11 items-center gap-1.5 text-[15px] font-medium text-fern-dark transition-colors hover:text-heading">
               Continue browsing the shop
-              <ArrowRight size={14} />
+              <ArrowRight size={16} aria-hidden="true" />
             </button>
           </div>
         )}

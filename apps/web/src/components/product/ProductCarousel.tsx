@@ -21,12 +21,12 @@ export function ProductCarousel({ products }: ProductCarouselProps) {
       <Swiper
         modules={[Navigation, A11y]}
         navigation={{ prevEl: `.${prevClass}`, nextEl: `.${nextClass}` }}
-        spaceBetween={20}
-        slidesPerView={1.3}
+        spaceBetween={12}
+        slidesPerView={2.15}
         breakpoints={{
-          480: { slidesPerView: 2.2 },
-          768: { slidesPerView: 3.2 },
-          1024: { slidesPerView: 4 },
+          520: { slidesPerView: 2.8, spaceBetween: 16 },
+          768: { slidesPerView: 3.4, spaceBetween: 20 },
+          1024: { slidesPerView: 4, spaceBetween: 20 },
         }}
         a11y={{ enabled: true }}
         className="!pb-2"

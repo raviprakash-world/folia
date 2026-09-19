@@ -8,7 +8,7 @@ import { sortByRelevance, findDidYouMean } from '@/utils/textMatch';
 import { categories, collections } from '@/data/categories';
 import { blogPosts } from '@/data/blog';
 import { products as allProducts } from '@/data/products';
-import { trending } from '@/data/homepage';
+import { newArrivals as trending } from '@/data/homepage';
 import { fetchRealSearch } from '@/services/searchApiService';
 
 const DEBOUNCE_MS = 250;

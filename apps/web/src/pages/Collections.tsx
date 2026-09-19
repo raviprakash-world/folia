@@ -4,17 +4,7 @@ import { Container } from '@/components/ui/Container';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ProductImage } from '@/components/product/ProductImage';
 import { collections } from '@/data/categories';
-
-const images: Record<string, string> = {
-  'low-light-plants': 'snake-plant-laurentii',
-  'statement-vessels': 'fluted-ceramic-planter',
-  gifting: 'peace-lily',
-  'pet-friendly': 'spider-plant',
-  flowering: 'hibiscus',
-  baskets: 'woven-plant-basket',
-  'new-home': 'money-plant-golden-pothos',
-  office: 'zz-plant',
-};
+import { collectionImages, productPhoto } from '@/data/collectionImages';
 
 export default function Collections() {
   return (
@@ -31,9 +21,9 @@ export default function Collections() {
             to={`/collections/${c.slug}`}
             className="group relative aspect-[4/5] rounded-[var(--radius-card)] bg-fern/25 border border-stone-dark overflow-hidden flex flex-col justify-end p-6"
           >
-            {images[c.slug] && (
+            {collectionImages[c.slug] && (
               <ProductImage
-                src={`/demo/products/${images[c.slug]}.jpg`}
+                src={productPhoto(collectionImages[c.slug])}
                 alt=""
                 className="transition-transform duration-500 group-hover:scale-105"
               />

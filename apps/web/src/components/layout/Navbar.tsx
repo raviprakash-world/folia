@@ -42,110 +42,111 @@ export function Navbar() {
   const openCartDrawer = useUIStore((s) => s.openCartDrawer);
   const openSearchOverlay = useUIStore((s) => s.openSearchOverlay);
 
+  const iconBtn =
+    'relative size-11 items-center justify-center rounded-[var(--radius-control)] text-ink-soft transition-colors hover:bg-stone-dark hover:text-heading';
+
   return (
-    <header className="relative sticky top-0 z-40 bg-stone-light/95 backdrop-blur border-b border-stone-dark">
-      <Container className="flex items-center justify-between h-16">
-        <Link to="/" aria-label="Folia home">
-          <Logo />
-        </Link>
-
-        <nav aria-label="Primary" className="hidden lg:flex items-center gap-6 xl:gap-8">
-          <button
-            type="button"
-            aria-expanded={megaMenuOpen}
-            onClick={() => setMegaMenuOpen((v) => !v)}
-            className={`flex items-center gap-1 text-sm font-medium transition-colors ${
-              megaMenuOpen ? 'text-heading' : 'text-ink-soft hover:text-heading'
-            }`}
-          >
-            Shop
-            <ChevronDown size={14} className={`transition-transform ${megaMenuOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {primaryLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) =>
-                `text-sm font-medium transition-colors ${
-                  isActive ? 'text-heading' : 'text-ink-soft hover:text-heading'
-                }`
-              }
+    <>
+      <header className="relative sticky top-0 z-40 border-b border-stone-dark bg-stone-light/95 backdrop-blur">
+        <Container className="flex h-14 items-center justify-between gap-2 lg:h-16">
+          <div className="flex min-w-0 items-center gap-1">
+            <button
+              type="button"
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen((v) => !v)}
+              className={`${iconBtn} -ml-2.5 inline-flex lg:hidden`}
             >
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-1">
-          <div className="hidden sm:block">
-            <ThemeToggle compact />
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+            <Link to="/" aria-label="Folia home" className="flex min-h-11 items-center">
+              <Logo />
+            </Link>
           </div>
-          <Link
-            to={user ? '/account' : '/account/login'}
-            aria-label={user ? `Account — ${user.firstName}` : 'Sign in'}
-            className="p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-          >
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-            ) : (
-              <User size={20} />
-            )}
-          </Link>
-          <button
-            type="button"
-            aria-label="Search"
-            onClick={openSearchOverlay}
-            className="flex items-center gap-1.5 p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-          >
-            <Search size={20} />
-            <kbd className="hidden lg:inline-block font-mono text-[10px] border border-stone-dark rounded px-1.5 py-0.5">
-              ⌘K
-            </kbd>
-          </button>
-          <Link
-            to="/account/notifications"
-            aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-            className="relative p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-          >
-            <Bell size={20} />
-            <NavBadge count={unreadCount} />
-          </Link>
-          <Link
-            to="/wishlist"
-            aria-label={`Wishlist${wishlistCount > 0 ? ` (${wishlistCount} items)` : ''}`}
-            className="relative p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-          >
-            <Heart size={20} />
-            <NavBadge count={wishlistCount} />
-          </Link>
-          <button
-            type="button"
-            aria-label={`Shopping bag${cartCount > 0 ? ` (${cartCount} items)` : ''}`}
-            onClick={openCartDrawer}
-            className="relative p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-          >
-            <ShoppingBag size={20} />
-            <NavBadge count={cartCount} />
-          </button>
-          <button
-            type="button"
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileOpen}
-            onClick={() => setMobileOpen((v) => !v)}
-            className="lg:hidden p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-          >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-      </Container>
-      <LocationBar />
 
-      <MegaMenu open={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
-      <MobileNav
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        links={[{ label: 'Shop', to: '/shop' }, ...primaryLinks]}
-      />
-    </header>
+          <nav aria-label="Primary" className="hidden lg:flex items-center gap-6 xl:gap-8">
+            <button
+              type="button"
+              aria-expanded={megaMenuOpen}
+              onClick={() => setMegaMenuOpen((v) => !v)}
+              className={`flex items-center gap-1 text-sm font-medium transition-colors ${
+                megaMenuOpen ? 'text-heading' : 'text-ink-soft hover:text-heading'
+              }`}
+            >
+              Shop
+              <ChevronDown size={14} className={`transition-transform ${megaMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {primaryLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `text-sm font-medium transition-colors ${isActive ? 'text-heading' : 'text-ink-soft hover:text-heading'}`
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-0.5">
+            <div className="hidden lg:block">
+              <ThemeToggle compact />
+            </div>
+            <Link
+              to={user ? '/account' : '/account/login'}
+              aria-label={user ? `Account — ${user.firstName}` : 'Sign in'}
+              className={`${iconBtn} hidden lg:inline-flex`}
+            >
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+              ) : (
+                <User size={20} />
+              )}
+            </Link>
+            <button type="button" aria-label="Search" onClick={openSearchOverlay} className={`${iconBtn} hidden gap-1.5 lg:inline-flex lg:w-auto lg:px-2.5`}>
+              <Search size={20} />
+              <kbd className="font-mono text-[10px] border border-stone-dark rounded px-1.5 py-0.5">⌘K</kbd>
+            </button>
+            <Link
+              to="/account/notifications"
+              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+              className={`${iconBtn} hidden lg:inline-flex`}
+            >
+              <Bell size={20} />
+              <NavBadge count={unreadCount} />
+            </Link>
+            <Link to="/wishlist" aria-label={`Wishlist${wishlistCount > 0 ? ` (${wishlistCount} items)` : ''}`} className={`${iconBtn} inline-flex`}>
+              <Heart size={22} />
+              <NavBadge count={wishlistCount} />
+            </Link>
+            <button type="button" aria-label={`Shopping bag${cartCount > 0 ? ` (${cartCount} items)` : ''}`} onClick={openCartDrawer} className={`${iconBtn} -mr-2.5 inline-flex lg:mr-0`}>
+              <ShoppingBag size={22} />
+              <NavBadge count={cartCount} />
+            </button>
+          </div>
+        </Container>
+
+        <Container className="pb-2.5 lg:hidden">
+          <button
+            type="button"
+            onClick={openSearchOverlay}
+            className="flex h-11 w-full items-center gap-3 rounded-full border border-stone-dark bg-stone px-4 text-left text-[15px] text-ink-soft transition-colors hover:border-fern"
+          >
+            <Search size={18} aria-hidden="true" className="shrink-0" />
+            <span className="truncate">Search plants, planters &amp; more</span>
+          </button>
+        </Container>
+
+        <MegaMenu open={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
+        <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} links={[{ label: 'Shop', to: '/shop' }, ...primaryLinks]}>
+          <li className="flex items-center justify-between gap-3 py-3">
+            <span className="text-base font-medium text-ink-soft">Appearance</span>
+            <ThemeToggle compact />
+          </li>
+        </MobileNav>
+      </header>
+      <LocationBar />
+    </>
   );
 }

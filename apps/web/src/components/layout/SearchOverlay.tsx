@@ -54,7 +54,7 @@ export function SearchOverlay() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed top-0 left-0 right-0 z-50 bg-stone-light border-b border-stone-dark shadow-[var(--shadow-lifted)] max-h-[85vh] overflow-y-auto"
+            className="fixed inset-x-0 top-0 z-50 h-dvh overflow-y-auto bg-stone-light sm:h-auto sm:max-h-[85vh] sm:border-b sm:border-stone-dark sm:shadow-[var(--shadow-lifted)]"
           >
             <Suspense fallback={<PageLoader />}>
               <SearchOverlayContent onClose={closeSearchOverlay} />

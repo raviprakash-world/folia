@@ -3,7 +3,11 @@
 // nested untyped jest.fn() mocks, not worth full generics for a test
 // file whose value is behavioral coverage of the query-building logic.
 import { NotFoundException, ConflictException } from '@nestjs/common';
-import { ProductsService, buildOrderBy } from './products.service';
+import {
+  ProductsService,
+  buildOrderBy,
+  searchTokens,
+} from './products.service';
 
 describe('buildOrderBy', () => {
   it('featured sort (default) puts bestsellers first via declaration-order DESC with nulls last', () => {
@@ -139,6 +143,33 @@ describe('ProductsService.findMany', () => {
     expect(prisma.product.count).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ compareAtPrice: { not: null } }),
+      }),
+    );
+  });
+
+  it('search: every word must match name, category or description, with plurals folded', async () => {
+    const prisma = createMockPrisma();
+    prisma.$transaction.mockResolvedValue([0, []]);
+    const service = new ProductsService(prisma as never);
+
+    await service.findMany({
+      search: 'Ceramic Planters',
+      page: 1,
+      pageSize: 12,
+    });
+
+    const word = (t: string) => ({
+      OR: [
+        { name: { contains: t, mode: 'insensitive' } },
+        { category: { name: { contains: t, mode: 'insensitive' } } },
+        { description: { contains: t, mode: 'insensitive' } },
+      ],
+    });
+    expect(prisma.product.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: [word('ceramic'), word('planter')],
+        }),
       }),
     );
   });
@@ -463,5 +494,20 @@ describe('ProductsService.findManyByIds', () => {
     const service = new ProductsService(prisma as never);
     const result = await service.findManyByIds(['a', 'b']);
     expect(result.map((p) => p.id)).toEqual(['a']);
+  });
+});
+
+describe('searchTokens', () => {
+  it('lowercases, drops punctuation, folds plurals, keeps short words and double-s words', () => {
+    expect(searchTokens('  Low-Light  Plants! ')).toEqual([
+      'low',
+      'light',
+      'plant',
+    ]);
+    expect(searchTokens('pots')).toEqual(['pot']);
+    expect(searchTokens('moss')).toEqual(['moss']);
+    expect(searchTokens('gas')).toEqual(['gas']);
+    expect(searchTokens('')).toEqual([]);
+    expect(searchTokens('Fertilizers')).toEqual(['fertiliser']);
   });
 });

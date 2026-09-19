@@ -59,7 +59,19 @@ export const catalogHandlers = [
     if (minPrice) filtered = filtered.filter((p) => p.price >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => p.price <= Number(maxPrice));
     if (inStockOnly) filtered = filtered.filter((p) => p.inStock);
-    if (search) filtered = filtered.filter((p) => p.name.toLowerCase().includes(search));
+    if (search) {
+      // Same matching as the API: every word in the name, category or description; simple plurals folded.
+      const tokens = search
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter(Boolean)
+        .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
+        .map((w) => w.replace('fertiliz', 'fertilis'))
+        .slice(0, 6);
+      filtered = filtered.filter((p) => {
+        const hay = `${p.name} ${p.category} ${p.description}`.toLowerCase();
+        return tokens.every((t) => hay.includes(t));
+      });
+    }
     if (shipFromState) filtered = filtered.filter((p) => p.shipsFrom?.state.toLowerCase() === shipFromState);
 
     const sorted = sortProducts(filtered, sort);

@@ -70,6 +70,24 @@ export function buildOrderBy(sort: SortKey | undefined) {
   }
 }
 
+/** Splits a shopper's query into words and folds simple plurals ("planters" -> "planter"). */
+export function searchTokens(query: string): string[] {
+  return (
+    query
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(Boolean)
+      .map((word) =>
+        word.length > 3 && word.endsWith('s') && !word.endsWith('ss')
+          ? word.slice(0, -1)
+          : word,
+      )
+      // The catalog uses Indian/UK spelling; shoppers often type the US one.
+      .map((word) => word.replace('fertiliz', 'fertilis'))
+      .slice(0, 6)
+  );
+}
+
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -89,8 +107,20 @@ export class ProductsService {
     }
     if (query.inStockOnly) where.inStock = true;
     if (query.onSale) where.compareAtPrice = { not: null };
-    if (query.search)
-      where.name = { contains: query.search, mode: 'insensitive' };
+    if (query.search) {
+      const tokens = searchTokens(query.search);
+      if (tokens.length) {
+        // Every word must appear somewhere useful (name, category, or
+        // description), so "ceramic planters" finds "Fluted Ceramic Planter".
+        where.AND = tokens.map((token) => ({
+          OR: [
+            { name: { contains: token, mode: 'insensitive' } },
+            { category: { name: { contains: token, mode: 'insensitive' } } },
+            { description: { contains: token, mode: 'insensitive' } },
+          ],
+        }));
+      }
+    }
     if (query.sellerId) where.sellerId = query.sellerId;
     if (query.shipFromState) {
       const state = { equals: query.shipFromState, mode: 'insensitive' };

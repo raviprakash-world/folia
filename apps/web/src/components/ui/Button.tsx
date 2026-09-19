@@ -1,9 +1,9 @@
 import { forwardRef } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/utils/cn';
+import { sizeStyles, variantStyles } from './buttonStyles';
+import type { ButtonSize, ButtonVariant } from './buttonStyles';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline';
-type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -11,19 +11,6 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode;
   iconPosition?: 'left' | 'right';
 }
-
-const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-pine text-cream-light hover:bg-pine-light active:bg-pine dark:bg-fern dark:text-pine dark:hover:bg-fern-light dark:active:bg-fern',
-  secondary: 'bg-ochre text-pine hover:bg-ochre-light active:bg-ochre',
-  ghost: 'bg-transparent text-heading hover:bg-stone-dark',
-  outline: 'bg-transparent text-heading border border-pine dark:border-fern hover:bg-pine hover:text-cream-light dark:hover:bg-fern dark:hover:text-pine',
-};
-
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'text-sm px-3 py-1.5 gap-1.5',
-  md: 'text-sm px-5 py-2.5 gap-2',
-  lg: 'text-base px-7 py-3.5 gap-2.5',
-};
 
 /**
  * Base interactive control. Every button in the app should route through this

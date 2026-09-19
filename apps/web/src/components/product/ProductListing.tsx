@@ -7,6 +7,7 @@ import { ProductSort } from './ProductSort';
 import { ProductGrid } from './ProductGrid';
 import { ProductGridSkeleton } from './ProductGridSkeleton';
 import { EmptyState } from '@/components/common/EmptyState';
+import { ErrorState } from '@/components/common/ErrorState';
 import { Pagination } from '@/components/common/Pagination';
 import { useProducts } from '@/hooks/useProducts';
 import { useProductListState } from '@/hooks/useProductListState';
@@ -45,14 +46,14 @@ export function ProductListing({
       collection: fixedCollection,
       onSale: fixedOnSale,
     });
-  const { data, isLoading, isError } = useProducts(filters);
+  const { data, isLoading, isError, refetch } = useProducts(filters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   return (
-    <Container className="py-16">
+    <Container className="py-6 sm:py-10 lg:py-16">
       {header ?? (
-        <div className="mb-10">
-          <h1 className="font-display text-4xl font-semibold text-heading">{title}</h1>
+        <div className="mb-6 sm:mb-10">
+          <h1 className="font-display text-3xl font-semibold text-heading sm:text-4xl">{title}</h1>
           {description && <p className="text-ink-soft mt-2 max-w-[60ch]">{description}</p>}
         </div>
       )}
@@ -63,25 +64,22 @@ export function ProductListing({
           <ProductFilters filters={filters} onChange={updateFilters} onReset={resetFilters} />
         </aside>
 
-        <div>
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
+        <div className="min-w-0">
+          <div className="mb-5 flex flex-col gap-3 lg:mb-6 lg:flex-row lg:items-center lg:justify-between">
+            {data && (
+              <p className="order-2 text-sm text-ink-soft lg:order-1" aria-live="polite">
+                {data.total} {data.total === 1 ? 'product' : 'products'}
+              </p>
+            )}
+            <div className="order-1 flex items-center gap-2 lg:order-2 lg:gap-3">
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen(true)}
-                className="lg:hidden flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-heading"
+                className="flex h-11 shrink-0 items-center gap-2 rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-4 text-[15px] font-medium text-ink hover:border-fern lg:hidden"
               >
-                <SlidersHorizontal size={16} />
+                <SlidersHorizontal size={16} aria-hidden="true" />
                 Filters
               </button>
-              {data && (
-                <p className="text-sm text-ink-soft font-mono">
-                  {data.total} {data.total === 1 ? 'product' : 'products'}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
               <ProductSort value={filters.sort ?? 'featured'} onChange={setSort} />
               <div className="hidden sm:flex items-center border border-stone-dark rounded-[var(--radius-control)] overflow-hidden">
                 <button
@@ -89,7 +87,7 @@ export function ProductListing({
                   aria-label="Grid view"
                   aria-pressed={view === 'grid'}
                   onClick={() => setView('grid')}
-                  className={cn('p-2', view === 'grid' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
+                  className={cn('p-2.5', view === 'grid' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
                 >
                   <LayoutGrid size={16} />
                 </button>
@@ -98,7 +96,7 @@ export function ProductListing({
                   aria-label="List view"
                   aria-pressed={view === 'list'}
                   onClick={() => setView('list')}
-                  className={cn('p-2', view === 'list' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
+                  className={cn('p-2.5', view === 'list' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
                 >
                   <List size={16} />
                 </button>
@@ -109,16 +107,13 @@ export function ProductListing({
           {isLoading && <ProductGridSkeleton />}
 
           {isError && (
-            <EmptyState
-              title="Couldn't load products"
-              description="Something went wrong fetching the catalog. Try refreshing the page."
-            />
+            <ErrorState title="Something went wrong" description="We couldn't load the products right now." onRetry={() => void refetch()} />
           )}
 
           {data && data.items.length === 0 && (
             <EmptyState
-              title="No products match those filters"
-              description="Try widening your price range or clearing a filter."
+              title="Nothing matches those filters"
+              description="Try a wider price range, or clear a filter to see more."
               action={
                 <Button variant="outline" onClick={resetFilters}>
                   Clear filters
