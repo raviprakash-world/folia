@@ -6,7 +6,8 @@ import type { Order, OrderItem } from '@/types/order';
 import type { ReturnClaimReason } from '@/types/returnClaim';
 import type { CreateReturnClaimInput } from '@/services/returnsApiService';
 
-const PLANT_CATEGORY_SLUG = 'plants';
+// Mirrors apps/api's return-policy.util.ts: every category selling live plants.
+const PLANT_CATEGORY_SLUGS = new Set(['plants', 'outdoor-plants']);
 
 /** Mirrors apps/api/src/orders/return-policy.util.ts's DOA_CLAIM_REASONS/STANDARD_RETURN_REASONS exactly — the backend re-validates this regardless, but showing only the reasons that can actually succeed avoids a confusing rejection after upload. */
 const STANDARD_RETURN_REASONS: ReturnClaimReason[] = [
@@ -49,8 +50,8 @@ export function ReturnClaimForm({ order, onSubmit, onCancel, submitError, isSubm
   const [fileError, setFileError] = useState<string | null>(null);
 
   const selectedItems: OrderItem[] = order.items.filter((item) => quantities[item.id] !== undefined);
-  const hasPlant = selectedItems.some((item) => item.categorySlug === PLANT_CATEGORY_SLUG);
-  const hasNonPlant = selectedItems.some((item) => item.categorySlug !== PLANT_CATEGORY_SLUG);
+  const hasPlant = selectedItems.some((item) => PLANT_CATEGORY_SLUGS.has(item.categorySlug));
+  const hasNonPlant = selectedItems.some((item) => !PLANT_CATEGORY_SLUGS.has(item.categorySlug));
   const isMixed = hasPlant && hasNonPlant;
   const claimType = hasPlant ? 'doa-claim' : 'standard-return';
   const allowedReasons = hasPlant ? DOA_CLAIM_REASONS : STANDARD_RETURN_REASONS;

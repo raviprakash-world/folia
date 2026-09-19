@@ -29,6 +29,7 @@ const columns = [
       { label: 'Returns', to: '/policies/returns' },
       { label: 'Privacy policy', to: '/policies/privacy' },
       { label: 'Terms & conditions', to: '/policies/terms' },
+      { label: 'Photo credits', to: '/policies/photo-credits' },
     ],
   },
 ];

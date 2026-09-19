@@ -22,6 +22,18 @@ describe('deriveClaimType', () => {
     expect(deriveClaimType([{ categorySlug: 'plants' }])).toBe('DOA_CLAIM');
   });
 
+  it('treats outdoor plants as live plants too — otherwise a bougainvillea would get the 14-day standard-return path meant for pots and tools', () => {
+    expect(deriveClaimType([{ categorySlug: 'outdoor-plants' }])).toBe(
+      'DOA_CLAIM',
+    );
+    expect(
+      deriveClaimType([
+        { categorySlug: 'plants' },
+        { categorySlug: 'outdoor-plants' },
+      ]),
+    ).toBe('DOA_CLAIM');
+  });
+
   it('derives MIXED when the selection spans plant and non-plant items — the caller must reject this and ask for two separate claims', () => {
     expect(
       deriveClaimType([

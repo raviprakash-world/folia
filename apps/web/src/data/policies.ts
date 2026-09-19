@@ -1,4 +1,5 @@
 import { FREE_SHIPPING_THRESHOLD } from '@/services/deliveryService';
+import imageCredits from '../../../api/prisma/demo/image-credits.json';
 import { formatCurrency } from '@/utils/currency';
 
 export interface PolicySection {
@@ -108,6 +109,27 @@ export const policies: Policy[] = [
         heading: 'About this page',
         body: 'This is a portfolio project, not a real store — these terms are illustrative content, not a binding legal document.',
       },
+    ],
+  },
+  {
+    slug: 'photo-credits',
+    title: 'Photo credits',
+    updatedAt: '2026-09-19',
+    sections: [
+      {
+        heading: 'About these images',
+        body: 'Every product, seller and review on this site is fictional demo content. The pictures are placeholders: photographs from Wikimedia Commons under the open licences listed below (cropped and resized), and illustrations drawn for this project.',
+      },
+      ...imageCredits.map((c) => {
+        const credit = c as { kind: string; artist?: string; license?: string; page?: string };
+        return {
+          heading: c.name,
+          body:
+            credit.kind === 'photo'
+              ? `Photo by ${credit.artist || 'unknown author'} · ${credit.license ?? ''} · ${credit.page ?? ''}`
+              : 'Illustration created for this project.',
+        };
+      }),
     ],
   },
 ];

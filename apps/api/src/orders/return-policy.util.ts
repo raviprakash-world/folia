@@ -21,7 +21,9 @@ import type { ReturnReasonDb } from './order.types';
 
 export type ReturnClaimType = 'STANDARD_RETURN' | 'DOA_CLAIM';
 
-const PLANT_CATEGORY_SLUG = 'plants';
+// Live plants — final sale, covered by the DOA claim instead. Every category
+// that sells living plants belongs here, not just the original 'plants'.
+const PLANT_CATEGORY_SLUGS = new Set(['plants', 'outdoor-plants']);
 
 /**
  * Business-rule constant, not a secret or environment-specific value —
@@ -92,11 +94,11 @@ export function deriveClaimType(
   if (items.length === 0) {
     throw new Error('A claim must include at least one line item.');
   }
-  const hasPlant = items.some(
-    (item) => item.categorySlug === PLANT_CATEGORY_SLUG,
+  const hasPlant = items.some((item) =>
+    PLANT_CATEGORY_SLUGS.has(item.categorySlug),
   );
   const hasNonPlant = items.some(
-    (item) => item.categorySlug !== PLANT_CATEGORY_SLUG,
+    (item) => !PLANT_CATEGORY_SLUGS.has(item.categorySlug),
   );
   if (hasPlant && hasNonPlant) return 'MIXED';
   return hasPlant ? 'DOA_CLAIM' : 'STANDARD_RETURN';

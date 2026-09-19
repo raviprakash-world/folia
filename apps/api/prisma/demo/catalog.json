@@ -1,0 +1,4169 @@
+{
+ "categories": [
+  {
+   "slug": "plants",
+   "name": "Indoor Plants",
+   "description": "Houseplants shipped established in their nursery pot — for bedrooms, desks and bright corners."
+  },
+  {
+   "slug": "outdoor-plants",
+   "name": "Outdoor Plants",
+   "description": "Flowering and foliage plants for balconies, terraces and gardens."
+  },
+  {
+   "slug": "vessels",
+   "name": "Pots & Planters",
+   "description": "Terracotta, ceramic, cement and hanging planters in sizes to match."
+  },
+  {
+   "slug": "soil-fertilisers",
+   "name": "Soil & Fertilisers",
+   "description": "Potting mixes, composts and plant food for healthier growth."
+  },
+  {
+   "slug": "tools",
+   "name": "Gardening Tools",
+   "description": "The unglamorous things that keep plants alive."
+  },
+  {
+   "slug": "home-decor",
+   "name": "Home Décor",
+   "description": "Plant stands, hangers and shelves that make plants part of the room."
+  }
+ ],
+ "collections": [
+  {
+   "slug": "low-light-plants",
+   "name": "Low-light Plants",
+   "description": "For north-facing rooms and shadier corners."
+  },
+  {
+   "slug": "statement-vessels",
+   "name": "Statement Vessels",
+   "description": "Ceramics and stoneware built to be seen."
+  },
+  {
+   "slug": "gifting",
+   "name": "Gifting",
+   "description": "Ready to arrive boxed, no assembly required."
+  },
+  {
+   "slug": "pet-friendly",
+   "name": "Pet-friendly",
+   "description": "Non-toxic picks for homes with cats and dogs."
+  },
+  {
+   "slug": "flowering",
+   "name": "Flowering",
+   "description": "Plants that bloom, not just green ones."
+  },
+  {
+   "slug": "baskets",
+   "name": "Baskets",
+   "description": "Woven vessels for a softer look."
+  },
+  {
+   "slug": "new-home",
+   "name": "New Home",
+   "description": "Easy-care starter plants for a fresh space."
+  },
+  {
+   "slug": "office",
+   "name": "Office Plants",
+   "description": "Tolerant of fluorescent light and Monday neglect."
+  }
+ ],
+ "sellers": [
+  {
+   "slug": "terracotta-and-fern",
+   "displayName": "Terracotta & Fern",
+   "description": "Small-batch hand-thrown planters and easy-care houseplants, based in Pune.",
+   "city": "Pune",
+   "state": "Maharashtra",
+   "postalCode": "411001",
+   "addressLine1": "14, Demo Lane, Camp",
+   "phone": "+91 98765 43210"
+  },
+  {
+   "slug": "greenleaf-nursery",
+   "displayName": "GreenLeaf Nursery",
+   "description": "Family-run demo nursery growing flowering shrubs and hardy outdoor plants for Bengaluru balconies and gardens.",
+   "city": "Bengaluru",
+   "state": "Karnataka",
+   "postalCode": "560064",
+   "addressLine1": "21, Demo Nursery Road, Yelahanka",
+   "phone": "+91 98765 43211"
+  },
+  {
+   "slug": "urban-roots",
+   "displayName": "Urban Roots",
+   "description": "City-apartment specialists: compact, low-maintenance indoor plants and self-watering planters.",
+   "city": "Hyderabad",
+   "state": "Telangana",
+   "postalCode": "500081",
+   "addressLine1": "8, Demo Enclave, Madhapur",
+   "phone": "+91 98765 43212"
+  },
+  {
+   "slug": "the-balcony-garden",
+   "displayName": "The Balcony Garden",
+   "description": "Everything for a small balcony garden — railing planters, seasonal flowers and beginner-friendly feeds.",
+   "city": "Mumbai",
+   "state": "Maharashtra",
+   "postalCode": "400050",
+   "addressLine1": "5, Demo Heights, Bandra West",
+   "phone": "+91 98765 43213"
+  },
+  {
+   "slug": "earthy-pots",
+   "displayName": "Earthy Pots",
+   "description": "Cement and stone planters cast by hand in Jaipur, in muted earth tones.",
+   "city": "Jaipur",
+   "state": "Rajasthan",
+   "postalCode": "302001",
+   "addressLine1": "32, Demo Workshop Lane, Sanganer",
+   "phone": "+91 98765 43214"
+  },
+  {
+   "slug": "leaf-and-living",
+   "displayName": "Leaf & Living",
+   "description": "Plant stands, hangers and shelving in wood, bamboo and powder-coated metal.",
+   "city": "New Delhi",
+   "state": "Delhi",
+   "postalCode": "110017",
+   "addressLine1": "17, Demo Market, Malviya Nagar",
+   "phone": "+91 98765 43215"
+  },
+  {
+   "slug": "root-and-bloom",
+   "displayName": "Root & Bloom",
+   "description": "Soil mixes, composts and organic plant food, blended in small batches.",
+   "city": "Kolkata",
+   "state": "West Bengal",
+   "postalCode": "700019",
+   "addressLine1": "9, Demo Garden Row, Ballygunge",
+   "phone": "+91 98765 43216"
+  },
+  {
+   "slug": "gardenkart",
+   "displayName": "GardenKart",
+   "description": "Practical gardening tools and hanging planters, dispatched from Ahmedabad.",
+   "city": "Ahmedabad",
+   "state": "Gujarat",
+   "postalCode": "380015",
+   "addressLine1": "44, Demo Complex, Satellite",
+   "phone": "+91 98765 43217"
+  }
+ ],
+ "products": [
+  {
+   "id": "p1",
+   "slug": "monstera-deliciosa",
+   "name": "Monstera Deliciosa",
+   "price": 899,
+   "compareAtPrice": null,
+   "description": "Split, glossy leaves that make one plant feel like a room. Monstera is forgiving — bright indirect light, water when the top inch of soil is dry, and a moss pole once it starts climbing.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "Bestseller",
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 18,
+   "inStock": true,
+   "stockCount": 10,
+   "createdAt": "2026-07-29",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": false
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Weekly"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "90cm"
+    }
+   ],
+   "image": {
+    "file": "monstera-deliciosa.jpg",
+    "alt": "Monstera Deliciosa"
+   }
+  },
+  {
+   "id": "p2",
+   "slug": "fiddle-leaf-fig",
+   "name": "Fiddle Leaf Fig",
+   "price": 1499,
+   "compareAtPrice": null,
+   "description": "The dramatic violin-shaped leaves everyone wants, and the drama to go with them: it dislikes drafts and being moved. Give it a bright spot and leave it there.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": "Advanced",
+   "rating": 4.5,
+   "reviewCount": 31,
+   "inStock": true,
+   "stockCount": 13,
+   "createdAt": "2026-07-20",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Weekly"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if ingested"
+    },
+    {
+     "label": "Mature height",
+     "value": "45cm"
+    }
+   ],
+   "image": {
+    "file": "fiddle-leaf-fig.jpg",
+    "alt": "Fiddle Leaf Fig"
+   }
+  },
+  {
+   "id": "p3",
+   "slug": "snake-plant-laurentii",
+   "name": "Snake Plant Laurentii",
+   "price": 549,
+   "compareAtPrice": null,
+   "description": "Stiff, sword-like leaves edged in pale yellow. Survives low light and missed waterings, which makes it the classic first plant and a good bedroom air-freshening pick.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "New",
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 44,
+   "inStock": true,
+   "stockCount": 16,
+   "createdAt": "2026-07-11",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Weekly"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if ingested"
+    },
+    {
+     "label": "Mature height",
+     "value": "60cm"
+    }
+   ],
+   "image": {
+    "file": "snake-plant-laurentii.jpg",
+    "alt": "Snake Plant Laurentii"
+   }
+  },
+  {
+   "id": "p4",
+   "slug": "pothos-marble-queen",
+   "name": "Pothos Marble Queen",
+   "price": 399,
+   "compareAtPrice": null,
+   "description": "A trailing vine with cream-and-green marbled leaves. Let it hang from a shelf or climb a stake — it roots easily in water if you want to share cuttings.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4,
+   "reviewCount": 57,
+   "inStock": true,
+   "stockCount": 19,
+   "createdAt": "2026-07-02",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": false
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Medium indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Every 10–14 days"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if ingested"
+    },
+    {
+     "label": "Mature height",
+     "value": "105cm"
+    }
+   ],
+   "image": {
+    "file": "pothos-marble-queen.jpg",
+    "alt": "Pothos Marble Queen"
+   }
+  },
+  {
+   "id": "p5",
+   "slug": "bird-s-nest-fern",
+   "name": "Bird's Nest Fern",
+   "price": 449,
+   "compareAtPrice": 599,
+   "description": "Ruffled, bright-green fronds in a tidy rosette. It loves humidity, so a bathroom with a window or a regular misting keeps the leaf tips crisp.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "Sale",
+   "careLevel": "Moderate",
+   "rating": 4.1,
+   "reviewCount": 70,
+   "inStock": true,
+   "stockCount": 22,
+   "createdAt": "2026-06-23",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Medium indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Every 10–14 days"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "60cm"
+    }
+   ],
+   "image": {
+    "file": "bird-s-nest-fern.jpg",
+    "alt": "Bird's Nest Fern"
+   }
+  },
+  {
+   "id": "p6",
+   "slug": "calathea-orbifolia",
+   "name": "Calathea Orbifolia",
+   "price": 699,
+   "compareAtPrice": null,
+   "description": "Wide, rounded leaves with silver-green stripes that fold up at night. Prefers filtered light and steady moisture — a good choice if you like a plant with a bit of personality.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "Low stock",
+   "careLevel": "Moderate",
+   "rating": 4.4,
+   "reviewCount": 83,
+   "inStock": true,
+   "stockCount": 2,
+   "createdAt": "2026-06-14",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Weekly"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "90cm"
+    }
+   ],
+   "image": {
+    "file": "calathea-orbifolia.jpg",
+    "alt": "Calathea Orbifolia"
+   }
+  },
+  {
+   "id": "p7",
+   "slug": "zz-plant",
+   "name": "ZZ Plant",
+   "price": 749,
+   "compareAtPrice": null,
+   "description": "Waxy, deep-green leaves on arching stems that shrug off neglect. Stores water in its rhizomes, so it's happiest when you forget to water it.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "Bestseller",
+   "careLevel": "Easy",
+   "rating": 4,
+   "reviewCount": 96,
+   "inStock": true,
+   "stockCount": 28,
+   "createdAt": "2026-06-05",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": false
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Low light tolerant"
+    },
+    {
+     "label": "Water",
+     "value": "When top 5cm dry"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "90cm"
+    }
+   ],
+   "image": {
+    "file": "zz-plant.jpg",
+    "alt": "ZZ Plant"
+   }
+  },
+  {
+   "id": "p8",
+   "slug": "rubber-plant-burgundy",
+   "name": "Rubber Plant Burgundy",
+   "price": 649,
+   "compareAtPrice": null,
+   "description": "Thick, burgundy-tinted leaves on an upright stem. Grows tall and bold in a bright corner; wipe the leaves occasionally to keep them glossy.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 109,
+   "inStock": true,
+   "stockCount": 31,
+   "createdAt": "2026-05-27",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Weekly"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if ingested"
+    },
+    {
+     "label": "Mature height",
+     "value": "60cm"
+    }
+   ],
+   "image": {
+    "file": "rubber-plant-burgundy.jpg",
+    "alt": "Rubber Plant Burgundy"
+   }
+  },
+  {
+   "id": "p9",
+   "slug": "string-of-pearls",
+   "name": "String of Pearls",
+   "price": 349,
+   "compareAtPrice": null,
+   "description": "Bead-like leaves on trailing strands, ideal for a hanging pot. Give it bright light and let the soil dry out fully between waterings.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "New",
+   "careLevel": "Moderate",
+   "rating": 4.1,
+   "reviewCount": 122,
+   "inStock": true,
+   "stockCount": 34,
+   "createdAt": "2026-05-18",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Medium indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Every 10–14 days"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "60cm"
+    }
+   ],
+   "image": {
+    "file": "string-of-pearls.jpg",
+    "alt": "String of Pearls"
+   }
+  },
+  {
+   "id": "p10",
+   "slug": "peace-lily",
+   "name": "Peace Lily",
+   "price": 499,
+   "compareAtPrice": null,
+   "description": "Dark leaves and white spathes that bloom indoors. It droops visibly when thirsty and perks right back up after watering — an easy plant to read.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 135,
+   "inStock": true,
+   "stockCount": 37,
+   "createdAt": "2026-05-09",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": false
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Medium indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Every 10–14 days"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "45cm"
+    }
+   ],
+   "image": {
+    "file": "peace-lily.jpg",
+    "alt": "Peace Lily"
+   }
+  },
+  {
+   "id": "p11",
+   "slug": "boston-fern",
+   "name": "Boston Fern",
+   "price": 399,
+   "compareAtPrice": 499,
+   "description": "Soft, feathery fronds that look best in a hanging basket. Keep the soil evenly moist and out of direct afternoon sun.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "Sale",
+   "careLevel": "Moderate",
+   "rating": 3.9,
+   "reviewCount": 148,
+   "inStock": true,
+   "stockCount": 40,
+   "createdAt": "2026-04-30",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Low light tolerant"
+    },
+    {
+     "label": "Water",
+     "value": "When top 5cm dry"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if ingested"
+    },
+    {
+     "label": "Mature height",
+     "value": "60cm"
+    }
+   ],
+   "image": {
+    "file": "boston-fern.jpg",
+    "alt": "Boston Fern"
+   }
+  },
+  {
+   "id": "p12",
+   "slug": "areca-palm",
+   "name": "Areca Palm",
+   "price": 799,
+   "compareAtPrice": null,
+   "description": "Feathery, arching fronds that give a room a tropical feel. Needs bright light and regular watering; a fine choice for a living-room corner.",
+   "categorySlug": "plants",
+   "sellerSlug": null,
+   "badge": "Low stock",
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 161,
+   "inStock": true,
+   "stockCount": 2,
+   "createdAt": "2026-04-21",
+   "variants": [
+    {
+     "id": "sm",
+     "label": "Small (10cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "md",
+     "label": "Medium (15cm pot)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "lg",
+     "label": "Large (25cm pot)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Medium indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Every 10–14 days"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "45cm"
+    }
+   ],
+   "image": {
+    "file": "areca-palm.jpg",
+    "alt": "Areca Palm"
+   }
+  },
+  {
+   "id": "p13",
+   "slug": "ceramic-vessel-ash",
+   "name": "Ceramic Vessel — Ash",
+   "price": 899,
+   "compareAtPrice": null,
+   "description": "A matte ash-grey ceramic planter with a soft glaze and a drainage hole with saucer. Sits well beside plain walls and wooden furniture.",
+   "categorySlug": "vessels",
+   "sellerSlug": null,
+   "badge": "Bestseller",
+   "careLevel": null,
+   "rating": 4.7,
+   "reviewCount": 18,
+   "inStock": true,
+   "stockCount": 10,
+   "createdAt": "2026-07-29",
+   "variants": [
+    {
+     "id": "ash",
+     "label": "Ash",
+     "swatch": "#8b8378",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#4a5a5f",
+     "inStock": true
+    },
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#d9c9a8",
+     "inStock": false
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Glazed ceramic"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, includes saucer"
+    },
+    {
+     "label": "Diameter",
+     "value": "20cm"
+    }
+   ],
+   "image": {
+    "file": "ceramic-vessel-ash.jpg",
+    "alt": "Ceramic Vessel — Ash"
+   }
+  },
+  {
+   "id": "p14",
+   "slug": "stone-planter-round",
+   "name": "Stone Planter — Round",
+   "price": 1299,
+   "compareAtPrice": null,
+   "description": "A weighty round planter with a textured stone-look finish. Heavy enough to steady a tall plant and drainage-drilled for healthy roots.",
+   "categorySlug": "vessels",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": null,
+   "rating": 4.3,
+   "reviewCount": 31,
+   "inStock": true,
+   "stockCount": 13,
+   "createdAt": "2026-07-20",
+   "variants": [
+    {
+     "id": "ash",
+     "label": "Ash",
+     "swatch": "#8b8378",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#4a5a5f",
+     "inStock": true
+    },
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#d9c9a8",
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Cast concrete"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, includes saucer"
+    },
+    {
+     "label": "Diameter",
+     "value": "23cm"
+    }
+   ],
+   "image": {
+    "file": "stone-planter-round.jpg",
+    "alt": "Stone Planter — Round"
+   }
+  },
+  {
+   "id": "p15",
+   "slug": "terracotta-pot-set-of-3",
+   "name": "Terracotta Pot Set of 3",
+   "price": 599,
+   "compareAtPrice": null,
+   "description": "Three classic terracotta pots in graduated sizes with drainage holes. Porous clay lets roots breathe — pair them up on a sill or step.",
+   "categorySlug": "vessels",
+   "sellerSlug": null,
+   "badge": "New",
+   "careLevel": null,
+   "rating": 4.6,
+   "reviewCount": 44,
+   "inStock": true,
+   "stockCount": 16,
+   "createdAt": "2026-07-11",
+   "variants": [
+    {
+     "id": "ash",
+     "label": "Ash",
+     "swatch": "#8b8378",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#4a5a5f",
+     "inStock": true
+    },
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#d9c9a8",
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Unglazed clay"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, includes saucer"
+    },
+    {
+     "label": "Diameter",
+     "value": "28cm"
+    }
+   ],
+   "image": {
+    "file": "terracotta-pot-set-of-3.jpg",
+    "alt": "Terracotta Pot Set of 3"
+   }
+  },
+  {
+   "id": "p16",
+   "slug": "woven-plant-basket",
+   "name": "Woven Plant Basket",
+   "price": 749,
+   "compareAtPrice": null,
+   "description": "A hand-woven basket with a removable liner, made to hold a nursery pot. Adds warmth and texture; use the liner to keep it dry inside.",
+   "categorySlug": "vessels",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": null,
+   "rating": 4.4,
+   "reviewCount": 57,
+   "inStock": true,
+   "stockCount": 19,
+   "createdAt": "2026-07-02",
+   "variants": [
+    {
+     "id": "ash",
+     "label": "Ash",
+     "swatch": "#8b8378",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#4a5a5f",
+     "inStock": true
+    },
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#d9c9a8",
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Glazed ceramic"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, includes saucer"
+    },
+    {
+     "label": "Diameter",
+     "value": "15cm"
+    }
+   ],
+   "image": {
+    "file": "woven-plant-basket.jpg",
+    "alt": "Woven Plant Basket"
+   }
+  },
+  {
+   "id": "p17",
+   "slug": "matte-black-cylinder-pot",
+   "name": "Matte Black Cylinder Pot",
+   "price": 649,
+   "compareAtPrice": 799,
+   "description": "A straight-sided matte black cylinder pot with a drainage hole. Clean, modern and easy to style with almost any plant.",
+   "categorySlug": "vessels",
+   "sellerSlug": null,
+   "badge": "Sale",
+   "careLevel": null,
+   "rating": 4.2,
+   "reviewCount": 70,
+   "inStock": true,
+   "stockCount": 22,
+   "createdAt": "2026-06-23",
+   "variants": [
+    {
+     "id": "ash",
+     "label": "Ash",
+     "swatch": "#8b8378",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#4a5a5f",
+     "inStock": true
+    },
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#d9c9a8",
+     "inStock": false
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Glazed ceramic"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, includes saucer"
+    },
+    {
+     "label": "Diameter",
+     "value": "15cm"
+    }
+   ],
+   "image": {
+    "file": "matte-black-cylinder-pot.jpg",
+    "alt": "Matte Black Cylinder Pot"
+   }
+  },
+  {
+   "id": "p18",
+   "slug": "fluted-ceramic-planter",
+   "name": "Fluted Ceramic Planter",
+   "price": 849,
+   "compareAtPrice": null,
+   "description": "Vertical fluting gives this ceramic planter a soft, architectural look. Glazed inside and out, with a drainage hole and saucer.",
+   "categorySlug": "vessels",
+   "sellerSlug": null,
+   "badge": "Low stock",
+   "careLevel": null,
+   "rating": 3.9,
+   "reviewCount": 83,
+   "inStock": true,
+   "stockCount": 2,
+   "createdAt": "2026-06-14",
+   "variants": [
+    {
+     "id": "ash",
+     "label": "Ash",
+     "swatch": "#8b8378",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#4a5a5f",
+     "inStock": true
+    },
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#d9c9a8",
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Glazed ceramic"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, includes saucer"
+    },
+    {
+     "label": "Diameter",
+     "value": "25cm"
+    }
+   ],
+   "image": {
+    "file": "fluted-ceramic-planter.jpg",
+    "alt": "Fluted Ceramic Planter"
+   }
+  },
+  {
+   "id": "p19",
+   "slug": "brass-plant-mister",
+   "name": "Brass Plant Mister",
+   "price": 499,
+   "compareAtPrice": null,
+   "description": "A small brass-finished mister for humidity-loving plants like ferns and calatheas. Fine spray, sturdy pump, good looking on a shelf.",
+   "categorySlug": "tools",
+   "sellerSlug": null,
+   "badge": "Bestseller",
+   "careLevel": null,
+   "rating": 4.4,
+   "reviewCount": 18,
+   "inStock": true,
+   "stockCount": 10,
+   "createdAt": "2026-07-29",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid brass / carbon steel"
+    },
+    {
+     "label": "Care",
+     "value": "Hand wash, dry before storing"
+    }
+   ],
+   "image": {
+    "file": "brass-plant-mister.jpg",
+    "alt": "Brass Plant Mister"
+   }
+  },
+  {
+   "id": "p20",
+   "slug": "precision-pruning-shears",
+   "name": "Precision Pruning Shears",
+   "price": 449,
+   "compareAtPrice": null,
+   "description": "Sharp bypass blades for clean cuts on stems up to 15 mm, with a safety lock and a comfortable grip. Clean cuts help plants heal faster.",
+   "categorySlug": "tools",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": null,
+   "rating": 4.2,
+   "reviewCount": 31,
+   "inStock": true,
+   "stockCount": 13,
+   "createdAt": "2026-07-20",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid brass / carbon steel"
+    },
+    {
+     "label": "Care",
+     "value": "Hand wash, dry before storing"
+    }
+   ],
+   "image": {
+    "file": "precision-pruning-shears.jpg",
+    "alt": "Precision Pruning Shears"
+   }
+  },
+  {
+   "id": "p21",
+   "slug": "soil-moisture-meter",
+   "name": "Soil Moisture Meter",
+   "price": 349,
+   "compareAtPrice": null,
+   "description": "Push the probe into the soil for an instant dry-to-wet reading. No battery needed — it takes the guesswork out of watering.",
+   "categorySlug": "tools",
+   "sellerSlug": null,
+   "badge": "New",
+   "careLevel": null,
+   "rating": 4,
+   "reviewCount": 44,
+   "inStock": true,
+   "stockCount": 16,
+   "createdAt": "2026-07-11",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid brass / carbon steel"
+    },
+    {
+     "label": "Care",
+     "value": "Hand wash, dry before storing"
+    }
+   ],
+   "image": {
+    "file": "soil-moisture-meter.jpg",
+    "alt": "Soil Moisture Meter"
+   }
+  },
+  {
+   "id": "p22",
+   "slug": "watering-can-1-5l",
+   "name": "Watering Can — 1.5L",
+   "price": 549,
+   "compareAtPrice": null,
+   "description": "A 1.5-litre metal can with a long, slim spout that reaches under leaves and into tight corners without splashing.",
+   "categorySlug": "tools",
+   "sellerSlug": null,
+   "badge": null,
+   "careLevel": null,
+   "rating": 4,
+   "reviewCount": 57,
+   "inStock": true,
+   "stockCount": 19,
+   "createdAt": "2026-07-02",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid brass / carbon steel"
+    },
+    {
+     "label": "Care",
+     "value": "Hand wash, dry before storing"
+    }
+   ],
+   "image": {
+    "file": "watering-can-1-5l.jpg",
+    "alt": "Watering Can — 1.5L"
+   }
+  },
+  {
+   "id": "p23",
+   "slug": "bamboo-plant-stakes-set-of-6",
+   "name": "Bamboo Plant Stakes (Set of 6)",
+   "price": 199,
+   "compareAtPrice": 249,
+   "description": "Six natural bamboo stakes (45 cm) to support climbing and top-heavy plants. Tie in gently with garden twine or soft clips.",
+   "categorySlug": "tools",
+   "sellerSlug": null,
+   "badge": "Sale",
+   "careLevel": null,
+   "rating": 4,
+   "reviewCount": 70,
+   "inStock": true,
+   "stockCount": 22,
+   "createdAt": "2026-06-23",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid brass / carbon steel"
+    },
+    {
+     "label": "Care",
+     "value": "Hand wash, dry before storing"
+    }
+   ],
+   "image": {
+    "file": "bamboo-plant-stakes-set-of-6.jpg",
+    "alt": "Bamboo Plant Stakes (Set of 6)"
+   }
+  },
+  {
+   "id": "p24",
+   "slug": "grow-light-full-spectrum",
+   "name": "Grow Light — Full Spectrum",
+   "price": 1299,
+   "compareAtPrice": null,
+   "description": "A full-spectrum LED grow light on a flexible neck, for dim rooms and winter months. Set on a timer for 8–10 hours a day.",
+   "categorySlug": "tools",
+   "sellerSlug": null,
+   "badge": "Low stock",
+   "careLevel": null,
+   "rating": 4.5,
+   "reviewCount": 83,
+   "inStock": true,
+   "stockCount": 2,
+   "createdAt": "2026-06-14",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid brass / carbon steel"
+    },
+    {
+     "label": "Care",
+     "value": "Hand wash, dry before storing"
+    }
+   ],
+   "image": {
+    "file": "grow-light-full-spectrum.jpg",
+    "alt": "Grow Light — Full Spectrum"
+   }
+  },
+  {
+   "id": "p25",
+   "slug": "money-plant-golden-pothos",
+   "name": "Money Plant (Golden Pothos)",
+   "price": 249,
+   "compareAtPrice": null,
+   "description": "The plant found on nearly every Indian windowsill. Trail it from a hanging pot or train it up a stake; it grows happily in soil or in a jar of water.",
+   "categorySlug": "plants",
+   "sellerSlug": "terracotta-and-fern",
+   "badge": "Bestseller",
+   "careLevel": "Easy",
+   "rating": 4.6,
+   "reviewCount": 142,
+   "inStock": true,
+   "stockCount": 60,
+   "createdAt": "2026-08-02",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Low to bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "When top inch is dry"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if chewed"
+    },
+    {
+     "label": "Mature height",
+     "value": "Trails to 1.5 m"
+    }
+   ],
+   "image": {
+    "file": "money-plant-golden-pothos.jpg",
+    "alt": "Money Plant (Golden Pothos)"
+   }
+  },
+  {
+   "id": "p26",
+   "slug": "spider-plant",
+   "name": "Spider Plant",
+   "price": 299,
+   "compareAtPrice": null,
+   "description": "Arching green-and-white leaves and dangling baby plantlets. Tough, quick to grow and safe around cats and dogs.",
+   "categorySlug": "plants",
+   "sellerSlug": "terracotta-and-fern",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.5,
+   "reviewCount": 88,
+   "inStock": true,
+   "stockCount": 45,
+   "createdAt": "2026-08-05",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Weekly"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Yes"
+    },
+    {
+     "label": "Mature height",
+     "value": "40 cm"
+    }
+   ],
+   "image": {
+    "file": "spider-plant.jpg",
+    "alt": "Spider Plant"
+   }
+  },
+  {
+   "id": "p27",
+   "slug": "philodendron-heartleaf",
+   "name": "Philodendron (Heartleaf)",
+   "price": 349,
+   "compareAtPrice": null,
+   "description": "Soft, heart-shaped leaves on a vine that suits a shelf or moss pole. Very forgiving of low light and irregular care.",
+   "categorySlug": "plants",
+   "sellerSlug": "urban-roots",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 63,
+   "inStock": true,
+   "stockCount": 38,
+   "createdAt": "2026-08-08",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Low to medium"
+    },
+    {
+     "label": "Water",
+     "value": "When top inch is dry"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if chewed"
+    },
+    {
+     "label": "Mature height",
+     "value": "Trails to 1.2 m"
+    }
+   ],
+   "image": {
+    "file": "philodendron-heartleaf.jpg",
+    "alt": "Philodendron (Heartleaf)"
+   }
+  },
+  {
+   "id": "p28",
+   "slug": "lucky-bamboo",
+   "name": "Lucky Bamboo (2-layer)",
+   "price": 299,
+   "compareAtPrice": null,
+   "description": "Twisted two-tier stems that grow in water and small pebbles — no soil, no fuss. Change the water every week or two.",
+   "categorySlug": "plants",
+   "sellerSlug": "urban-roots",
+   "badge": "New",
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 51,
+   "inStock": true,
+   "stockCount": 50,
+   "createdAt": "2026-09-01",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Low to medium indirect"
+    },
+    {
+     "label": "Water",
+     "value": "Keep roots submerged"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic to pets"
+    },
+    {
+     "label": "Mature height",
+     "value": "30 cm"
+    }
+   ],
+   "image": {
+    "file": "lucky-bamboo.jpg",
+    "alt": "Lucky Bamboo (2-layer)"
+   }
+  },
+  {
+   "id": "p29",
+   "slug": "bougainvillea",
+   "name": "Bougainvillea",
+   "price": 399,
+   "compareAtPrice": null,
+   "description": "Papery magenta bracts that cover the plant in bloom. Wants full sun and a lean watering hand, and is a natural for a sunny balcony or fence.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "greenleaf-nursery",
+   "badge": "Bestseller",
+   "careLevel": "Moderate",
+   "rating": 4.5,
+   "reviewCount": 97,
+   "inStock": true,
+   "stockCount": 40,
+   "createdAt": "2026-07-25",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Full sun (5+ hours)"
+    },
+    {
+     "label": "Water",
+     "value": "Let soil dry between waterings"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Mildly toxic"
+    },
+    {
+     "label": "Mature height",
+     "value": "1–2 m with training"
+    }
+   ],
+   "image": {
+    "file": "bougainvillea.jpg",
+    "alt": "Bougainvillea"
+   }
+  },
+  {
+   "id": "p30",
+   "slug": "hibiscus",
+   "name": "Hibiscus (Gudhal)",
+   "price": 349,
+   "compareAtPrice": null,
+   "description": "Large, showy flowers on a glossy-leaved shrub — a fixture of Indian gardens and pooja flowers. Best in strong sun with regular water.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "greenleaf-nursery",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 120,
+   "inStock": true,
+   "stockCount": 55,
+   "createdAt": "2026-07-30",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Full sun"
+    },
+    {
+     "label": "Water",
+     "value": "Regular; keep moist"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Generally safe"
+    },
+    {
+     "label": "Mature height",
+     "value": "1–1.5 m"
+    }
+   ],
+   "image": {
+    "file": "hibiscus.jpg",
+    "alt": "Hibiscus (Gudhal)"
+   }
+  },
+  {
+   "id": "p31",
+   "slug": "jasmine-mogra",
+   "name": "Jasmine (Mogra)",
+   "price": 329,
+   "compareAtPrice": null,
+   "description": "Sweetly scented white flowers in the evening. Give it sun, a good pot and regular feeding, and it will scent a whole balcony.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "greenleaf-nursery",
+   "badge": null,
+   "careLevel": "Moderate",
+   "rating": 4.6,
+   "reviewCount": 110,
+   "inStock": true,
+   "stockCount": 35,
+   "createdAt": "2026-08-10",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Full to partial sun"
+    },
+    {
+     "label": "Water",
+     "value": "Regular"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Generally safe"
+    },
+    {
+     "label": "Mature height",
+     "value": "0.8–1.5 m"
+    }
+   ],
+   "image": {
+    "file": "jasmine-mogra.jpg",
+    "alt": "Jasmine (Mogra)"
+   }
+  },
+  {
+   "id": "p32",
+   "slug": "rose-desi-gulab",
+   "name": "Rose (Desi Gulab)",
+   "price": 299,
+   "compareAtPrice": null,
+   "description": "A fragrant, hardy country rose that keeps flowering in pots. Needs at least five hours of sun and a prune after each flush.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "the-balcony-garden",
+   "badge": null,
+   "careLevel": "Moderate",
+   "rating": 4.3,
+   "reviewCount": 76,
+   "inStock": true,
+   "stockCount": 42,
+   "createdAt": "2026-08-12",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Full sun"
+    },
+    {
+     "label": "Water",
+     "value": "Regular"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Safe (thorns!)"
+    },
+    {
+     "label": "Mature height",
+     "value": "0.6–1 m"
+    }
+   ],
+   "image": {
+    "file": "rose-desi-gulab.jpg",
+    "alt": "Rose (Desi Gulab)"
+   }
+  },
+  {
+   "id": "p33",
+   "slug": "marigold-genda",
+   "name": "Marigold (Genda)",
+   "price": 149,
+   "compareAtPrice": null,
+   "description": "Cheerful orange-and-yellow blooms, quick to flower from a nursery pot. Good for festival garlands and for keeping pests off nearby plants.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "the-balcony-garden",
+   "badge": "Sale",
+   "careLevel": "Easy",
+   "rating": 4.2,
+   "reviewCount": 59,
+   "inStock": true,
+   "stockCount": 80,
+   "createdAt": "2026-08-18",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Full sun"
+    },
+    {
+     "label": "Water",
+     "value": "Regular"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Generally safe"
+    },
+    {
+     "label": "Mature height",
+     "value": "30–45 cm"
+    }
+   ],
+   "image": {
+    "file": "marigold-genda.jpg",
+    "alt": "Marigold (Genda)"
+   }
+  },
+  {
+   "id": "p34",
+   "slug": "ixora",
+   "name": "Ixora (Rugmini)",
+   "price": 379,
+   "compareAtPrice": null,
+   "description": "Clusters of small red-orange flowers on a dense evergreen shrub. Loves warm weather, sun and slightly acidic soil.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "greenleaf-nursery",
+   "badge": null,
+   "careLevel": "Moderate",
+   "rating": 4.4,
+   "reviewCount": 44,
+   "inStock": true,
+   "stockCount": 30,
+   "createdAt": "2026-08-20",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Full sun"
+    },
+    {
+     "label": "Water",
+     "value": "Regular"
+    },
+    {
+     "label": "Pet safe",
+     "value": "Generally safe"
+    },
+    {
+     "label": "Mature height",
+     "value": "0.6–1.2 m"
+    }
+   ],
+   "image": {
+    "file": "ixora.jpg",
+    "alt": "Ixora (Rugmini)"
+   }
+  },
+  {
+   "id": "p35",
+   "slug": "croton-petra",
+   "name": "Croton (Petra)",
+   "price": 449,
+   "compareAtPrice": null,
+   "description": "Bold, veined leaves in green, yellow, orange and red. Colours deepen in bright light; keep it out of cold drafts.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "greenleaf-nursery",
+   "badge": null,
+   "careLevel": "Moderate",
+   "rating": 4.5,
+   "reviewCount": 68,
+   "inStock": true,
+   "stockCount": 28,
+   "createdAt": "2026-08-22",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright, some direct sun"
+    },
+    {
+     "label": "Water",
+     "value": "Keep evenly moist"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic if eaten"
+    },
+    {
+     "label": "Mature height",
+     "value": "0.6–1 m"
+    }
+   ],
+   "image": {
+    "file": "croton-petra.jpg",
+    "alt": "Croton (Petra)"
+   }
+  },
+  {
+   "id": "p36",
+   "slug": "aloe-vera",
+   "name": "Aloe Vera",
+   "price": 199,
+   "compareAtPrice": null,
+   "description": "A succulent that does well on a sunny sill or balcony. Water only when the soil is completely dry; the gel is a useful first-aid plant.",
+   "categorySlug": "outdoor-plants",
+   "sellerSlug": "urban-roots",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.7,
+   "reviewCount": 201,
+   "inStock": true,
+   "stockCount": 90,
+   "createdAt": "2026-07-18",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Light",
+     "value": "Bright, some direct sun"
+    },
+    {
+     "label": "Water",
+     "value": "Every 2 weeks"
+    },
+    {
+     "label": "Pet safe",
+     "value": "No — toxic to pets"
+    },
+    {
+     "label": "Mature height",
+     "value": "40 cm"
+    }
+   ],
+   "image": {
+    "file": "aloe-vera.jpg",
+    "alt": "Aloe Vera"
+   }
+  },
+  {
+   "id": "p37",
+   "slug": "classic-terracotta-planter",
+   "name": "Classic Terracotta Planter (8 in)",
+   "price": 249,
+   "compareAtPrice": null,
+   "description": "A plain, honest clay pot with a drainage hole. The porous walls let soil dry evenly, which forgives over-watering.",
+   "categorySlug": "vessels",
+   "sellerSlug": "terracotta-and-fern",
+   "badge": "Bestseller",
+   "careLevel": "Easy",
+   "rating": 4.5,
+   "reviewCount": 175,
+   "inStock": true,
+   "stockCount": 120,
+   "createdAt": "2026-07-12",
+   "variants": [
+    {
+     "id": "8in",
+     "label": "8 inch (20 cm)",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "10in",
+     "label": "10 inch (25 cm)",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Kiln-fired terracotta"
+    },
+    {
+     "label": "Diameter",
+     "value": "20 cm (8 in)"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, with hole"
+    },
+    {
+     "label": "Colour",
+     "value": "Natural terracotta"
+    }
+   ],
+   "image": {
+    "file": "classic-terracotta-planter.jpg",
+    "alt": "Classic Terracotta Planter (8 in)"
+   }
+  },
+  {
+   "id": "p38",
+   "slug": "ribbed-cement-pot",
+   "name": "Ribbed Cement Pot",
+   "price": 449,
+   "compareAtPrice": 599,
+   "description": "Hand-cast cement with vertical ribs and a matte finish that ages gracefully. Heavy and stable, with a drainage hole and rubber feet.",
+   "categorySlug": "vessels",
+   "sellerSlug": "earthy-pots",
+   "badge": "Sale",
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 64,
+   "inStock": true,
+   "stockCount": 40,
+   "createdAt": "2026-08-03",
+   "variants": [
+    {
+     "id": "sand",
+     "label": "Sand",
+     "swatch": "#C9B99A",
+     "inStock": true
+    },
+    {
+     "id": "slate",
+     "label": "Slate",
+     "swatch": "#5C6166",
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Cement"
+    },
+    {
+     "label": "Diameter",
+     "value": "15 cm"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, with hole"
+    },
+    {
+     "label": "Weight",
+     "value": "1.4 kg"
+    }
+   ],
+   "image": {
+    "file": "ribbed-cement-pot.jpg",
+    "alt": "Ribbed Cement Pot"
+   }
+  },
+  {
+   "id": "p39",
+   "slug": "hanging-macrame-planter",
+   "name": "Hanging Macramé Planter",
+   "price": 399,
+   "compareAtPrice": null,
+   "description": "A hand-knotted cotton macramé hanger with a ceramic-glazed pot. Hangs from a ceiling hook or curtain rod to free up floor space.",
+   "categorySlug": "vessels",
+   "sellerSlug": "gardenkart",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 72,
+   "inStock": true,
+   "stockCount": 55,
+   "createdAt": "2026-08-06",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Cotton cord + ceramic pot"
+    },
+    {
+     "label": "Pot diameter",
+     "value": "12 cm"
+    },
+    {
+     "label": "Length",
+     "value": "90 cm"
+    },
+    {
+     "label": "Drainage",
+     "value": "Pot has hole + saucer"
+    }
+   ],
+   "image": {
+    "file": "hanging-macrame-planter.jpg",
+    "alt": "Hanging Macramé Planter"
+   }
+  },
+  {
+   "id": "p40",
+   "slug": "self-watering-planter",
+   "name": "Self-Watering Planter",
+   "price": 549,
+   "compareAtPrice": null,
+   "description": "A two-part pot with a hidden water reservoir and a water-level indicator — good for busy weeks and short trips away.",
+   "categorySlug": "vessels",
+   "sellerSlug": "urban-roots",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 58,
+   "inStock": true,
+   "stockCount": 60,
+   "createdAt": "2026-08-14",
+   "variants": [
+    {
+     "id": "white",
+     "label": "White",
+     "swatch": "#F2F0EA",
+     "inStock": true
+    },
+    {
+     "id": "grey",
+     "label": "Grey",
+     "swatch": "#8A8D8F",
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Food-grade polypropylene"
+    },
+    {
+     "label": "Diameter",
+     "value": "18 cm"
+    },
+    {
+     "label": "Reservoir",
+     "value": "About 500 ml"
+    },
+    {
+     "label": "Colour",
+     "value": "White"
+    }
+   ],
+   "image": {
+    "file": "self-watering-planter.jpg",
+    "alt": "Self-Watering Planter"
+   }
+  },
+  {
+   "id": "p41",
+   "slug": "balcony-railing-planter",
+   "name": "Balcony Railing Planter",
+   "price": 599,
+   "compareAtPrice": null,
+   "description": "A long rectangular planter with adjustable hooks that grip a railing. Gives balcony herbs and flowers room without using floor space.",
+   "categorySlug": "vessels",
+   "sellerSlug": "the-balcony-garden",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.2,
+   "reviewCount": 47,
+   "inStock": true,
+   "stockCount": 35,
+   "createdAt": "2026-08-16",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "UV-stabilised plastic"
+    },
+    {
+     "label": "Length",
+     "value": "60 cm"
+    },
+    {
+     "label": "Drainage",
+     "value": "Yes, with tray"
+    },
+    {
+     "label": "Fits rails",
+     "value": "Up to 6 cm wide"
+    }
+   ],
+   "image": {
+    "file": "balcony-railing-planter.jpg",
+    "alt": "Balcony Railing Planter"
+   }
+  },
+  {
+   "id": "p42",
+   "slug": "organic-potting-mix",
+   "name": "Organic Potting Mix (5 kg)",
+   "price": 299,
+   "compareAtPrice": null,
+   "description": "A ready-to-use blend of cocopeat, compost and perlite for pots and planters. Light, well-draining and pre-moistened.",
+   "categorySlug": "soil-fertilisers",
+   "sellerSlug": "root-and-bloom",
+   "badge": "Bestseller",
+   "careLevel": "Easy",
+   "rating": 4.6,
+   "reviewCount": 133,
+   "inStock": true,
+   "stockCount": 150,
+   "createdAt": "2026-07-08",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Weight",
+     "value": "5 kg"
+    },
+    {
+     "label": "Ingredients",
+     "value": "Cocopeat, compost, perlite"
+    },
+    {
+     "label": "Suitable for",
+     "value": "Most indoor and outdoor pots"
+    },
+    {
+     "label": "Certified",
+     "value": "Not certified organic"
+    }
+   ],
+   "image": {
+    "file": "organic-potting-mix.jpg",
+    "alt": "Organic Potting Mix (5 kg)"
+   }
+  },
+  {
+   "id": "p43",
+   "slug": "vermicompost",
+   "name": "Vermicompost (2 kg)",
+   "price": 199,
+   "compareAtPrice": null,
+   "description": "Worm-processed compost that feeds plants slowly and improves soil structure. Mix a handful into the top soil once a month.",
+   "categorySlug": "soil-fertilisers",
+   "sellerSlug": "root-and-bloom",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.5,
+   "reviewCount": 95,
+   "inStock": true,
+   "stockCount": 140,
+   "createdAt": "2026-07-10",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Weight",
+     "value": "2 kg"
+    },
+    {
+     "label": "Use",
+     "value": "Mix into top soil monthly"
+    },
+    {
+     "label": "Form",
+     "value": "Dry, crumbly"
+    },
+    {
+     "label": "Suitable for",
+     "value": "All plants"
+    }
+   ],
+   "image": {
+    "file": "vermicompost.jpg",
+    "alt": "Vermicompost (2 kg)"
+   }
+  },
+  {
+   "id": "p44",
+   "slug": "neem-cake-powder",
+   "name": "Neem Cake Powder (1 kg)",
+   "price": 179,
+   "compareAtPrice": null,
+   "description": "Ground neem seed cake — a slow-release feed that also discourages soil pests. Use a spoonful per pot and water in.",
+   "categorySlug": "soil-fertilisers",
+   "sellerSlug": "root-and-bloom",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 81,
+   "inStock": true,
+   "stockCount": 110,
+   "createdAt": "2026-07-14",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Weight",
+     "value": "1 kg"
+    },
+    {
+     "label": "Use",
+     "value": "1–2 tbsp per pot, monthly"
+    },
+    {
+     "label": "Form",
+     "value": "Powder"
+    },
+    {
+     "label": "Note",
+     "value": "Strong smell at first"
+    }
+   ],
+   "image": {
+    "file": "neem-cake-powder.jpg",
+    "alt": "Neem Cake Powder (1 kg)"
+   }
+  },
+  {
+   "id": "p45",
+   "slug": "cocopeat-block",
+   "name": "Cocopeat Block (5 kg)",
+   "price": 249,
+   "compareAtPrice": null,
+   "description": "A compressed coir block that expands into about 25 litres of soft, moisture-holding growing medium. Mix with soil or compost.",
+   "categorySlug": "soil-fertilisers",
+   "sellerSlug": "root-and-bloom",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 74,
+   "inStock": true,
+   "stockCount": 100,
+   "createdAt": "2026-07-16",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Weight",
+     "value": "5 kg (dry)"
+    },
+    {
+     "label": "Expands to",
+     "value": "About 25 L"
+    },
+    {
+     "label": "Form",
+     "value": "Compressed block"
+    },
+    {
+     "label": "Use",
+     "value": "Mix with soil/compost"
+    }
+   ],
+   "image": {
+    "file": "cocopeat-block.jpg",
+    "alt": "Cocopeat Block (5 kg)"
+   }
+  },
+  {
+   "id": "p46",
+   "slug": "perlite",
+   "name": "Perlite (1 L)",
+   "price": 149,
+   "compareAtPrice": null,
+   "description": "Light, porous volcanic glass that keeps potting mixes airy and free-draining. Mix in up to a third by volume for succulents.",
+   "categorySlug": "soil-fertilisers",
+   "sellerSlug": "root-and-bloom",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 39,
+   "inStock": true,
+   "stockCount": 90,
+   "createdAt": "2026-07-20",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Volume",
+     "value": "1 litre"
+    },
+    {
+     "label": "Use",
+     "value": "Aerating potting mixes"
+    },
+    {
+     "label": "Form",
+     "value": "Small white granules"
+    },
+    {
+     "label": "Suitable for",
+     "value": "Succulents, aroids, seedlings"
+    }
+   ],
+   "image": {
+    "file": "perlite.jpg",
+    "alt": "Perlite (1 L)"
+   }
+  },
+  {
+   "id": "p47",
+   "slug": "all-purpose-plant-fertiliser",
+   "name": "All-purpose Plant Fertiliser (500 g)",
+   "price": 229,
+   "compareAtPrice": null,
+   "description": "A balanced granular NPK feed for foliage and flowering plants alike. Sprinkle around the plant every two to three weeks in the growing season.",
+   "categorySlug": "soil-fertilisers",
+   "sellerSlug": "the-balcony-garden",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.2,
+   "reviewCount": 66,
+   "inStock": true,
+   "stockCount": 120,
+   "createdAt": "2026-07-22",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Weight",
+     "value": "500 g"
+    },
+    {
+     "label": "Type",
+     "value": "Granular NPK"
+    },
+    {
+     "label": "Use",
+     "value": "Every 2–3 weeks"
+    },
+    {
+     "label": "Suitable for",
+     "value": "Indoor and outdoor plants"
+    }
+   ],
+   "image": {
+    "file": "all-purpose-plant-fertiliser.jpg",
+    "alt": "All-purpose Plant Fertiliser (500 g)"
+   }
+  },
+  {
+   "id": "p48",
+   "slug": "gardening-gloves",
+   "name": "Gardening Gloves",
+   "price": 199,
+   "compareAtPrice": null,
+   "description": "Breathable gloves with a nitrile-dipped palm for grip and thorn protection. Machine washable.",
+   "categorySlug": "tools",
+   "sellerSlug": "gardenkart",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 92,
+   "inStock": true,
+   "stockCount": 100,
+   "createdAt": "2026-07-05",
+   "variants": [
+    {
+     "id": "m",
+     "label": "Medium",
+     "swatch": null,
+     "inStock": true
+    },
+    {
+     "id": "l",
+     "label": "Large",
+     "swatch": null,
+     "inStock": true
+    }
+   ],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Polyester with nitrile palm"
+    },
+    {
+     "label": "Size",
+     "value": "M/L"
+    },
+    {
+     "label": "Care",
+     "value": "Machine wash cold"
+    },
+    {
+     "label": "Pair",
+     "value": "1 pair"
+    }
+   ],
+   "image": {
+    "file": "gardening-gloves.jpg",
+    "alt": "Gardening Gloves"
+   }
+  },
+  {
+   "id": "p49",
+   "slug": "hand-trowel",
+   "name": "Hand Trowel",
+   "price": 249,
+   "compareAtPrice": null,
+   "description": "A rust-resistant steel trowel with a rubber-grip handle, sized for repotting and planting out seedlings.",
+   "categorySlug": "tools",
+   "sellerSlug": "gardenkart",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 85,
+   "inStock": true,
+   "stockCount": 80,
+   "createdAt": "2026-07-06",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Carbon steel + rubber grip"
+    },
+    {
+     "label": "Length",
+     "value": "30 cm"
+    },
+    {
+     "label": "Blade",
+     "value": "Polished, rust-resistant"
+    },
+    {
+     "label": "Use",
+     "value": "Repotting, planting"
+    }
+   ],
+   "image": {
+    "file": "hand-trowel.jpg",
+    "alt": "Hand Trowel"
+   }
+  },
+  {
+   "id": "p50",
+   "slug": "wooden-plant-stand",
+   "name": "Wooden Plant Stand",
+   "price": 899,
+   "compareAtPrice": null,
+   "description": "A tall stand in solid mango wood with a natural oiled finish. Lifts a plant to window height and adds a bit of furniture-grade warmth.",
+   "categorySlug": "home-decor",
+   "sellerSlug": "leaf-and-living",
+   "badge": "Bestseller",
+   "careLevel": "Easy",
+   "rating": 4.5,
+   "reviewCount": 101,
+   "inStock": true,
+   "stockCount": 25,
+   "createdAt": "2026-07-28",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Solid mango wood"
+    },
+    {
+     "label": "Height",
+     "value": "45 cm"
+    },
+    {
+     "label": "Top diameter",
+     "value": "25 cm"
+    },
+    {
+     "label": "Assembly",
+     "value": "Screw-on legs"
+    }
+   ],
+   "image": {
+    "file": "wooden-plant-stand.jpg",
+    "alt": "Wooden Plant Stand"
+   }
+  },
+  {
+   "id": "p51",
+   "slug": "metal-plant-stand",
+   "name": "Metal Plant Stand",
+   "price": 749,
+   "compareAtPrice": null,
+   "description": "A slim powder-coated iron stand with a round top and three tapered legs. Light to move, sturdy under a full pot.",
+   "categorySlug": "home-decor",
+   "sellerSlug": "leaf-and-living",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 57,
+   "inStock": true,
+   "stockCount": 30,
+   "createdAt": "2026-08-01",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Powder-coated iron"
+    },
+    {
+     "label": "Height",
+     "value": "40 cm"
+    },
+    {
+     "label": "Load",
+     "value": "Up to 8 kg"
+    },
+    {
+     "label": "Colour",
+     "value": "Matte black"
+    }
+   ],
+   "image": {
+    "file": "metal-plant-stand.jpg",
+    "alt": "Metal Plant Stand"
+   }
+  },
+  {
+   "id": "p52",
+   "slug": "macrame-plant-hanger",
+   "name": "Macramé Plant Hanger",
+   "price": 299,
+   "compareAtPrice": null,
+   "description": "A hand-knotted cotton hanger that fits pots up to 8 inches. Comes with a ceiling hook and a brass ring.",
+   "categorySlug": "home-decor",
+   "sellerSlug": "leaf-and-living",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.2,
+   "reviewCount": 84,
+   "inStock": true,
+   "stockCount": 70,
+   "createdAt": "2026-08-04",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Cotton cord"
+    },
+    {
+     "label": "Length",
+     "value": "100 cm"
+    },
+    {
+     "label": "Fits pots",
+     "value": "Up to 20 cm"
+    },
+    {
+     "label": "Colour",
+     "value": "Natural"
+    }
+   ],
+   "image": {
+    "file": "macrame-plant-hanger.jpg",
+    "alt": "Macramé Plant Hanger"
+   }
+  },
+  {
+   "id": "p53",
+   "slug": "decorative-pebbles",
+   "name": "Decorative Pebbles (1 kg)",
+   "price": 179,
+   "compareAtPrice": null,
+   "description": "Smooth white river pebbles for topping soil, filling planters or lining a drip tray. They also help hold in moisture.",
+   "categorySlug": "home-decor",
+   "sellerSlug": "earthy-pots",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.1,
+   "reviewCount": 49,
+   "inStock": true,
+   "stockCount": 80,
+   "createdAt": "2026-08-09",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Weight",
+     "value": "1 kg"
+    },
+    {
+     "label": "Colour",
+     "value": "White"
+    },
+    {
+     "label": "Size",
+     "value": "1–2 cm"
+    },
+    {
+     "label": "Use",
+     "value": "Top dressing, drip trays"
+    }
+   ],
+   "image": {
+    "file": "decorative-pebbles.jpg",
+    "alt": "Decorative Pebbles (1 kg)"
+   }
+  },
+  {
+   "id": "p54",
+   "slug": "bamboo-planter-stand",
+   "name": "Bamboo Planter Stand",
+   "price": 649,
+   "compareAtPrice": null,
+   "description": "A three-tier bamboo stand that lets you group small pots together. Naturally light and easy to move between rooms.",
+   "categorySlug": "home-decor",
+   "sellerSlug": "leaf-and-living",
+   "badge": null,
+   "careLevel": "Easy",
+   "rating": 4.3,
+   "reviewCount": 38,
+   "inStock": true,
+   "stockCount": 22,
+   "createdAt": "2026-08-11",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Natural bamboo"
+    },
+    {
+     "label": "Tiers",
+     "value": "3"
+    },
+    {
+     "label": "Height",
+     "value": "80 cm"
+    },
+    {
+     "label": "Assembly",
+     "value": "Screw-together"
+    }
+   ],
+   "image": {
+    "file": "bamboo-planter-stand.jpg",
+    "alt": "Bamboo Planter Stand"
+   }
+  },
+  {
+   "id": "p55",
+   "slug": "indoor-plant-shelf",
+   "name": "Indoor Plant Shelf",
+   "price": 1199,
+   "compareAtPrice": 1499,
+   "description": "A wall-mounted, two-shelf display in matte-finished wood. Holds a few small pots at eye level without taking up floor space.",
+   "categorySlug": "home-decor",
+   "sellerSlug": "leaf-and-living",
+   "badge": "Sale",
+   "careLevel": "Easy",
+   "rating": 4.4,
+   "reviewCount": 33,
+   "inStock": true,
+   "stockCount": 15,
+   "createdAt": "2026-08-24",
+   "variants": [],
+   "specs": [
+    {
+     "label": "Material",
+     "value": "Engineered wood"
+    },
+    {
+     "label": "Size",
+     "value": "60 × 15 × 45 cm"
+    },
+    {
+     "label": "Load",
+     "value": "5 kg per shelf"
+    },
+    {
+     "label": "Mounting",
+     "value": "Wall screws included"
+    }
+   ],
+   "image": {
+    "file": "indoor-plant-shelf.jpg",
+    "alt": "Indoor Plant Shelf"
+   }
+  }
+ ],
+ "reviews": [
+  {
+   "productId": "p1",
+   "author": "Divya L.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-08-09",
+   "verified": true
+  },
+  {
+   "productId": "p1",
+   "author": "Amit Z.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Monstera Deliciosa itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-08-28",
+   "verified": true
+  },
+  {
+   "productId": "p1",
+   "author": "Kavya N.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-09-10",
+   "verified": false
+  },
+  {
+   "productId": "p2",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Fiddle Leaf Fig itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-08-15",
+   "verified": true
+  },
+  {
+   "productId": "p2",
+   "author": "Sneha R.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-08-23",
+   "verified": true
+  },
+  {
+   "productId": "p2",
+   "author": "Karthik V.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-08-29",
+   "verified": false
+  },
+  {
+   "productId": "p3",
+   "author": "Karthik V.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-08-05",
+   "verified": true
+  },
+  {
+   "productId": "p3",
+   "author": "Lakshmi Q.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Snake Plant Laurentii came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-08-06",
+   "verified": true
+  },
+  {
+   "productId": "p3",
+   "author": "Arjun T.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-08-11",
+   "verified": false
+  },
+  {
+   "productId": "p4",
+   "author": "Arjun T.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Pothos Marble Queen itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-07-21",
+   "verified": true
+  },
+  {
+   "productId": "p4",
+   "author": "Divya L.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-08-03",
+   "verified": true
+  },
+  {
+   "productId": "p4",
+   "author": "Amit Z.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-08-05",
+   "verified": false
+  },
+  {
+   "productId": "p5",
+   "author": "Arjun T.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-07-12",
+   "verified": true
+  },
+  {
+   "productId": "p5",
+   "author": "Divya L.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-07-19",
+   "verified": true
+  },
+  {
+   "productId": "p5",
+   "author": "Amit Z.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-07-27",
+   "verified": false
+  },
+  {
+   "productId": "p6",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-07-08",
+   "verified": true
+  },
+  {
+   "productId": "p6",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Calathea Orbifolia came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-06-29",
+   "verified": true
+  },
+  {
+   "productId": "p6",
+   "author": "Aditya G.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-07-12",
+   "verified": false
+  },
+  {
+   "productId": "p7",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The ZZ Plant came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-07-02",
+   "verified": true
+  },
+  {
+   "productId": "p7",
+   "author": "Manoj H.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-06-30",
+   "verified": true
+  },
+  {
+   "productId": "p7",
+   "author": "Meera K.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-07-16",
+   "verified": false
+  },
+  {
+   "productId": "p8",
+   "author": "Harsh Y.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-06-12",
+   "verified": true
+  },
+  {
+   "productId": "p8",
+   "author": "Sneha R.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-06-27",
+   "verified": true
+  },
+  {
+   "productId": "p8",
+   "author": "Karthik V.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-06-28",
+   "verified": false
+  },
+  {
+   "productId": "p9",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The String of Pearls came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-06-19",
+   "verified": true
+  },
+  {
+   "productId": "p9",
+   "author": "Manoj H.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-06-05",
+   "verified": true
+  },
+  {
+   "productId": "p9",
+   "author": "Meera K.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-06-16",
+   "verified": false
+  },
+  {
+   "productId": "p10",
+   "author": "Siddharth A.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-05-21",
+   "verified": true
+  },
+  {
+   "productId": "p10",
+   "author": "Ananya S.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-06-15",
+   "verified": true
+  },
+  {
+   "productId": "p10",
+   "author": "Rohan D.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-06-09",
+   "verified": false
+  },
+  {
+   "productId": "p11",
+   "author": "Tanvi W.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-05-10",
+   "verified": true
+  },
+  {
+   "productId": "p11",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Boston Fern itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-06-01",
+   "verified": true
+  },
+  {
+   "productId": "p11",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-05-23",
+   "verified": false
+  },
+  {
+   "productId": "p12",
+   "author": "Aditya G.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-05-19",
+   "verified": true
+  },
+  {
+   "productId": "p12",
+   "author": "Tanvi W.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-05-16",
+   "verified": true
+  },
+  {
+   "productId": "p12",
+   "author": "Vikram P.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-06-01",
+   "verified": false
+  },
+  {
+   "productId": "p13",
+   "author": "Karthik V.",
+   "rating": 4,
+   "title": "Nice, slightly small",
+   "body": "Lovely piece but a little smaller than I had imagined; check the diameter before ordering.",
+   "date": "2026-08-08",
+   "verified": true
+  },
+  {
+   "productId": "p13",
+   "author": "Lakshmi Q.",
+   "rating": 5,
+   "title": "Solid value",
+   "body": "Better finish than similar pots I've bought elsewhere at this price.",
+   "date": "2026-09-03",
+   "verified": true
+  },
+  {
+   "productId": "p13",
+   "author": "Arjun T.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-08-28",
+   "verified": false
+  },
+  {
+   "productId": "p14",
+   "author": "Karthik V.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-07-30",
+   "verified": true
+  },
+  {
+   "productId": "p14",
+   "author": "Lakshmi Q.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-08-25",
+   "verified": true
+  },
+  {
+   "productId": "p14",
+   "author": "Arjun T.",
+   "rating": 4,
+   "title": "Looks great on my balcony",
+   "body": "Sturdy and well made. Colour is slightly different in daylight but I like it.",
+   "date": "2026-08-25",
+   "verified": false
+  },
+  {
+   "productId": "p15",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-07-22",
+   "verified": true
+  },
+  {
+   "productId": "p15",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-08-09",
+   "verified": true
+  },
+  {
+   "productId": "p15",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Looks great on my balcony",
+   "body": "Sturdy and well made. Colour is slightly different in daylight but I like it.",
+   "date": "2026-08-08",
+   "verified": false
+  },
+  {
+   "productId": "p16",
+   "author": "Kavya N.",
+   "rating": 5,
+   "title": "Solid value",
+   "body": "Better finish than similar pots I've bought elsewhere at this price.",
+   "date": "2026-07-12",
+   "verified": true
+  },
+  {
+   "productId": "p16",
+   "author": "Siddharth A.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-07-24",
+   "verified": true
+  },
+  {
+   "productId": "p16",
+   "author": "Ananya S.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-08-06",
+   "verified": false
+  },
+  {
+   "productId": "p17",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Nice, slightly small",
+   "body": "Lovely piece but a little smaller than I had imagined; check the diameter before ordering.",
+   "date": "2026-07-04",
+   "verified": true
+  },
+  {
+   "productId": "p17",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Solid value",
+   "body": "Better finish than similar pots I've bought elsewhere at this price.",
+   "date": "2026-07-15",
+   "verified": true
+  },
+  {
+   "productId": "p17",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-07-23",
+   "verified": false
+  },
+  {
+   "productId": "p18",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-07-15",
+   "verified": true
+  },
+  {
+   "productId": "p18",
+   "author": "Aditya G.",
+   "rating": 4,
+   "title": "Looks great on my balcony",
+   "body": "Sturdy and well made. Colour is slightly different in daylight but I like it.",
+   "date": "2026-07-12",
+   "verified": true
+  },
+  {
+   "productId": "p18",
+   "author": "Tanvi W.",
+   "rating": 5,
+   "title": "Well packed",
+   "body": "Arrived with no chips or cracks — wrapped properly in paper and a box.",
+   "date": "2026-07-10",
+   "verified": false
+  },
+  {
+   "productId": "p19",
+   "author": "Aditya G.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-08-26",
+   "verified": true
+  },
+  {
+   "productId": "p19",
+   "author": "Tanvi W.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-08-23",
+   "verified": true
+  },
+  {
+   "productId": "p19",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-08-25",
+   "verified": false
+  },
+  {
+   "productId": "p20",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-07-31",
+   "verified": true
+  },
+  {
+   "productId": "p20",
+   "author": "Sneha R.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-08-08",
+   "verified": true
+  },
+  {
+   "productId": "p20",
+   "author": "Karthik V.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-08-16",
+   "verified": false
+  },
+  {
+   "productId": "p21",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-08-06",
+   "verified": true
+  },
+  {
+   "productId": "p21",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Solid and useful",
+   "body": "Well built for the price and comfortable to use for a long time.",
+   "date": "2026-08-17",
+   "verified": true
+  },
+  {
+   "productId": "p21",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-08-21",
+   "verified": false
+  },
+  {
+   "productId": "p22",
+   "author": "Sneha R.",
+   "rating": 5,
+   "title": "Solid and useful",
+   "body": "Well built for the price and comfortable to use for a long time.",
+   "date": "2026-07-20",
+   "verified": true
+  },
+  {
+   "productId": "p22",
+   "author": "Karthik V.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-08-03",
+   "verified": true
+  },
+  {
+   "productId": "p22",
+   "author": "Lakshmi Q.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-08-02",
+   "verified": false
+  },
+  {
+   "productId": "p23",
+   "author": "Siddharth A.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-07-15",
+   "verified": true
+  },
+  {
+   "productId": "p23",
+   "author": "Ananya S.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-07-21",
+   "verified": true
+  },
+  {
+   "productId": "p23",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-07-21",
+   "verified": false
+  },
+  {
+   "productId": "p24",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-07-07",
+   "verified": true
+  },
+  {
+   "productId": "p24",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-07-12",
+   "verified": true
+  },
+  {
+   "productId": "p24",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Solid and useful",
+   "body": "Well built for the price and comfortable to use for a long time.",
+   "date": "2026-07-05",
+   "verified": false
+  },
+  {
+   "productId": "p25",
+   "author": "Neha J.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-08-11",
+   "verified": true
+  },
+  {
+   "productId": "p25",
+   "author": "Harsh Y.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-09-01",
+   "verified": true
+  },
+  {
+   "productId": "p25",
+   "author": "Sneha R.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-08-23",
+   "verified": false
+  },
+  {
+   "productId": "p26",
+   "author": "Kavya N.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-08-20",
+   "verified": true
+  },
+  {
+   "productId": "p26",
+   "author": "Siddharth A.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-08-26",
+   "verified": true
+  },
+  {
+   "productId": "p26",
+   "author": "Ananya S.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-08-29",
+   "verified": false
+  },
+  {
+   "productId": "p27",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-08-22",
+   "verified": true
+  },
+  {
+   "productId": "p27",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-09-06",
+   "verified": true
+  },
+  {
+   "productId": "p27",
+   "author": "Sneha R.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Philodendron came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p28",
+   "author": "Siddharth A.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Lucky Bamboo itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-09-13",
+   "verified": true
+  },
+  {
+   "productId": "p28",
+   "author": "Ananya S.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-09-16",
+   "verified": true
+  },
+  {
+   "productId": "p28",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p29",
+   "author": "Siddharth A.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-08-16",
+   "verified": true
+  },
+  {
+   "productId": "p29",
+   "author": "Ananya S.",
+   "rating": 4,
+   "title": "Good plant, a bit smaller than pictured",
+   "body": "Healthy and settled in quickly, but slightly smaller than I expected for the price. Would still order again.",
+   "date": "2026-08-28",
+   "verified": true
+  },
+  {
+   "productId": "p29",
+   "author": "Rohan D.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-09-05",
+   "verified": false
+  },
+  {
+   "productId": "p30",
+   "author": "Tanvi W.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-08-24",
+   "verified": true
+  },
+  {
+   "productId": "p30",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Hibiscus itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-09-02",
+   "verified": true
+  },
+  {
+   "productId": "p30",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-08-30",
+   "verified": false
+  },
+  {
+   "productId": "p31",
+   "author": "Vikram P.",
+   "rating": 5,
+   "title": "Packaging was excellent",
+   "body": "Nothing shifted in transit and the pot was wrapped properly. Only one leaf tip had browned.",
+   "date": "2026-08-27",
+   "verified": true
+  },
+  {
+   "productId": "p31",
+   "author": "Neha J.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-08-30",
+   "verified": true
+  },
+  {
+   "productId": "p31",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Jasmine itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-09-09",
+   "verified": false
+  },
+  {
+   "productId": "p32",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-09-10",
+   "verified": true
+  },
+  {
+   "productId": "p32",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-08-31",
+   "verified": true
+  },
+  {
+   "productId": "p32",
+   "author": "Sneha R.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Rose came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-09-10",
+   "verified": false
+  },
+  {
+   "productId": "p33",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-08-30",
+   "verified": true
+  },
+  {
+   "productId": "p33",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Marigold came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-09-16",
+   "verified": true
+  },
+  {
+   "productId": "p33",
+   "author": "Harsh Y.",
+   "rating": 5,
+   "title": "Better than my local nursery",
+   "body": "Healthy roots, glossy leaves, and it came with a care card. Very happy with the quality.",
+   "date": "2026-09-09",
+   "verified": false
+  },
+  {
+   "productId": "p34",
+   "author": "Pooja B.",
+   "rating": 4,
+   "title": "Thriving near my window",
+   "body": "Placed it in bright light and it has been happy ever since. As easy to care for as described.",
+   "date": "2026-09-11",
+   "verified": true
+  },
+  {
+   "productId": "p34",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Delivery was slow, plant was fine",
+   "body": "The Ixora itself is perfect but the courier took six days. A little droopy on arrival, recovered within a day.",
+   "date": "2026-09-16",
+   "verified": true
+  },
+  {
+   "productId": "p34",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p35",
+   "author": "Lakshmi Q.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-09-03",
+   "verified": true
+  },
+  {
+   "productId": "p35",
+   "author": "Arjun T.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-09-10",
+   "verified": true
+  },
+  {
+   "productId": "p35",
+   "author": "Divya L.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Croton came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p36",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Great value for money",
+   "body": "Full and healthy for the price, and the seller replied quickly to my watering question.",
+   "date": "2026-08-13",
+   "verified": true
+  },
+  {
+   "productId": "p36",
+   "author": "Aditya G.",
+   "rating": 4,
+   "title": "Needs a little patience",
+   "body": "Dropped two lower leaves while adjusting to my room, now putting out new ones. Follow the care card and give it time.",
+   "date": "2026-08-23",
+   "verified": true
+  },
+  {
+   "productId": "p36",
+   "author": "Tanvi W.",
+   "rating": 5,
+   "title": "Arrived healthy and well packed",
+   "body": "The Aloe Vera came upright with the soil intact and no damaged leaves. New growth started within two weeks.",
+   "date": "2026-08-20",
+   "verified": false
+  },
+  {
+   "productId": "p37",
+   "author": "Kavya N.",
+   "rating": 5,
+   "title": "Solid value",
+   "body": "Better finish than similar pots I've bought elsewhere at this price.",
+   "date": "2026-08-06",
+   "verified": true
+  },
+  {
+   "productId": "p37",
+   "author": "Siddharth A.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-07-31",
+   "verified": true
+  },
+  {
+   "productId": "p37",
+   "author": "Ananya S.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-08-24",
+   "verified": false
+  },
+  {
+   "productId": "p38",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-08-27",
+   "verified": true
+  },
+  {
+   "productId": "p38",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-08-31",
+   "verified": true
+  },
+  {
+   "productId": "p38",
+   "author": "Aditya G.",
+   "rating": 4,
+   "title": "Looks great on my balcony",
+   "body": "Sturdy and well made. Colour is slightly different in daylight but I like it.",
+   "date": "2026-09-09",
+   "verified": false
+  },
+  {
+   "productId": "p39",
+   "author": "Tanvi W.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-08-31",
+   "verified": true
+  },
+  {
+   "productId": "p39",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Looks great on my balcony",
+   "body": "Sturdy and well made. Colour is slightly different in daylight but I like it.",
+   "date": "2026-08-22",
+   "verified": true
+  },
+  {
+   "productId": "p39",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Well packed",
+   "body": "Arrived with no chips or cracks — wrapped properly in paper and a box.",
+   "date": "2026-09-11",
+   "verified": false
+  },
+  {
+   "productId": "p40",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-09-09",
+   "verified": true
+  },
+  {
+   "productId": "p40",
+   "author": "Aditya G.",
+   "rating": 4,
+   "title": "Looks great on my balcony",
+   "body": "Sturdy and well made. Colour is slightly different in daylight but I like it.",
+   "date": "2026-09-13",
+   "verified": true
+  },
+  {
+   "productId": "p40",
+   "author": "Tanvi W.",
+   "rating": 5,
+   "title": "Well packed",
+   "body": "Arrived with no chips or cracks — wrapped properly in paper and a box.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p41",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Solid value",
+   "body": "Better finish than similar pots I've bought elsewhere at this price.",
+   "date": "2026-08-28",
+   "verified": true
+  },
+  {
+   "productId": "p41",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Pretty, but check the drainage",
+   "body": "Looks great; I had to widen the drainage hole slightly for my plant.",
+   "date": "2026-09-01",
+   "verified": true
+  },
+  {
+   "productId": "p41",
+   "author": "Meera K.",
+   "rating": 5,
+   "title": "Good quality, as shown",
+   "body": "The finish is exactly like the photos and the drainage hole is well cut. Feels solid.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p42",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Good for beginners",
+   "body": "Instructions on the pack were clear and it was easy to use.",
+   "date": "2026-07-26",
+   "verified": true
+  },
+  {
+   "productId": "p42",
+   "author": "Rahul M.",
+   "rating": 5,
+   "title": "Good quality",
+   "body": "No bad smell and no clumps. Packed well in a sealed bag.",
+   "date": "2026-07-25",
+   "verified": true
+  },
+  {
+   "productId": "p42",
+   "author": "Pooja B.",
+   "rating": 4,
+   "title": "Reasonable price",
+   "body": "Comparable to what I buy locally, but delivered to my door.",
+   "date": "2026-08-07",
+   "verified": false
+  },
+  {
+   "productId": "p43",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Reasonable price",
+   "body": "Comparable to what I buy locally, but delivered to my door.",
+   "date": "2026-07-27",
+   "verified": true
+  },
+  {
+   "productId": "p43",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Plants responded well",
+   "body": "Light, crumbly and easy to mix. My plants put out new growth within a few weeks.",
+   "date": "2026-08-11",
+   "verified": true
+  },
+  {
+   "productId": "p43",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Works as described",
+   "body": "Does what it says. I'd use a little more of it than the pack suggests for large pots.",
+   "date": "2026-08-01",
+   "verified": false
+  },
+  {
+   "productId": "p44",
+   "author": "Lakshmi Q.",
+   "rating": 4,
+   "title": "Reasonable price",
+   "body": "Comparable to what I buy locally, but delivered to my door.",
+   "date": "2026-08-15",
+   "verified": true
+  },
+  {
+   "productId": "p44",
+   "author": "Arjun T.",
+   "rating": 5,
+   "title": "Plants responded well",
+   "body": "Light, crumbly and easy to mix. My plants put out new growth within a few weeks.",
+   "date": "2026-08-22",
+   "verified": true
+  },
+  {
+   "productId": "p44",
+   "author": "Divya L.",
+   "rating": 4,
+   "title": "Works as described",
+   "body": "Does what it says. I'd use a little more of it than the pack suggests for large pots.",
+   "date": "2026-08-24",
+   "verified": false
+  },
+  {
+   "productId": "p45",
+   "author": "Lakshmi Q.",
+   "rating": 4,
+   "title": "Reasonable price",
+   "body": "Comparable to what I buy locally, but delivered to my door.",
+   "date": "2026-08-07",
+   "verified": true
+  },
+  {
+   "productId": "p45",
+   "author": "Arjun T.",
+   "rating": 5,
+   "title": "Plants responded well",
+   "body": "Light, crumbly and easy to mix. My plants put out new growth within a few weeks.",
+   "date": "2026-08-08",
+   "verified": true
+  },
+  {
+   "productId": "p45",
+   "author": "Divya L.",
+   "rating": 4,
+   "title": "Works as described",
+   "body": "Does what it says. I'd use a little more of it than the pack suggests for large pots.",
+   "date": "2026-08-15",
+   "verified": false
+  },
+  {
+   "productId": "p46",
+   "author": "Pooja B.",
+   "rating": 4,
+   "title": "Reasonable price",
+   "body": "Comparable to what I buy locally, but delivered to my door.",
+   "date": "2026-08-11",
+   "verified": true
+  },
+  {
+   "productId": "p46",
+   "author": "Manoj H.",
+   "rating": 5,
+   "title": "Plants responded well",
+   "body": "Light, crumbly and easy to mix. My plants put out new growth within a few weeks.",
+   "date": "2026-08-15",
+   "verified": true
+  },
+  {
+   "productId": "p46",
+   "author": "Meera K.",
+   "rating": 4,
+   "title": "Works as described",
+   "body": "Does what it says. I'd use a little more of it than the pack suggests for large pots.",
+   "date": "2026-08-21",
+   "verified": false
+  },
+  {
+   "productId": "p47",
+   "author": "Tanvi W.",
+   "rating": 5,
+   "title": "Good quality",
+   "body": "No bad smell and no clumps. Packed well in a sealed bag.",
+   "date": "2026-08-11",
+   "verified": true
+  },
+  {
+   "productId": "p47",
+   "author": "Vikram P.",
+   "rating": 4,
+   "title": "Reasonable price",
+   "body": "Comparable to what I buy locally, but delivered to my door.",
+   "date": "2026-08-08",
+   "verified": true
+  },
+  {
+   "productId": "p47",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Plants responded well",
+   "body": "Light, crumbly and easy to mix. My plants put out new growth within a few weeks.",
+   "date": "2026-08-24",
+   "verified": false
+  },
+  {
+   "productId": "p48",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-08-04",
+   "verified": true
+  },
+  {
+   "productId": "p48",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-08-02",
+   "verified": true
+  },
+  {
+   "productId": "p48",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-08-05",
+   "verified": false
+  },
+  {
+   "productId": "p49",
+   "author": "Siddharth A.",
+   "rating": 4,
+   "title": "Does the job",
+   "body": "Simple, sturdy and exactly as described. No complaints.",
+   "date": "2026-07-28",
+   "verified": true
+  },
+  {
+   "productId": "p49",
+   "author": "Ananya S.",
+   "rating": 5,
+   "title": "Good value",
+   "body": "Better quality than the ones from my local hardware shop.",
+   "date": "2026-07-28",
+   "verified": true
+  },
+  {
+   "productId": "p49",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Works fine",
+   "body": "Arrived well packed. A little basic but it does the job.",
+   "date": "2026-08-04",
+   "verified": false
+  },
+  {
+   "productId": "p50",
+   "author": "Siddharth A.",
+   "rating": 4,
+   "title": "Good quality for the price",
+   "body": "Feels solid and the finish is even. Colour matches the photos.",
+   "date": "2026-08-19",
+   "verified": true
+  },
+  {
+   "productId": "p50",
+   "author": "Ananya S.",
+   "rating": 5,
+   "title": "Well packed, no damage",
+   "body": "Came neatly packed with all screws. Very happy.",
+   "date": "2026-08-25",
+   "verified": true
+  },
+  {
+   "productId": "p50",
+   "author": "Rohan D.",
+   "rating": 4,
+   "title": "Nice, slightly lighter than expected",
+   "body": "Looks great; it's on the lighter side so I wouldn't put a very heavy pot on it.",
+   "date": "2026-09-01",
+   "verified": false
+  },
+  {
+   "productId": "p51",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Good quality for the price",
+   "body": "Feels solid and the finish is even. Colour matches the photos.",
+   "date": "2026-08-21",
+   "verified": true
+  },
+  {
+   "productId": "p51",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Well packed, no damage",
+   "body": "Came neatly packed with all screws. Very happy.",
+   "date": "2026-08-26",
+   "verified": true
+  },
+  {
+   "productId": "p51",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Nice, slightly lighter than expected",
+   "body": "Looks great; it's on the lighter side so I wouldn't put a very heavy pot on it.",
+   "date": "2026-09-13",
+   "verified": false
+  },
+  {
+   "productId": "p52",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Well packed, no damage",
+   "body": "Came neatly packed with all screws. Very happy.",
+   "date": "2026-09-01",
+   "verified": true
+  },
+  {
+   "productId": "p52",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Nice, slightly lighter than expected",
+   "body": "Looks great; it's on the lighter side so I wouldn't put a very heavy pot on it.",
+   "date": "2026-09-06",
+   "verified": true
+  },
+  {
+   "productId": "p52",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Looks lovely in my living room",
+   "body": "Sturdy and well finished. It took a few minutes to assemble and instructions were clear.",
+   "date": "2026-08-26",
+   "verified": false
+  },
+  {
+   "productId": "p53",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Good quality for the price",
+   "body": "Feels solid and the finish is even. Colour matches the photos.",
+   "date": "2026-08-29",
+   "verified": true
+  },
+  {
+   "productId": "p53",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Well packed, no damage",
+   "body": "Came neatly packed with all screws. Very happy.",
+   "date": "2026-09-15",
+   "verified": true
+  },
+  {
+   "productId": "p53",
+   "author": "Manoj H.",
+   "rating": 4,
+   "title": "Nice, slightly lighter than expected",
+   "body": "Looks great; it's on the lighter side so I wouldn't put a very heavy pot on it.",
+   "date": "2026-09-16",
+   "verified": false
+  },
+  {
+   "productId": "p54",
+   "author": "Ishita C.",
+   "rating": 5,
+   "title": "Well packed, no damage",
+   "body": "Came neatly packed with all screws. Very happy.",
+   "date": "2026-09-13",
+   "verified": true
+  },
+  {
+   "productId": "p54",
+   "author": "Rahul M.",
+   "rating": 4,
+   "title": "Nice, slightly lighter than expected",
+   "body": "Looks great; it's on the lighter side so I wouldn't put a very heavy pot on it.",
+   "date": "2026-09-16",
+   "verified": true
+  },
+  {
+   "productId": "p54",
+   "author": "Pooja B.",
+   "rating": 5,
+   "title": "Looks lovely in my living room",
+   "body": "Sturdy and well finished. It took a few minutes to assemble and instructions were clear.",
+   "date": "2026-09-13",
+   "verified": false
+  },
+  {
+   "productId": "p55",
+   "author": "Neha J.",
+   "rating": 5,
+   "title": "Well packed, no damage",
+   "body": "Came neatly packed with all screws. Very happy.",
+   "date": "2026-09-12",
+   "verified": true
+  },
+  {
+   "productId": "p55",
+   "author": "Harsh Y.",
+   "rating": 4,
+   "title": "Nice, slightly lighter than expected",
+   "body": "Looks great; it's on the lighter side so I wouldn't put a very heavy pot on it.",
+   "date": "2026-09-14",
+   "verified": true
+  },
+  {
+   "productId": "p55",
+   "author": "Sneha R.",
+   "rating": 5,
+   "title": "Looks lovely in my living room",
+   "body": "Sturdy and well finished. It took a few minutes to assemble and instructions were clear.",
+   "date": "2026-09-16",
+   "verified": false
+  }
+ ]
+}

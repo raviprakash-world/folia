@@ -5,6 +5,8 @@
 // `prisma generate` has succeeded (see the root README's Known Issues).
 import { PrismaClient } from '@prisma/client';
 import { randomBytes } from 'crypto';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { hashPassword } from '../src/auth/password.util';
 
 const prisma = new PrismaClient();
@@ -62,1348 +64,78 @@ const SELLER_PERMISSIONS = PERMISSIONS.filter((p) =>
   p.key.startsWith('seller_'),
 ).map((p) => p.key);
 
-// Categories and collections, matching apps/web/src/data/categories.ts exactly.
-const CATEGORIES = [
-  {
-    slug: 'plants',
-    name: 'Plants',
-    description: 'Living plants, shipped established in their nursery pot.',
-  },
-  {
-    slug: 'vessels',
-    name: 'Vessels',
-    description: 'Pots, planters, and baskets sized to match.',
-  },
-  {
-    slug: 'tools',
-    name: 'Tools',
-    description: 'The unglamorous things that keep plants alive.',
-  },
-];
-
-const COLLECTIONS = [
-  {
-    slug: 'low-light-plants',
-    name: 'Low-light Plants',
-    description: 'For north-facing rooms and shadier corners.',
-  },
-  {
-    slug: 'statement-vessels',
-    name: 'Statement Vessels',
-    description: 'Ceramics and stoneware built to be seen.',
-  },
-  {
-    slug: 'gifting',
-    name: 'Gifting',
-    description: 'Ready to arrive boxed, no assembly required.',
-  },
-  {
-    slug: 'pet-friendly',
-    name: 'Pet-friendly',
-    description: 'Non-toxic picks, verified against the ASPCA list.',
-  },
-  {
-    slug: 'flowering',
-    name: 'Flowering',
-    description: 'Plants that bloom indoors, not just green ones.',
-  },
-  {
-    slug: 'baskets',
-    name: 'Baskets',
-    description: 'Woven vessels for a softer look.',
-  },
-  {
-    slug: 'new-home',
-    name: 'New Home',
-    description: 'Easy-care starter plants for a fresh space.',
-  },
-  {
-    slug: 'office',
-    name: 'Office Plants',
-    description: 'Tolerant of fluorescent light and Monday neglect.',
-  },
-];
-
-interface SeedProductInput {
+// The catalog (categories, collections, demo sellers, products, reviews) is
+// one JSON file, prisma/demo/catalog.json — also what apps/web's static
+// mock data reads, so the storefront looks the same whether it's served by
+// this database or by the frontend's offline fixtures. Everything in it is
+// FICTIONAL demo content (invented sellers, products, reviews); product
+// photos are openly-licensed images credited in apps/web/public/demo/CREDITS.md.
+interface CatalogProduct {
   id: string;
   slug: string;
   name: string;
   price: number;
-  compareAtPrice?: number;
+  compareAtPrice: number | null;
   description: string;
   categorySlug: string;
-  badge?: string;
-  careLevel?: string;
-  rating?: number;
-  reviewCount: number;
+  sellerSlug: string | null;
+  badge: string | null;
+  careLevel: string | null;
+  rating: number | null;
+  reviewCount: number | null;
   inStock: boolean;
   stockCount: number;
   createdAt: string;
   variants: { label: string; swatch: string | null; inStock: boolean }[];
   specs: { label: string; value: string }[];
+  image: { file: string; alt: string } | null;
 }
 
-interface SeedReviewInput {
-  productId: string;
-  author: string;
-  rating: number;
-  title: string;
-  body: string;
-  date: string;
-  verified: boolean;
+interface CatalogFile {
+  categories: { slug: string; name: string; description: string }[];
+  collections: { slug: string; name: string; description: string }[];
+  sellers: {
+    slug: string;
+    displayName: string;
+    description: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    addressLine1: string;
+    phone: string;
+  }[];
+  products: CatalogProduct[];
+  reviews: {
+    productId: string;
+    author: string;
+    rating: number;
+    title: string;
+    body: string;
+    date: string;
+    verified: boolean;
+  }[];
 }
 
-// The 24 products and 72 reviews below are transcribed programmatically
-// from apps/web's real catalog (src/data/products.ts, src/data/reviews.ts)
-// via a one-off parsing script, not hand-typed — the frontend's actual
-// mock catalog IS the seed data, kept in sync at generation time rather
-// than risking manual transcription drift. createdAt values are preserved
-// exactly from the source data, which matters: ProductsService's
-// "featured" sort tiebreaker relies on createdAt reflecting the original
-// catalog's relative order (see products.service.ts's buildOrderBy comment).
+const catalog = JSON.parse(
+  readFileSync(join(__dirname, 'demo', 'catalog.json'), 'utf8'),
+) as CatalogFile;
+const CATEGORIES = catalog.categories;
+const COLLECTIONS = catalog.collections;
+const PRODUCTS = catalog.products;
+const REVIEWS = catalog.reviews;
 
-const PRODUCTS: SeedProductInput[] = [
-  {
-    id: 'p1',
-    slug: 'monstera-deliciosa',
-    name: 'Monstera Deliciosa',
-    price: 2720,
-    description:
-      'Monstera Deliciosa brings Cheese plant, iconic split leaves to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'BESTSELLER',
-    careLevel: 'EASY',
-    rating: 4.4,
-    reviewCount: 18,
-    inStock: true,
-    stockCount: 10,
-    createdAt: '2026-07-29',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: false },
-    ],
-    specs: [
-      { label: 'Light', value: 'Bright indirect' },
-      { label: 'Water', value: 'Weekly' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '90cm' },
-    ],
-  },
-  {
-    id: 'p2',
-    slug: 'fiddle-leaf-fig',
-    name: 'Fiddle Leaf Fig',
-    price: 3800,
-    description:
-      'Fiddle Leaf Fig brings dramatic violin-shaped leaves, fussy about drafts to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    careLevel: 'ADVANCED',
-    rating: 4.5,
-    reviewCount: 31,
-    inStock: true,
-    stockCount: 13,
-    createdAt: '2026-07-20',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Bright indirect' },
-      { label: 'Water', value: 'Weekly' },
-      { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '45cm' },
-    ],
-  },
-  {
-    id: 'p3',
-    slug: 'snake-plant-laurentii',
-    name: 'Snake Plant Laurentii',
-    price: 1520,
-    description:
-      'Snake Plant Laurentii brings upright striped leaves, tolerates neglect to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'NEW',
-    careLevel: 'EASY',
-    rating: 4.3,
-    reviewCount: 44,
-    inStock: true,
-    stockCount: 16,
-    createdAt: '2026-07-11',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Bright indirect' },
-      { label: 'Water', value: 'Weekly' },
-      { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '60cm' },
-    ],
-  },
-  {
-    id: 'p4',
-    slug: 'pothos-marble-queen',
-    name: 'Pothos Marble Queen',
-    price: 1280,
-    description:
-      'Pothos Marble Queen brings trailing variegated vine, grows in low light to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    careLevel: 'EASY',
-    rating: 4,
-    reviewCount: 57,
-    inStock: true,
-    stockCount: 19,
-    createdAt: '2026-07-02',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: false },
-    ],
-    specs: [
-      { label: 'Light', value: 'Medium indirect' },
-      { label: 'Water', value: 'Every 10–14 days' },
-      { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '105cm' },
-    ],
-  },
-  {
-    id: 'p5',
-    slug: 'bird-s-nest-fern',
-    name: "Bird's Nest Fern",
-    price: 1760,
-    compareAtPrice: 2200,
-    description:
-      "Bird's Nest Fern brings ruffled fronds, likes humidity to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.",
-    categorySlug: 'plants',
-    badge: 'SALE',
-    careLevel: 'MODERATE',
-    rating: 4.1,
-    reviewCount: 70,
-    inStock: true,
-    stockCount: 22,
-    createdAt: '2026-06-23',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Medium indirect' },
-      { label: 'Water', value: 'Every 10–14 days' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '60cm' },
-    ],
-  },
-  {
-    id: 'p6',
-    slug: 'calathea-orbifolia',
-    name: 'Calathea Orbifolia',
-    price: 2320,
-    description:
-      'Calathea Orbifolia brings striped round leaves, prayer-plant family to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'LOW_STOCK',
-    careLevel: 'MODERATE',
-    rating: 4.4,
-    reviewCount: 83,
-    inStock: true,
-    stockCount: 2,
-    createdAt: '2026-06-14',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Bright indirect' },
-      { label: 'Water', value: 'Weekly' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '90cm' },
-    ],
-  },
-  {
-    id: 'p7',
-    slug: 'zz-plant',
-    name: 'ZZ Plant',
-    price: 1840,
-    description:
-      'ZZ Plant brings glossy dark leaves, drought tolerant to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'BESTSELLER',
-    careLevel: 'EASY',
-    rating: 4,
-    reviewCount: 96,
-    inStock: true,
-    stockCount: 28,
-    createdAt: '2026-06-05',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: false },
-    ],
-    specs: [
-      { label: 'Light', value: 'Low light tolerant' },
-      { label: 'Water', value: 'When top 5cm dry' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '90cm' },
-    ],
-  },
-  {
-    id: 'p8',
-    slug: 'rubber-plant-burgundy',
-    name: 'Rubber Plant Burgundy',
-    price: 2480,
-    description:
-      'Rubber Plant Burgundy brings deep maroon leaves, fast growing to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    careLevel: 'EASY',
-    rating: 4.3,
-    reviewCount: 109,
-    inStock: true,
-    stockCount: 31,
-    createdAt: '2026-05-27',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Bright indirect' },
-      { label: 'Water', value: 'Weekly' },
-      { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '60cm' },
-    ],
-  },
-  {
-    id: 'p9',
-    slug: 'string-of-pearls',
-    name: 'String of Pearls',
-    price: 1040,
-    description:
-      'String of Pearls brings trailing bead-like leaves, needs bright light to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'NEW',
-    careLevel: 'MODERATE',
-    rating: 4.1,
-    reviewCount: 122,
-    inStock: true,
-    stockCount: 34,
-    createdAt: '2026-05-18',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Medium indirect' },
-      { label: 'Water', value: 'Every 10–14 days' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '60cm' },
-    ],
-  },
-  {
-    id: 'p10',
-    slug: 'peace-lily',
-    name: 'Peace Lily',
-    price: 1360,
-    description:
-      'Peace Lily brings white blooms, signals thirst by drooping to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    careLevel: 'EASY',
-    rating: 4.3,
-    reviewCount: 135,
-    inStock: true,
-    stockCount: 37,
-    createdAt: '2026-05-09',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: false },
-    ],
-    specs: [
-      { label: 'Light', value: 'Medium indirect' },
-      { label: 'Water', value: 'Every 10–14 days' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '45cm' },
-    ],
-  },
-  {
-    id: 'p11',
-    slug: 'boston-fern',
-    name: 'Boston Fern',
-    price: 1160,
-    compareAtPrice: 1440,
-    description:
-      'Boston Fern brings classic feathery fronds, humidity lover to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'SALE',
-    careLevel: 'MODERATE',
-    rating: 3.9,
-    reviewCount: 148,
-    inStock: true,
-    stockCount: 40,
-    createdAt: '2026-04-30',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Low light tolerant' },
-      { label: 'Water', value: 'When top 5cm dry' },
-      { label: 'Pet safe', value: 'No — toxic if ingested' },
-      { label: 'Mature height', value: '60cm' },
-    ],
-  },
-  {
-    id: 'p12',
-    slug: 'areca-palm',
-    name: 'Areca Palm',
-    price: 3520,
-    description:
-      'Areca Palm brings airy fronds, good for filtering air to a room without asking much in return. We ship it established in its nursery pot, roots settled, ready to move into your own vessel or stay put.',
-    categorySlug: 'plants',
-    badge: 'LOW_STOCK',
-    careLevel: 'EASY',
-    rating: 4.3,
-    reviewCount: 161,
-    inStock: true,
-    stockCount: 2,
-    createdAt: '2026-04-21',
-    variants: [
-      { label: 'Small (10cm pot)', swatch: null, inStock: true },
-      { label: 'Medium (15cm pot)', swatch: null, inStock: true },
-      { label: 'Large (25cm pot)', swatch: null, inStock: true },
-    ],
-    specs: [
-      { label: 'Light', value: 'Medium indirect' },
-      { label: 'Water', value: 'Every 10–14 days' },
-      { label: 'Pet safe', value: 'Yes' },
-      { label: 'Mature height', value: '45cm' },
-    ],
-  },
-  {
-    id: 'p13',
-    slug: 'ceramic-vessel-ash',
-    name: 'Ceramic Vessel — Ash',
-    price: 1680,
-    description:
-      'Ceramic Vessel — Ash is made for plants that outgrew their nursery pot. Features hand-glazed stoneware, drainage hole + saucer, sized to work with our most popular plant varieties.',
-    categorySlug: 'vessels',
-    badge: 'BESTSELLER',
-    rating: 4.7,
-    reviewCount: 18,
-    inStock: true,
-    stockCount: 10,
-    createdAt: '2026-07-29',
-    variants: [
-      { label: 'Ash', swatch: '#8b8378', inStock: true },
-      { label: 'Slate', swatch: '#4a5a5f', inStock: true },
-      { label: 'Sand', swatch: '#d9c9a8', inStock: false },
-    ],
-    specs: [
-      { label: 'Material', value: 'Glazed ceramic' },
-      { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '20cm' },
-    ],
-  },
-  {
-    id: 'p14',
-    slug: 'stone-planter-round',
-    name: 'Stone Planter — Round',
-    price: 2560,
-    description:
-      'Stone Planter — Round is made for plants that outgrew their nursery pot. Features cast concrete finish, weatherproof for patios, sized to work with our most popular plant varieties.',
-    categorySlug: 'vessels',
-    rating: 4.3,
-    reviewCount: 31,
-    inStock: true,
-    stockCount: 13,
-    createdAt: '2026-07-20',
-    variants: [
-      { label: 'Ash', swatch: '#8b8378', inStock: true },
-      { label: 'Slate', swatch: '#4a5a5f', inStock: true },
-      { label: 'Sand', swatch: '#d9c9a8', inStock: true },
-    ],
-    specs: [
-      { label: 'Material', value: 'Cast concrete' },
-      { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '23cm' },
-    ],
-  },
-  {
-    id: 'p15',
-    slug: 'terracotta-pot-set-of-3',
-    name: 'Terracotta Pot Set of 3',
-    price: 1440,
-    description:
-      'Terracotta Pot Set of 3 is made for plants that outgrew their nursery pot. Features unglazed clay, breathable for root health, sized to work with our most popular plant varieties.',
-    categorySlug: 'vessels',
-    badge: 'NEW',
-    rating: 4.6,
-    reviewCount: 44,
-    inStock: true,
-    stockCount: 16,
-    createdAt: '2026-07-11',
-    variants: [
-      { label: 'Ash', swatch: '#8b8378', inStock: true },
-      { label: 'Slate', swatch: '#4a5a5f', inStock: true },
-      { label: 'Sand', swatch: '#d9c9a8', inStock: true },
-    ],
-    specs: [
-      { label: 'Material', value: 'Unglazed clay' },
-      { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '28cm' },
-    ],
-  },
-  {
-    id: 'p16',
-    slug: 'woven-plant-basket',
-    name: 'Woven Plant Basket',
-    price: 2240,
-    description:
-      'Woven Plant Basket is made for plants that outgrew their nursery pot. Features natural seagrass weave, fits standard nursery pots, sized to work with our most popular plant varieties.',
-    categorySlug: 'vessels',
-    rating: 4.4,
-    reviewCount: 57,
-    inStock: true,
-    stockCount: 19,
-    createdAt: '2026-07-02',
-    variants: [
-      { label: 'Ash', swatch: '#8b8378', inStock: true },
-      { label: 'Slate', swatch: '#4a5a5f', inStock: true },
-      { label: 'Sand', swatch: '#d9c9a8', inStock: true },
-    ],
-    specs: [
-      { label: 'Material', value: 'Glazed ceramic' },
-      { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '15cm' },
-    ],
-  },
-  {
-    id: 'p17',
-    slug: 'matte-black-cylinder-pot',
-    name: 'Matte Black Cylinder Pot',
-    price: 1920,
-    compareAtPrice: 2400,
-    description:
-      'Matte Black Cylinder Pot is made for plants that outgrew their nursery pot. Features powder-coated steel, modern minimalist profile, sized to work with our most popular plant varieties.',
-    categorySlug: 'vessels',
-    badge: 'SALE',
-    rating: 4.2,
-    reviewCount: 70,
-    inStock: true,
-    stockCount: 22,
-    createdAt: '2026-06-23',
-    variants: [
-      { label: 'Ash', swatch: '#8b8378', inStock: true },
-      { label: 'Slate', swatch: '#4a5a5f', inStock: true },
-      { label: 'Sand', swatch: '#d9c9a8', inStock: false },
-    ],
-    specs: [
-      { label: 'Material', value: 'Glazed ceramic' },
-      { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '15cm' },
-    ],
-  },
-  {
-    id: 'p18',
-    slug: 'fluted-ceramic-planter',
-    name: 'Fluted Ceramic Planter',
-    price: 2080,
-    description:
-      'Fluted Ceramic Planter is made for plants that outgrew their nursery pot. Features ridged texture, available in three sizes, sized to work with our most popular plant varieties.',
-    categorySlug: 'vessels',
-    badge: 'LOW_STOCK',
-    rating: 3.9,
-    reviewCount: 83,
-    inStock: true,
-    stockCount: 2,
-    createdAt: '2026-06-14',
-    variants: [
-      { label: 'Ash', swatch: '#8b8378', inStock: true },
-      { label: 'Slate', swatch: '#4a5a5f', inStock: true },
-      { label: 'Sand', swatch: '#d9c9a8', inStock: true },
-    ],
-    specs: [
-      { label: 'Material', value: 'Glazed ceramic' },
-      { label: 'Drainage', value: 'Yes, includes saucer' },
-      { label: 'Diameter', value: '25cm' },
-    ],
-  },
-  {
-    id: 'p19',
-    slug: 'brass-plant-mister',
-    name: 'Brass Plant Mister',
-    price: 1120,
-    description:
-      'Brass Plant Mister: fine mist nozzle, solid brass, ages naturally. Built to last a few plant-parenting eras, not one season.',
-    categorySlug: 'tools',
-    badge: 'BESTSELLER',
-    rating: 4.4,
-    reviewCount: 18,
-    inStock: true,
-    stockCount: 10,
-    createdAt: '2026-07-29',
-    variants: [],
-    specs: [
-      { label: 'Material', value: 'Solid brass / carbon steel' },
-      { label: 'Care', value: 'Hand wash, dry before storing' },
-    ],
-  },
-  {
-    id: 'p20',
-    slug: 'precision-pruning-shears',
-    name: 'Precision Pruning Shears',
-    price: 960,
-    description:
-      'Precision Pruning Shears: carbon steel blade, for clean cuts that heal fast. Built to last a few plant-parenting eras, not one season.',
-    categorySlug: 'tools',
-    rating: 4.2,
-    reviewCount: 31,
-    inStock: true,
-    stockCount: 13,
-    createdAt: '2026-07-20',
-    variants: [],
-    specs: [
-      { label: 'Material', value: 'Solid brass / carbon steel' },
-      { label: 'Care', value: 'Hand wash, dry before storing' },
-    ],
-  },
-  {
-    id: 'p21',
-    slug: 'soil-moisture-meter',
-    name: 'Soil Moisture Meter',
-    price: 720,
-    description:
-      'Soil Moisture Meter: no batteries required, reads 3 depths. Built to last a few plant-parenting eras, not one season.',
-    categorySlug: 'tools',
-    badge: 'NEW',
-    rating: 4,
-    reviewCount: 44,
-    inStock: true,
-    stockCount: 16,
-    createdAt: '2026-07-11',
-    variants: [],
-    specs: [
-      { label: 'Material', value: 'Solid brass / carbon steel' },
-      { label: 'Care', value: 'Hand wash, dry before storing' },
-    ],
-  },
-  {
-    id: 'p22',
-    slug: 'watering-can-1-5l',
-    name: 'Watering Can — 1.5L',
-    price: 1280,
-    description:
-      'Watering Can — 1.5L: long spout for tight spaces, powder-coated finish. Built to last a few plant-parenting eras, not one season.',
-    categorySlug: 'tools',
-    rating: 4,
-    reviewCount: 57,
-    inStock: true,
-    stockCount: 19,
-    createdAt: '2026-07-02',
-    variants: [],
-    specs: [
-      { label: 'Material', value: 'Solid brass / carbon steel' },
-      { label: 'Care', value: 'Hand wash, dry before storing' },
-    ],
-  },
-  {
-    id: 'p23',
-    slug: 'bamboo-plant-stakes-set-of-6',
-    name: 'Bamboo Plant Stakes (Set of 6)',
-    price: 560,
-    compareAtPrice: 720,
-    description:
-      'Bamboo Plant Stakes (Set of 6): for climbing and top-heavy stems. Built to last a few plant-parenting eras, not one season.',
-    categorySlug: 'tools',
-    badge: 'SALE',
-    rating: 4,
-    reviewCount: 70,
-    inStock: true,
-    stockCount: 22,
-    createdAt: '2026-06-23',
-    variants: [],
-    specs: [
-      { label: 'Material', value: 'Solid brass / carbon steel' },
-      { label: 'Care', value: 'Hand wash, dry before storing' },
-    ],
-  },
-  {
-    id: 'p24',
-    slug: 'grow-light-full-spectrum',
-    name: 'Grow Light — Full Spectrum',
-    price: 2960,
-    description:
-      'Grow Light — Full Spectrum: clips onto shelving, timer built in. Built to last a few plant-parenting eras, not one season.',
-    categorySlug: 'tools',
-    badge: 'LOW_STOCK',
-    rating: 4.5,
-    reviewCount: 83,
-    inStock: true,
-    stockCount: 2,
-    createdAt: '2026-06-14',
-    variants: [],
-    specs: [
-      { label: 'Material', value: 'Solid brass / carbon steel' },
-      { label: 'Care', value: 'Hand wash, dry before storing' },
-    ],
-  },
-];
-const REVIEWS: SeedReviewInput[] = [
-  {
-    productId: 'p1',
-    author: 'Priya M.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-07-27',
-    verified: false,
-  },
-  {
-    productId: 'p1',
-    author: 'Daniel K.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-07-16',
-    verified: true,
-  },
-  {
-    productId: 'p2',
-    author: 'Daniel K.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-07-23',
-    verified: true,
-  },
-  {
-    productId: 'p2',
-    author: 'Amara O.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-07-12',
-    verified: true,
-  },
-  {
-    productId: 'p2',
-    author: 'Wei L.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-07-01',
-    verified: true,
-  },
-  {
-    productId: 'p3',
-    author: 'Amara O.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-07-19',
-    verified: true,
-  },
-  {
-    productId: 'p3',
-    author: 'Wei L.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-07-08',
-    verified: true,
-  },
-  {
-    productId: 'p3',
-    author: 'Sofia R.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-27',
-    verified: false,
-  },
-  {
-    productId: 'p3',
-    author: 'Marcus T.',
-    rating: 5,
-    title: 'Arrived in great shape',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-16',
-    verified: true,
-  },
-  {
-    productId: 'p4',
-    author: 'Wei L.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-07-15',
-    verified: true,
-  },
-  {
-    productId: 'p4',
-    author: 'Sofia R.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-07-04',
-    verified: false,
-  },
-  {
-    productId: 'p5',
-    author: 'Sofia R.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-07-11',
-    verified: false,
-  },
-  {
-    productId: 'p5',
-    author: 'Marcus T.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-30',
-    verified: true,
-  },
-  {
-    productId: 'p5',
-    author: 'Ingrid B.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-19',
-    verified: true,
-  },
-  {
-    productId: 'p6',
-    author: 'Marcus T.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-07-07',
-    verified: true,
-  },
-  {
-    productId: 'p6',
-    author: 'Ingrid B.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-06-26',
-    verified: true,
-  },
-  {
-    productId: 'p6',
-    author: 'Tomas V.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-15',
-    verified: true,
-  },
-  {
-    productId: 'p6',
-    author: 'Nadia F.',
-    rating: 5,
-    title: 'Arrived in great shape',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-04',
-    verified: false,
-  },
-  {
-    productId: 'p7',
-    author: 'Ingrid B.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-07-03',
-    verified: true,
-  },
-  {
-    productId: 'p7',
-    author: 'Tomas V.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-22',
-    verified: true,
-  },
-  {
-    productId: 'p8',
-    author: 'Tomas V.',
-    rating: 3,
-    title: 'It’s fine',
-    body: 'It’s okay — smaller than the photos implied but healthy enough.',
-    date: '2026-06-29',
-    verified: true,
-  },
-  {
-    productId: 'p8',
-    author: 'Nadia F.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-18',
-    verified: false,
-  },
-  {
-    productId: 'p8',
-    author: 'Owen P.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-07',
-    verified: true,
-  },
-  {
-    productId: 'p9',
-    author: 'Nadia F.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-06-25',
-    verified: false,
-  },
-  {
-    productId: 'p9',
-    author: 'Owen P.',
-    rating: 3,
-    title: 'Does the job',
-    body: 'Fine overall, care instructions could have been more specific to my climate.',
-    date: '2026-06-14',
-    verified: true,
-  },
-  {
-    productId: 'p9',
-    author: 'Priya M.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-03',
-    verified: true,
-  },
-  {
-    productId: 'p9',
-    author: 'Daniel K.',
-    rating: 5,
-    title: 'Arrived in great shape',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-05-23',
-    verified: true,
-  },
-  {
-    productId: 'p10',
-    author: 'Owen P.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-21',
-    verified: true,
-  },
-  {
-    productId: 'p10',
-    author: 'Priya M.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-06-10',
-    verified: true,
-  },
-  {
-    productId: 'p11',
-    author: 'Priya M.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-17',
-    verified: true,
-  },
-  {
-    productId: 'p11',
-    author: 'Daniel K.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-06',
-    verified: true,
-  },
-  {
-    productId: 'p11',
-    author: 'Amara O.',
-    rating: 4,
-    title: 'Happy with it',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-05-26',
-    verified: false,
-  },
-  {
-    productId: 'p12',
-    author: 'Daniel K.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-06-13',
-    verified: true,
-  },
-  {
-    productId: 'p12',
-    author: 'Amara O.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-06-02',
-    verified: false,
-  },
-  {
-    productId: 'p12',
-    author: 'Wei L.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-05-22',
-    verified: true,
-  },
-  {
-    productId: 'p12',
-    author: 'Sofia R.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-05-11',
-    verified: true,
-  },
-  {
-    productId: 'p13',
-    author: 'Amara O.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-09',
-    verified: false,
-  },
-  {
-    productId: 'p13',
-    author: 'Wei L.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-05-29',
-    verified: true,
-  },
-  {
-    productId: 'p14',
-    author: 'Wei L.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-06-05',
-    verified: true,
-  },
-  {
-    productId: 'p14',
-    author: 'Sofia R.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-05-25',
-    verified: true,
-  },
-  {
-    productId: 'p14',
-    author: 'Marcus T.',
-    rating: 4,
-    title: 'Happy with it',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-05-14',
-    verified: true,
-  },
-  {
-    productId: 'p15',
-    author: 'Sofia R.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-06-01',
-    verified: true,
-  },
-  {
-    productId: 'p15',
-    author: 'Marcus T.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-05-21',
-    verified: true,
-  },
-  {
-    productId: 'p15',
-    author: 'Ingrid B.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-05-10',
-    verified: false,
-  },
-  {
-    productId: 'p15',
-    author: 'Tomas V.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-04-29',
-    verified: true,
-  },
-  {
-    productId: 'p16',
-    author: 'Marcus T.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-05-28',
-    verified: true,
-  },
-  {
-    productId: 'p16',
-    author: 'Ingrid B.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-05-17',
-    verified: false,
-  },
-  {
-    productId: 'p17',
-    author: 'Ingrid B.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-05-24',
-    verified: false,
-  },
-  {
-    productId: 'p17',
-    author: 'Tomas V.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-05-13',
-    verified: true,
-  },
-  {
-    productId: 'p17',
-    author: 'Nadia F.',
-    rating: 4,
-    title: 'Happy with it',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-05-02',
-    verified: true,
-  },
-  {
-    productId: 'p18',
-    author: 'Tomas V.',
-    rating: 3,
-    title: 'It’s fine',
-    body: 'It’s okay — smaller than the photos implied but healthy enough.',
-    date: '2026-05-20',
-    verified: true,
-  },
-  {
-    productId: 'p18',
-    author: 'Nadia F.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-05-09',
-    verified: true,
-  },
-  {
-    productId: 'p18',
-    author: 'Owen P.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-04-28',
-    verified: true,
-  },
-  {
-    productId: 'p18',
-    author: 'Priya M.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-04-17',
-    verified: false,
-  },
-  {
-    productId: 'p19',
-    author: 'Nadia F.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-05-16',
-    verified: true,
-  },
-  {
-    productId: 'p19',
-    author: 'Owen P.',
-    rating: 3,
-    title: 'Does the job',
-    body: 'Fine overall, care instructions could have been more specific to my climate.',
-    date: '2026-05-05',
-    verified: true,
-  },
-  {
-    productId: 'p20',
-    author: 'Owen P.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-05-12',
-    verified: true,
-  },
-  {
-    productId: 'p20',
-    author: 'Priya M.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-05-01',
-    verified: false,
-  },
-  {
-    productId: 'p20',
-    author: 'Daniel K.',
-    rating: 3,
-    title: 'It’s fine',
-    body: 'It’s okay — smaller than the photos implied but healthy enough.',
-    date: '2026-04-20',
-    verified: true,
-  },
-  {
-    productId: 'p21',
-    author: 'Priya M.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-05-08',
-    verified: false,
-  },
-  {
-    productId: 'p21',
-    author: 'Daniel K.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-04-27',
-    verified: true,
-  },
-  {
-    productId: 'p21',
-    author: 'Amara O.',
-    rating: 4,
-    title: 'Happy with it',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-04-16',
-    verified: true,
-  },
-  {
-    productId: 'p21',
-    author: 'Wei L.',
-    rating: 3,
-    title: 'Does the job',
-    body: 'Fine overall, care instructions could have been more specific to my climate.',
-    date: '2026-04-05',
-    verified: true,
-  },
-  {
-    productId: 'p22',
-    author: 'Daniel K.',
-    rating: 4,
-    title: 'Good, minor issue',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-05-04',
-    verified: true,
-  },
-  {
-    productId: 'p22',
-    author: 'Amara O.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-04-23',
-    verified: true,
-  },
-  {
-    productId: 'p23',
-    author: 'Amara O.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-04-30',
-    verified: true,
-  },
-  {
-    productId: 'p23',
-    author: 'Wei L.',
-    rating: 4,
-    title: 'Solid pick',
-    body: 'Good quality, just took a little longer to arrive than the estimate suggested.',
-    date: '2026-04-19',
-    verified: true,
-  },
-  {
-    productId: 'p23',
-    author: 'Sofia R.',
-    rating: 5,
-    title: 'Would buy again',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-04-08',
-    verified: false,
-  },
-  {
-    productId: 'p24',
-    author: 'Wei L.',
-    rating: 5,
-    title: 'Exceeded expectations',
-    body: 'Arrived healthy and bigger than I expected. No shock, no drooping — settled in within a week.',
-    date: '2026-04-26',
-    verified: true,
-  },
-  {
-    productId: 'p24',
-    author: 'Sofia R.',
-    rating: 5,
-    title: 'Exactly as described',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-04-15',
-    verified: false,
-  },
-  {
-    productId: 'p24',
-    author: 'Marcus T.',
-    rating: 4,
-    title: 'Happy with it',
-    body: 'One small leaf had a nick from shipping but otherwise in great shape. Would still recommend.',
-    date: '2026-04-04',
-    verified: true,
-  },
-  {
-    productId: 'p24',
-    author: 'Ingrid B.',
-    rating: 5,
-    title: 'Arrived in great shape',
-    body: 'Packaging was impressive, nothing shifted in transit. Been thriving on my windowsill since.',
-    date: '2026-03-24',
-    verified: true,
-  },
-];
+const BADGE_TO_ENUM: Record<string, string> = {
+  New: 'NEW',
+  Sale: 'SALE',
+  Bestseller: 'BESTSELLER',
+  'Low stock': 'LOW_STOCK',
+};
+const CARE_TO_ENUM: Record<string, string> = {
+  Easy: 'EASY',
+  Moderate: 'MODERATE',
+  Advanced: 'ADVANCED',
+};
+
 // Demo accounts carry publicly known passwords (they're printed in the
 // README and on the login pages in dev). Fine on a laptop; a real
 // vulnerability on a public API. Outside production they behave as always.
@@ -1493,7 +225,7 @@ async function main() {
     ? 'folia-admin'
     : process.env.SEED_ADMIN_PASSWORD;
   if (adminEmail && adminPassword) {
-    if (adminPassword.length < 12) {
+    if (!knownPasswordsAllowed && adminPassword.length < 12) {
       throw new Error('SEED_ADMIN_PASSWORD must be at least 12 characters.');
     }
     await prisma.user.upsert({
@@ -1566,6 +298,55 @@ async function main() {
     });
   }
 
+  console.log(`Seeding ${catalog.sellers.length} demo sellers...`);
+  const sellerIdBySlug = new Map<string, string>();
+  for (const s of catalog.sellers) {
+    const owner =
+      s.slug === 'terracotta-and-fern'
+        ? demoSellerUser
+        : await prisma.user.upsert({
+            where: { email: `${s.slug}@folia.example` },
+            update: {},
+            create: {
+              email: `${s.slug}@folia.example`,
+              // Catalog owners only — nobody is meant to log in as them.
+              passwordHash: await hashPassword(randomBytes(32).toString('hex')),
+              firstName: s.displayName,
+              lastName: '(demo seller)',
+              emailVerified: true,
+              emailVerifiedAt: new Date(),
+              roleId: sellerRole.id,
+            },
+          });
+    const seller = await prisma.seller.upsert({
+      where: { userId: owner.id },
+      update: {},
+      create: {
+        userId: owner.id,
+        slug: s.slug,
+        displayName: s.displayName,
+        description: s.description,
+        contactEmail: `hello@${s.slug}.example`,
+        contactPhone: s.phone,
+        status: 'ACTIVE',
+        approvedAt: new Date(),
+      },
+    });
+    await prisma.sellerAddress.upsert({
+      where: { sellerId: seller.id },
+      update: {},
+      create: {
+        sellerId: seller.id,
+        addressLine1: s.addressLine1,
+        city: s.city,
+        state: s.state,
+        country: 'IN',
+        postalCode: s.postalCode,
+      },
+    });
+    sellerIdBySlug.set(s.slug, seller.id);
+  }
+
   console.log('Seeding categories and collections...');
   const categoryBySlug = new Map<string, string>();
   for (const category of CATEGORIES) {
@@ -1585,7 +366,7 @@ async function main() {
   }
 
   console.log(
-    `Seeding ${PRODUCTS.length} products (from apps/web's real catalog)...`,
+    `Seeding ${PRODUCTS.length} products (prisma/demo/catalog.json)...`,
   );
   for (const p of PRODUCTS) {
     const categoryId = categoryBySlug.get(p.categorySlug);
@@ -1595,9 +376,21 @@ async function main() {
       );
     }
 
-    await prisma.product.upsert({
+    const sellerId = p.sellerSlug ? sellerIdBySlug.get(p.sellerSlug) : undefined;
+    if (p.sellerSlug && !sellerId) {
+      throw new Error(`Product ${p.slug} references unknown seller "${p.sellerSlug}".`);
+    }
+
+    // Price/description are refreshed on re-seed (they're demo-catalog
+    // copy, e.g. the old USD-scale prices); stock, badge, ratings and any
+    // other admin/seller edits are left alone.
+    const product = await prisma.product.upsert({
       where: { slug: p.slug },
-      update: {},
+      update: {
+        price: p.price,
+        compareAtPrice: p.compareAtPrice,
+        description: p.description,
+      },
       create: {
         id: p.id,
         slug: p.slug,
@@ -1606,44 +399,60 @@ async function main() {
         compareAtPrice: p.compareAtPrice,
         description: p.description,
         categoryId,
-        badge: p.badge as never,
-        careLevel: p.careLevel as never,
-        rating: p.rating,
-        reviewCount: p.reviewCount,
+        ...(sellerId && { sellerId, ownerType: 'SELLER_OWNED' as never }),
+        badge: (p.badge ? BADGE_TO_ENUM[p.badge] : undefined) as never,
+        careLevel: (p.careLevel ? CARE_TO_ENUM[p.careLevel] : undefined) as never,
+        rating: p.rating ?? undefined,
+        reviewCount: p.reviewCount ?? 0,
         inStock: p.inStock,
         stockCount: p.stockCount,
         createdAt: new Date(p.createdAt),
-        variants: { create: p.variants },
+        variants: {
+          create: p.variants.map((v) => ({
+            label: v.label,
+            swatch: v.swatch,
+            inStock: v.inStock,
+          })),
+        },
         specs: { create: p.specs },
       },
     });
+
+    if (p.image && (await prisma.productImage.count({ where: { productId: product.id } })) === 0) {
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          url: `/demo/products/${p.image.file}`,
+          altText: p.image.alt,
+          position: 0,
+        },
+      });
+    }
   }
 
   console.log(`Seeding ${REVIEWS.length} reviews...`);
-  // Reviews have no natural unique key in the source data, so upsert isn't
-  // meaningful here — idempotency instead means "skip products that
-  // already have any reviews seeded" (one query, not one per review).
-  const productsWithReviews = await prisma.review.groupBy({
-    by: ['productId'],
+  // Reviews have no natural unique key, so re-seeding replaces the demo
+  // reviews wholesale: a seeded review is exactly one with userId = null
+  // (every real review carries the author's userId — ReviewsService), so
+  // real customer reviews are never touched. This also refreshes reviews
+  // seeded by older versions of this file.
+  await prisma.review.deleteMany({
+    where: {
+      userId: null,
+      productId: { in: PRODUCTS.map((p) => p.id) },
+    },
   });
-  const alreadySeeded = new Set(
-    productsWithReviews.map((r: { productId: string }) => r.productId),
-  );
-
-  for (const r of REVIEWS) {
-    if (alreadySeeded.has(r.productId)) continue;
-    await prisma.review.create({
-      data: {
-        productId: r.productId,
-        author: r.author,
-        rating: r.rating,
-        title: r.title,
-        body: r.body,
-        date: new Date(r.date),
-        verified: r.verified,
-      },
-    });
-  }
+  await prisma.review.createMany({
+    data: REVIEWS.map((r) => ({
+      productId: r.productId,
+      author: r.author,
+      rating: r.rating,
+      title: r.title,
+      body: r.body,
+      date: new Date(r.date),
+      verified: r.verified,
+    })),
+  });
 
   console.log('Seeding warehouse and inventory...');
   const mainWarehouse = await prisma.warehouse.upsert({

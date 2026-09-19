@@ -28,6 +28,9 @@ const COMPLEMENTARY_CATEGORIES: Record<string, string[]> = {
   plants: ['vessels', 'tools'],
   vessels: ['plants', 'tools'],
   tools: ['plants', 'vessels'],
+  'outdoor-plants': ['vessels', 'soil-fertilisers'],
+  'soil-fertilisers': ['plants', 'tools'],
+  'home-decor': ['plants', 'vessels'],
 };
 
 @Injectable()
@@ -42,7 +45,12 @@ export class RecommendationsService {
     const reference = await this.productsService.findByIdOrThrow(productId);
     const pool = await this.prisma.product.findMany({
       where: { deletedAt: null, id: { not: productId } },
-      include: { category: true, variants: true, specs: true },
+      include: {
+        category: true,
+        variants: true,
+        specs: true,
+        images: { orderBy: { position: 'asc' } },
+      },
       take: CANDIDATE_POOL_LIMIT,
     });
 
@@ -114,7 +122,12 @@ export class RecommendationsService {
             deletedAt: null,
             id: { notIn: [productId, ...results] },
           },
-          include: { category: true, variants: true, specs: true },
+          include: {
+            category: true,
+            variants: true,
+            specs: true,
+            images: { orderBy: { position: 'asc' } },
+          },
         })) as unknown;
         if (candidate) results.push((candidate as { id: string }).id);
       }
@@ -129,7 +142,12 @@ export class RecommendationsService {
   async getPersonalized(context: UserSignals, count = 8) {
     const pool = (await this.prisma.product.findMany({
       where: { deletedAt: null },
-      include: { category: true, variants: true, specs: true },
+      include: {
+        category: true,
+        variants: true,
+        specs: true,
+        images: { orderBy: { position: 'asc' } },
+      },
       take: CANDIDATE_POOL_LIMIT,
     })) as never[];
     const publicPool = pool.map((p) => toPublicProduct(p));
@@ -157,7 +175,12 @@ export class RecommendationsService {
   async getBestsellers(count = 8) {
     const products = (await this.prisma.product.findMany({
       where: { deletedAt: null, badge: 'BESTSELLER' },
-      include: { category: true, variants: true, specs: true },
+      include: {
+        category: true,
+        variants: true,
+        specs: true,
+        images: { orderBy: { position: 'asc' } },
+      },
       take: count,
     })) as never[];
     return products.map((p) => toPublicProduct(p));

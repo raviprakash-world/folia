@@ -16,6 +16,9 @@ const complementaryCategories: Record<string, string[]> = {
   plants: ['vessels', 'tools'],
   vessels: ['plants', 'tools'],
   tools: ['plants', 'vessels'],
+  'outdoor-plants': ['vessels', 'soil-fertilisers'],
+  'soil-fertilisers': ['plants', 'tools'],
+  'home-decor': ['plants', 'vessels'],
 };
 
 /** Deterministically picks one product from `candidates`, seeded by `seed`. */
