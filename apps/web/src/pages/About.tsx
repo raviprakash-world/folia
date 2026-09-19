@@ -21,13 +21,13 @@ const values = [
 export default function About() {
   return (
     <>
-      <div className="bg-pine text-stone-light">
+      <div className="bg-pine text-cream-light">
         <Container className="py-24">
           <p className="font-mono text-xs uppercase tracking-wider text-ochre mb-4">About Folia</p>
           <h1 className="font-display text-4xl md:text-5xl font-semibold max-w-[20ch] leading-tight">
             We think a plant should still be alive a year after you buy it.
           </h1>
-          <p className="text-stone/75 mt-5 max-w-[60ch] text-lg">
+          <p className="text-cream/75 mt-5 max-w-[60ch] text-lg">
             That sounds obvious. It isn't how most plant shops operate — optimized for the
             unboxing photo, not the following spring. We built Folia around the opposite bet.
           </p>

@@ -18,7 +18,7 @@ export function AccountSidebar({ onLogoutClick }: AccountSidebarProps) {
           className={({ isActive }) =>
             cn(
               'flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-control)] text-sm transition-colors',
-              isActive ? 'bg-pine text-stone-light' : 'text-ink-soft hover:bg-stone-dark hover:text-ink'
+              isActive ? 'bg-pine text-cream-light' : 'text-ink-soft hover:bg-stone-dark hover:text-ink'
             )
           }
         >

@@ -38,7 +38,7 @@ export function NewsletterForm() {
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
-        className="flex items-center gap-2 text-sm text-stone"
+        className="flex items-center gap-2 text-sm text-cream"
       >
         <Check size={16} className="text-ochre" />
         You're on the list.
@@ -54,7 +54,7 @@ export function NewsletterForm() {
       noValidate
       className="flex flex-col gap-1.5 max-w-xs"
     >
-      <label htmlFor="newsletter-email" className="text-xs text-stone/60">
+      <label htmlFor="newsletter-email" className="text-xs text-cream/70">
         Get plant care notes, once a month. No spam.
       </label>
       <div className="flex gap-2">
@@ -64,14 +64,14 @@ export function NewsletterForm() {
           placeholder="you@example.com"
           aria-invalid={!!errors.email || !!errorMessage}
           aria-describedby={errors.email || errorMessage ? 'newsletter-email-error' : undefined}
-          className="flex-1 min-w-0 rounded-[var(--radius-control)] bg-stone-light/10 border border-stone-light/20 px-3 py-2 text-sm text-stone placeholder:text-stone/40 focus:border-ochre transition-colors"
+          className="flex-1 min-w-0 rounded-[var(--radius-control)] bg-cream-light/10 border border-cream-light/20 px-3 py-2 text-sm text-cream placeholder:text-cream/40 focus:border-ochre transition-colors"
           {...register('email')}
         />
         <button
           type="submit"
           disabled={isSubmitting}
           aria-label="Subscribe"
-          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] bg-ochre text-heading hover:bg-ochre-light transition-colors disabled:opacity-50"
+          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] bg-ochre text-pine hover:bg-ochre-light transition-colors disabled:opacity-50"
         >
           <ArrowRight size={16} />
         </button>

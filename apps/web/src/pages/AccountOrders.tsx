@@ -118,7 +118,7 @@ export default function AccountOrders() {
             onClick={() => handleFilterChange(tab.value)}
             className={cn(
               'px-3.5 py-1.5 rounded-full text-sm border transition-colors',
-              filter === tab.value ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+              filter === tab.value ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
             )}
           >
             {tab.label}

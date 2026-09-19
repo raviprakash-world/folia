@@ -44,7 +44,7 @@ export default function AdminRevenue() {
                 type="button"
                 onClick={() => setGranularity(opt.value)}
                 className={`px-3.5 py-1.5 rounded-full text-sm border transition-colors ${
-                  granularity === opt.value ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+                  granularity === opt.value ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
                 }`}
               >
                 {opt.label}

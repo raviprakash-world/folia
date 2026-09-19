@@ -55,7 +55,7 @@ export function ProductGallery({ productName, images = [], imageCount = 4 }: Pro
               alt={images[activeIndex]?.altText ?? `${productName} — photo ${activeIndex + 1}`}
             />
           ) : (
-            <span className="font-mono text-xs text-ink-soft/50 uppercase tracking-wider">
+            <span className="font-mono text-xs text-ink-soft uppercase tracking-wider">
               {productName} — image {activeIndex + 1}
             </span>
           )}

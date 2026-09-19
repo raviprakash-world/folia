@@ -27,10 +27,17 @@
   --color-stone-dark: #ded9cb;
   --color-ink: #1b1b18;
   --color-ink-soft: #55534c;
-  --color-ochre: #c08a34;
+  --color-ochre: #c4903b;
   --color-ochre-light: #d9a555;
   --color-rust: #a6553c;
   --color-rust-light: #f3e2dc;
+  /*
+    Light text for fixed dark fills (the pine hero/footer/buttons). `stone` and
+    `stone-light` invert in dark mode — right for surfaces, wrong for text that
+    sits on a fill that does NOT invert. These two never change.
+  */
+  --color-cream: #edeae1;
+  --color-cream-light: #f6f4ee;
   /*
     Heading text is its own token, deliberately separate from `pine` — pine
     is also used as a *fill* color (buttons, hero/footer blocks, tags),
@@ -77,7 +84,7 @@
   --color-stone-light: #1e2b23;
   --color-stone-dark: #33453a;
   --color-ink: #ede9df;
-  --color-ink-soft: #a8a79c;
+  --color-ink-soft: #bcbbb0;
   --color-heading: #f1efe6;
 
   --color-fern: #7fa88f;

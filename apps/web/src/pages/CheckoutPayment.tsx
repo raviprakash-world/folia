@@ -106,7 +106,7 @@ export default function CheckoutPayment() {
             aria-pressed={method === def.id}
             className={cn(
               'px-3.5 py-1.5 rounded-full text-sm border transition-colors',
-              method === def.id ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+              method === def.id ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
             )}
           >
             {def.label}

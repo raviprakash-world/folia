@@ -50,7 +50,7 @@ export function ThemeToggle({ compact = false }: ThemeToggleProps) {
             className={cn(
               'flex items-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] transition-colors',
               compact ? 'p-1.5' : 'px-3 py-1.5 text-sm',
-              active ? 'bg-pine text-stone-light' : 'text-ink-soft hover:text-ink'
+              active ? 'bg-pine text-cream-light' : 'text-ink-soft hover:text-ink'
             )}
           >
             <Icon size={compact ? 15 : 14} />

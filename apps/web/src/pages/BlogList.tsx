@@ -40,7 +40,7 @@ export default function BlogList() {
             onClick={() => handleCategoryClick(undefined)}
             className={cn(
               'px-3 py-1.5 rounded-full text-sm border transition-colors',
-              !category ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+              !category ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
             )}
           >
             All
@@ -52,7 +52,7 @@ export default function BlogList() {
               onClick={() => handleCategoryClick(cat)}
               className={cn(
                 'px-3 py-1.5 rounded-full text-sm border transition-colors',
-                category === cat ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+                category === cat ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
               )}
             >
               {cat}

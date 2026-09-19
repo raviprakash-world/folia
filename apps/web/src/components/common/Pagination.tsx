@@ -39,7 +39,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
 
       {pages.map((p, i) =>
         p === 'ellipsis' ? (
-          <span key={`ellipsis-${i}`} className="px-2 text-ink-soft/50 font-mono text-sm">
+          <span key={`ellipsis-${i}`} className="px-2 text-ink-soft font-mono text-sm">
             …
           </span>
         ) : (
@@ -50,7 +50,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
             aria-current={p === page ? 'page' : undefined}
             className={cn(
               'w-9 h-9 rounded-[var(--radius-control)] font-mono text-sm transition-colors',
-              p === page ? 'bg-pine text-stone-light' : 'text-ink-soft hover:bg-stone-dark hover:text-heading'
+              p === page ? 'bg-pine text-cream-light' : 'text-ink-soft hover:bg-stone-dark hover:text-heading'
             )}
           >
             {p}

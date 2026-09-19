@@ -4,7 +4,7 @@ import { useToastStore } from '@/store/toastStore';
 import { cn } from '@/utils/cn';
 
 const toneStyles = {
-  success: { container: 'bg-pine text-stone-light', Icon: CheckCircle2 },
+  success: { container: 'bg-pine text-cream-light', Icon: CheckCircle2 },
   error: { container: 'bg-rust text-stone-light', Icon: AlertCircle },
   info: { container: 'bg-ink text-stone-light', Icon: Info },
 } as const;

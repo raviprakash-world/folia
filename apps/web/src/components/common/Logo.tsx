@@ -12,7 +12,7 @@ interface LogoProps {
  * literal plant.
  */
 export function Logo({ className, tone = 'dark' }: LogoProps) {
-  const color = tone === 'dark' ? 'var(--color-pine)' : 'var(--color-stone-light)';
+  const color = tone === 'dark' ? 'var(--color-heading)' : 'var(--color-cream-light)';
   return (
     <span className={cn('inline-flex items-center gap-2 font-display font-semibold text-xl', className)} style={{ color }}>
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">

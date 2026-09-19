@@ -28,7 +28,7 @@ export function ActivityFeed({ items, emptyMessage = 'No recent activity.' }: Ac
           <div className="min-w-0">
             <p className="text-sm text-ink">{item.title}</p>
             {item.description && <p className="text-xs text-ink-soft mt-0.5">{item.description}</p>}
-            <p className="font-mono text-[11px] text-ink-soft/70 mt-1">{item.timestamp}</p>
+            <p className="font-mono text-[11px] text-ink-soft mt-1">{item.timestamp}</p>
           </div>
         </li>
       ))}

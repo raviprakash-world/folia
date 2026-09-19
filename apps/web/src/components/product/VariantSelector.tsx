@@ -56,7 +56,7 @@ export function VariantSelector({ variants, selectedId, onSelect }: VariantSelec
               className={cn(
                 'px-4 py-2 rounded-[var(--radius-control)] border text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:line-through',
                 selected
-                  ? 'border-pine bg-pine text-stone-light'
+                  ? 'border-pine bg-pine text-cream-light'
                   : 'border-stone-dark text-ink hover:border-fern'
               )}
             >

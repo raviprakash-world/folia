@@ -52,7 +52,7 @@ export function CouponInput() {
         <button
           type="submit"
           disabled={status === 'pending' || !code.trim()}
-          className="shrink-0 flex items-center justify-center px-4 rounded-[var(--radius-control)] bg-pine text-stone-light text-sm font-medium disabled:opacity-40 transition-opacity"
+          className="shrink-0 flex items-center justify-center px-4 rounded-[var(--radius-control)] bg-pine text-cream-light text-sm font-medium disabled:opacity-40 transition-opacity"
         >
           {status === 'pending' ? <Loader2 size={15} className="animate-spin" /> : 'Apply'}
         </button>

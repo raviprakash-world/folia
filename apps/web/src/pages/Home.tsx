@@ -16,14 +16,14 @@ import { BlogPreview } from '@/components/home/BlogPreview';
 export default function Home() {
   return (
     <>
-      <section className="bg-pine text-stone-light">
+      <section className="bg-pine text-cream-light">
         <Container className="py-24 md:py-32 grid md:grid-cols-2 gap-12 items-center">
           <div>
             <Tag tone="ochre" tilted>New season</Tag>
             <h1 className="font-display text-5xl md:text-6xl font-semibold leading-[1.05] mt-5">
               Living design for the home.
             </h1>
-            <p className="mt-5 text-stone/75 text-lg max-w-[42ch]">
+            <p className="mt-5 text-cream/75 text-lg max-w-[42ch]">
               Considered plants and vessels, chosen for how they hold light in a room —
               not just how they photograph.
             </p>
@@ -34,7 +34,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="lg"
-                className="!text-stone-light !border-stone-light hover:!bg-stone-light hover:!text-heading"
+                className="!text-cream-light !border-cream-light hover:!bg-stone-light hover:!text-heading"
               >
                 <Link to="/about">Our approach</Link>
               </Button>

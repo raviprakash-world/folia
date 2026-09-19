@@ -95,7 +95,7 @@ export function TrackingTimeline({ order }: { order: Order }) {
         {courier && (
           <Card variant="flat" className="p-4 flex items-center gap-3">
             <span
-              className="flex items-center justify-center w-11 h-11 rounded-full text-stone-light font-mono text-sm font-semibold shrink-0"
+              className="flex items-center justify-center w-11 h-11 rounded-full text-cream-light font-mono text-sm font-semibold shrink-0"
               style={{ backgroundColor: courier.color }}
               aria-hidden="true"
             >
@@ -226,7 +226,7 @@ export function TrackingTimeline({ order }: { order: Order }) {
           </div>
           <div className="grid sm:grid-cols-[100px_1fr] gap-4">
             <div className="aspect-square rounded-[var(--radius-control)] bg-stone-dark flex items-center justify-center">
-              <span className="font-mono text-[10px] text-ink-soft/60 text-center px-1">Placeholder photo</span>
+              <span className="font-mono text-[10px] text-ink-soft text-center px-1">Placeholder photo</span>
             </div>
             <dl className="text-sm flex flex-col gap-1">
               <div className="flex gap-2">
@@ -241,7 +241,7 @@ export function TrackingTimeline({ order }: { order: Order }) {
                 <dt className="text-ink-soft w-24 shrink-0">Method</dt>
                 <dd className="text-ink capitalize">{tracking.proofOfDelivery.method}</dd>
               </div>
-              <p className="text-xs text-ink-soft/70 mt-2">{tracking.proofOfDelivery.note}</p>
+              <p className="text-xs text-ink-soft mt-2">{tracking.proofOfDelivery.note}</p>
             </dl>
           </div>
         </Card>
@@ -262,7 +262,7 @@ export function TrackingTimeline({ order }: { order: Order }) {
         </ul>
       </div>
 
-      <p className="text-xs text-ink-soft/70">
+      <p className="text-xs text-ink-soft">
         Delivery window: roughly {windowHours} hours from order placement — {formatCurrency(order.shippingCost)} shipping.
       </p>
     </div>

@@ -108,7 +108,7 @@ export default function AccountNotifications() {
               onClick={() => setFilter(t.value)}
               className={cn(
                 'px-3 py-1.5 rounded-full text-sm border transition-colors',
-                filter === t.value ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+                filter === t.value ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
               )}
             >
               {t.label}
@@ -146,7 +146,7 @@ export default function AccountNotifications() {
                 <div className="min-w-0">
                   <p className={cn('text-sm', n.read ? 'text-ink-soft' : 'text-ink font-medium')}>{n.title}</p>
                   <p className="text-xs text-ink-soft mt-0.5">{n.message}</p>
-                  <p className="font-mono text-[11px] text-ink-soft/70 mt-1">{timeAgo(n.createdAt)}</p>
+                  <p className="font-mono text-[11px] text-ink-soft mt-1">{timeAgo(n.createdAt)}</p>
                 </div>
               </div>
             );

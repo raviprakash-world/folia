@@ -19,7 +19,7 @@ export function AccountMobileNav({ onLogoutClick }: AccountMobileNavProps) {
             className={({ isActive }) =>
               cn(
                 'px-3.5 py-1.5 rounded-full text-sm border whitespace-nowrap transition-colors',
-                isActive ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft'
+                isActive ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft'
               )
             }
           >

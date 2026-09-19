@@ -186,7 +186,7 @@ export function ProductReviews({ productId, productSlug, averageRating, reviewCo
             </div>
             <h4 className="font-medium text-ink mt-2">{review.title}</h4>
             <p className="text-sm text-ink-soft mt-1">{review.body}</p>
-            <p className="font-mono text-xs text-ink-soft/70 mt-2">
+            <p className="font-mono text-xs text-ink-soft mt-2">
               {review.author} — {review.date}
             </p>
           </li>

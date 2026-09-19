@@ -33,7 +33,7 @@ function ProductListRow({ product }: { product: Product }) {
       <div className="text-right shrink-0">
         <div className="flex items-baseline gap-2 font-mono text-sm justify-end">
           <span className={onSale ? 'text-rust' : 'text-ink'}>{formatCurrency(product.price)}</span>
-          {onSale && <span className="text-ink-soft/50 line-through text-xs">{formatCurrency(product.compareAtPrice!)}</span>}
+          {onSale && <span className="text-ink-soft line-through text-xs">{formatCurrency(product.compareAtPrice!)}</span>}
         </div>
         {product.rating && (
           <div className="flex items-center justify-end gap-1 text-xs text-ink-soft mt-1">

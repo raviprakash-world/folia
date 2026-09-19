@@ -42,12 +42,12 @@ const socials = [
 
 export function Footer() {
   return (
-    <footer className="bg-pine text-stone mt-24">
+    <footer className="bg-pine text-cream mt-24">
       <Container className="py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
           <div className="col-span-2 md:col-span-2">
             <Logo tone="light" />
-            <p className="mt-4 text-sm text-stone/70 max-w-[24ch]">
+            <p className="mt-4 text-sm text-cream/70 max-w-[24ch]">
               Living design for the home.
             </p>
             <div className="mt-6 flex gap-3">
@@ -58,7 +58,7 @@ export function Footer() {
                   aria-label={label}
                   target="_blank"
                   rel="noreferrer"
-                  className="p-2 rounded-full border border-stone-light/15 text-stone/70 hover:text-stone hover:border-stone-light/40 transition-colors"
+                  className="p-2 rounded-full border border-cream-light/15 text-cream/70 hover:text-cream hover:border-cream-light/40 transition-colors"
                 >
                   <Icon size={16} />
                 </a>
@@ -67,13 +67,13 @@ export function Footer() {
           </div>
           {columns.map((col) => (
             <div key={col.heading}>
-              <h3 className="font-mono text-xs uppercase tracking-wider text-stone/50 mb-4">
+              <h3 className="font-mono text-xs uppercase tracking-wider text-cream/65 mb-4">
                 {col.heading}
               </h3>
               <ul className="flex flex-col gap-2.5">
                 {col.links.map((link) => (
                   <li key={link.to}>
-                    <Link to={link.to} className="text-sm text-stone/85 hover:text-stone transition-colors">
+                    <Link to={link.to} className="text-sm text-cream/85 hover:text-cream transition-colors">
                       {link.label}
                     </Link>
                   </li>
@@ -82,13 +82,13 @@ export function Footer() {
             </div>
           ))}
           <div className="col-span-2 md:col-span-1">
-            <h3 className="font-mono text-xs uppercase tracking-wider text-stone/50 mb-4">
+            <h3 className="font-mono text-xs uppercase tracking-wider text-cream/65 mb-4">
               Stay in the loop
             </h3>
             <NewsletterForm />
           </div>
         </div>
-        <div className="mt-14 pt-6 border-t border-stone/15 flex flex-col sm:flex-row justify-between gap-2 text-xs text-stone/50">
+        <div className="mt-14 pt-6 border-t border-stone/15 flex flex-col sm:flex-row justify-between gap-2 text-xs text-cream/65">
           <p>&copy; {new Date().getFullYear()} Folia. Portfolio project — not a real store.</p>
           <p>Made for demonstration purposes.</p>
         </div>

@@ -13,7 +13,7 @@ const promos = [
     title: 'Gift a plant, not a guess',
     description: 'Gift cards never wilt.',
     to: '/shop/gift-cards',
-    tone: 'bg-ochre text-heading',
+    tone: 'bg-ochre text-pine',
   },
 ];
 
@@ -29,7 +29,7 @@ export function PromoBanners() {
           >
             <div>
               <h3 className="font-display text-2xl font-semibold">{promo.title}</h3>
-              <p className="text-sm opacity-80 mt-2">{promo.description}</p>
+              <p className="text-sm mt-2">{promo.description}</p>
             </div>
             <span className="inline-flex items-center gap-1.5 text-sm font-medium mt-6">
               Shop now

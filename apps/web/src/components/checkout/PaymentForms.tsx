@@ -108,7 +108,7 @@ export function SavedCardPicker({ selectedId, onSelect }: SavedCardPickerProps) 
           className={cn(
             'px-3.5 py-1.5 rounded-full text-sm border transition-colors',
             selectedId === card.id
-              ? 'bg-pine text-stone-light border-pine'
+              ? 'bg-pine text-cream-light border-pine'
               : 'border-stone-dark text-ink-soft hover:border-fern'
           )}
         >
@@ -120,7 +120,7 @@ export function SavedCardPicker({ selectedId, onSelect }: SavedCardPickerProps) 
         onClick={() => onSelect(null)}
         className={cn(
           'px-3.5 py-1.5 rounded-full text-sm border transition-colors',
-          selectedId === null ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+          selectedId === null ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
         )}
       >
         Use a new card

@@ -23,7 +23,7 @@ export function CheckoutStepper({ pathname }: { pathname: string }) {
                 className={cn(
                   'flex items-center justify-center w-7 h-7 rounded-full text-xs font-mono shrink-0 transition-colors',
                   isComplete && 'bg-fern text-stone-light',
-                  isCurrent && 'bg-pine text-stone-light',
+                  isCurrent && 'bg-pine text-cream-light',
                   !isComplete && !isCurrent && 'bg-stone-dark text-ink-soft'
                 )}
                 aria-current={isCurrent ? 'step' : undefined}
