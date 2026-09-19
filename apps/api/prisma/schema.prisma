@@ -294,6 +294,11 @@ model Product {
   wishlistedBy   WishlistItem[]
   tags           Tag[]            @relation("ProductTags")
 
+  /// Slugs of the curated collections (categories with type COLLECTION) this
+  /// product is listed in. Kept as a plain slug list because a collection is
+  /// a merchandising grouping, not a place the product lives.
+  collectionSlugs String[] @default([])
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   /// Soft delete — matches User's pattern (Phase 1). A deleted product

@@ -1,7 +1,10 @@
 import { http, HttpResponse, delay } from 'msw';
 import { products } from '@/data/products';
 import { categories, collections } from '@/data/categories';
+import catalog from '../../../api/prisma/demo/catalog.json';
 import type { ProductQueryResult, SortKey } from '@/types/product';
+
+const collectionsByProduct = new Map<string, string[]>(catalog.products.map((p) => [p.slug, p.collectionSlugs]));
 
 const API_DELAY_MS = 350;
 
@@ -38,6 +41,7 @@ export const catalogHandlers = [
     await delay(API_DELAY_MS);
     const url = new URL(request.url);
     const category = url.searchParams.get('category');
+    const collection = url.searchParams.get('collection');
     const minPrice = url.searchParams.get('minPrice');
     const maxPrice = url.searchParams.get('maxPrice');
     const inStockOnly = url.searchParams.get('inStockOnly') === 'true';
@@ -49,6 +53,7 @@ export const catalogHandlers = [
 
     let filtered = products;
     if (category) filtered = filtered.filter((p) => p.categorySlug === category);
+    if (collection) filtered = filtered.filter((p) => collectionsByProduct.get(p.slug)?.includes(collection));
     if (minPrice) filtered = filtered.filter((p) => p.price >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => p.price <= Number(maxPrice));
     if (inStockOnly) filtered = filtered.filter((p) => p.inStock);

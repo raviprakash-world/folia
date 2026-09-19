@@ -5,7 +5,7 @@ import type { ProductQuery, SortKey } from '@/types/product';
 
 const PAGE_SIZE = 9;
 
-export function useProductListState(fixedCategory?: string, fixedSellerId?: string) {
+export function useProductListState(fixedCategory?: string, fixedSellerId?: string, fixedCollection?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
   const locationState = useLocationStore((s) => s.location?.state || undefined);
   const nearMe = searchParams.get('nearMe') === 'true';
@@ -13,6 +13,7 @@ export function useProductListState(fixedCategory?: string, fixedSellerId?: stri
   const filters: ProductQuery = useMemo(
     () => ({
       category: fixedCategory ?? searchParams.get('category') ?? undefined,
+      collection: fixedCollection,
       minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
       maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
       inStockOnly: searchParams.get('inStock') === 'true',
@@ -27,7 +28,7 @@ export function useProductListState(fixedCategory?: string, fixedSellerId?: stri
       nearMe,
       shipFromState: nearMe ? locationState : undefined,
     }),
-    [searchParams, fixedCategory, fixedSellerId, nearMe, locationState]
+    [searchParams, fixedCategory, fixedCollection, fixedSellerId, nearMe, locationState]
   );
 
   const view = (searchParams.get('view') as 'grid' | 'list') ?? 'grid';

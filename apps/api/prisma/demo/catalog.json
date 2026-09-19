@@ -203,7 +203,7 @@
     },
     {
      "label": "Pet safe",
-     "value": "Yes"
+     "value": "No — toxic if ingested"
     },
     {
      "label": "Mature height",
@@ -213,7 +213,8 @@
    "image": {
     "file": "monstera-deliciosa.jpg",
     "alt": "Monstera Deliciosa"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p2",
@@ -272,7 +273,8 @@
    "image": {
     "file": "fiddle-leaf-fig.jpg",
     "alt": "Fiddle Leaf Fig"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p3",
@@ -331,7 +333,13 @@
    "image": {
     "file": "snake-plant-laurentii.jpg",
     "alt": "Snake Plant Laurentii"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "gifting",
+    "new-home",
+    "office"
+   ]
   },
   {
    "id": "p4",
@@ -390,7 +398,12 @@
    "image": {
     "file": "pothos-marble-queen.jpg",
     "alt": "Pothos Marble Queen"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "new-home",
+    "office"
+   ]
   },
   {
    "id": "p5",
@@ -449,7 +462,11 @@
    "image": {
     "file": "bird-s-nest-fern.jpg",
     "alt": "Bird's Nest Fern"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "pet-friendly"
+   ]
   },
   {
    "id": "p6",
@@ -508,7 +525,10 @@
    "image": {
     "file": "calathea-orbifolia.jpg",
     "alt": "Calathea Orbifolia"
-   }
+   },
+   "collectionSlugs": [
+    "pet-friendly"
+   ]
   },
   {
    "id": "p7",
@@ -557,7 +577,7 @@
     },
     {
      "label": "Pet safe",
-     "value": "Yes"
+     "value": "No — toxic if ingested"
     },
     {
      "label": "Mature height",
@@ -567,7 +587,12 @@
    "image": {
     "file": "zz-plant.jpg",
     "alt": "ZZ Plant"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "new-home",
+    "office"
+   ]
   },
   {
    "id": "p8",
@@ -626,7 +651,10 @@
    "image": {
     "file": "rubber-plant-burgundy.jpg",
     "alt": "Rubber Plant Burgundy"
-   }
+   },
+   "collectionSlugs": [
+    "office"
+   ]
   },
   {
    "id": "p9",
@@ -675,7 +703,7 @@
     },
     {
      "label": "Pet safe",
-     "value": "Yes"
+     "value": "No — toxic if ingested"
     },
     {
      "label": "Mature height",
@@ -685,7 +713,8 @@
    "image": {
     "file": "string-of-pearls.jpg",
     "alt": "String of Pearls"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p10",
@@ -734,7 +763,7 @@
     },
     {
      "label": "Pet safe",
-     "value": "Yes"
+     "value": "No — toxic if ingested"
     },
     {
      "label": "Mature height",
@@ -744,7 +773,13 @@
    "image": {
     "file": "peace-lily.jpg",
     "alt": "Peace Lily"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "flowering",
+    "gifting",
+    "office"
+   ]
   },
   {
    "id": "p11",
@@ -793,7 +828,7 @@
     },
     {
      "label": "Pet safe",
-     "value": "No — toxic if ingested"
+     "value": "Yes"
     },
     {
      "label": "Mature height",
@@ -803,7 +838,11 @@
    "image": {
     "file": "boston-fern.jpg",
     "alt": "Boston Fern"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "pet-friendly"
+   ]
   },
   {
    "id": "p12",
@@ -862,7 +901,11 @@
    "image": {
     "file": "areca-palm.jpg",
     "alt": "Areca Palm"
-   }
+   },
+   "collectionSlugs": [
+    "pet-friendly",
+    "office"
+   ]
   },
   {
    "id": "p13",
@@ -917,7 +960,11 @@
    "image": {
     "file": "ceramic-vessel-ash.jpg",
     "alt": "Ceramic Vessel — Ash"
-   }
+   },
+   "collectionSlugs": [
+    "statement-vessels",
+    "gifting"
+   ]
   },
   {
    "id": "p14",
@@ -972,7 +1019,10 @@
    "image": {
     "file": "stone-planter-round.jpg",
     "alt": "Stone Planter — Round"
-   }
+   },
+   "collectionSlugs": [
+    "statement-vessels"
+   ]
   },
   {
    "id": "p15",
@@ -1027,7 +1077,8 @@
    "image": {
     "file": "terracotta-pot-set-of-3.jpg",
     "alt": "Terracotta Pot Set of 3"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p16",
@@ -1082,7 +1133,10 @@
    "image": {
     "file": "woven-plant-basket.jpg",
     "alt": "Woven Plant Basket"
-   }
+   },
+   "collectionSlugs": [
+    "baskets"
+   ]
   },
   {
    "id": "p17",
@@ -1137,7 +1191,10 @@
    "image": {
     "file": "matte-black-cylinder-pot.jpg",
     "alt": "Matte Black Cylinder Pot"
-   }
+   },
+   "collectionSlugs": [
+    "statement-vessels"
+   ]
   },
   {
    "id": "p18",
@@ -1192,7 +1249,10 @@
    "image": {
     "file": "fluted-ceramic-planter.jpg",
     "alt": "Fluted Ceramic Planter"
-   }
+   },
+   "collectionSlugs": [
+    "statement-vessels"
+   ]
   },
   {
    "id": "p19",
@@ -1224,7 +1284,10 @@
    "image": {
     "file": "brass-plant-mister.jpg",
     "alt": "Brass Plant Mister"
-   }
+   },
+   "collectionSlugs": [
+    "gifting"
+   ]
   },
   {
    "id": "p20",
@@ -1256,7 +1319,8 @@
    "image": {
     "file": "precision-pruning-shears.jpg",
     "alt": "Precision Pruning Shears"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p21",
@@ -1288,7 +1352,10 @@
    "image": {
     "file": "soil-moisture-meter.jpg",
     "alt": "Soil Moisture Meter"
-   }
+   },
+   "collectionSlugs": [
+    "office"
+   ]
   },
   {
    "id": "p22",
@@ -1320,7 +1387,10 @@
    "image": {
     "file": "watering-can-1-5l.jpg",
     "alt": "Watering Can — 1.5L"
-   }
+   },
+   "collectionSlugs": [
+    "new-home"
+   ]
   },
   {
    "id": "p23",
@@ -1352,7 +1422,8 @@
    "image": {
     "file": "bamboo-plant-stakes-set-of-6.jpg",
     "alt": "Bamboo Plant Stakes (Set of 6)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p24",
@@ -1384,7 +1455,8 @@
    "image": {
     "file": "grow-light-full-spectrum.jpg",
     "alt": "Grow Light — Full Spectrum"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p25",
@@ -1424,7 +1496,12 @@
    "image": {
     "file": "money-plant-golden-pothos.jpg",
     "alt": "Money Plant (Golden Pothos)"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "gifting",
+    "new-home"
+   ]
   },
   {
    "id": "p26",
@@ -1464,7 +1541,11 @@
    "image": {
     "file": "spider-plant.jpg",
     "alt": "Spider Plant"
-   }
+   },
+   "collectionSlugs": [
+    "pet-friendly",
+    "new-home"
+   ]
   },
   {
    "id": "p27",
@@ -1504,7 +1585,11 @@
    "image": {
     "file": "philodendron-heartleaf.jpg",
     "alt": "Philodendron (Heartleaf)"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "office"
+   ]
   },
   {
    "id": "p28",
@@ -1544,7 +1629,11 @@
    "image": {
     "file": "lucky-bamboo.jpg",
     "alt": "Lucky Bamboo (2-layer)"
-   }
+   },
+   "collectionSlugs": [
+    "low-light-plants",
+    "gifting"
+   ]
   },
   {
    "id": "p29",
@@ -1584,7 +1673,10 @@
    "image": {
     "file": "bougainvillea.jpg",
     "alt": "Bougainvillea"
-   }
+   },
+   "collectionSlugs": [
+    "flowering"
+   ]
   },
   {
    "id": "p30",
@@ -1624,7 +1716,10 @@
    "image": {
     "file": "hibiscus.jpg",
     "alt": "Hibiscus (Gudhal)"
-   }
+   },
+   "collectionSlugs": [
+    "flowering"
+   ]
   },
   {
    "id": "p31",
@@ -1664,7 +1759,11 @@
    "image": {
     "file": "jasmine-mogra.jpg",
     "alt": "Jasmine (Mogra)"
-   }
+   },
+   "collectionSlugs": [
+    "pet-friendly",
+    "flowering"
+   ]
   },
   {
    "id": "p32",
@@ -1704,7 +1803,11 @@
    "image": {
     "file": "rose-desi-gulab.jpg",
     "alt": "Rose (Desi Gulab)"
-   }
+   },
+   "collectionSlugs": [
+    "pet-friendly",
+    "flowering"
+   ]
   },
   {
    "id": "p33",
@@ -1744,7 +1847,10 @@
    "image": {
     "file": "marigold-genda.jpg",
     "alt": "Marigold (Genda)"
-   }
+   },
+   "collectionSlugs": [
+    "flowering"
+   ]
   },
   {
    "id": "p34",
@@ -1784,7 +1890,10 @@
    "image": {
     "file": "ixora.jpg",
     "alt": "Ixora (Rugmini)"
-   }
+   },
+   "collectionSlugs": [
+    "flowering"
+   ]
   },
   {
    "id": "p35",
@@ -1824,7 +1933,8 @@
    "image": {
     "file": "croton-petra.jpg",
     "alt": "Croton (Petra)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p36",
@@ -1864,7 +1974,11 @@
    "image": {
     "file": "aloe-vera.jpg",
     "alt": "Aloe Vera"
-   }
+   },
+   "collectionSlugs": [
+    "gifting",
+    "new-home"
+   ]
   },
   {
    "id": "p37",
@@ -1917,7 +2031,11 @@
    "image": {
     "file": "classic-terracotta-planter.jpg",
     "alt": "Classic Terracotta Planter (8 in)"
-   }
+   },
+   "collectionSlugs": [
+    "gifting",
+    "new-home"
+   ]
   },
   {
    "id": "p38",
@@ -1970,7 +2088,10 @@
    "image": {
     "file": "ribbed-cement-pot.jpg",
     "alt": "Ribbed Cement Pot"
-   }
+   },
+   "collectionSlugs": [
+    "statement-vessels"
+   ]
   },
   {
    "id": "p39",
@@ -2010,7 +2131,10 @@
    "image": {
     "file": "hanging-macrame-planter.jpg",
     "alt": "Hanging Macramé Planter"
-   }
+   },
+   "collectionSlugs": [
+    "baskets"
+   ]
   },
   {
    "id": "p40",
@@ -2063,7 +2187,10 @@
    "image": {
     "file": "self-watering-planter.jpg",
     "alt": "Self-Watering Planter"
-   }
+   },
+   "collectionSlugs": [
+    "office"
+   ]
   },
   {
    "id": "p41",
@@ -2103,7 +2230,8 @@
    "image": {
     "file": "balcony-railing-planter.jpg",
     "alt": "Balcony Railing Planter"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p42",
@@ -2143,7 +2271,10 @@
    "image": {
     "file": "organic-potting-mix.jpg",
     "alt": "Organic Potting Mix (5 kg)"
-   }
+   },
+   "collectionSlugs": [
+    "new-home"
+   ]
   },
   {
    "id": "p43",
@@ -2183,7 +2314,8 @@
    "image": {
     "file": "vermicompost.jpg",
     "alt": "Vermicompost (2 kg)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p44",
@@ -2223,7 +2355,8 @@
    "image": {
     "file": "neem-cake-powder.jpg",
     "alt": "Neem Cake Powder (1 kg)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p45",
@@ -2263,7 +2396,8 @@
    "image": {
     "file": "cocopeat-block.jpg",
     "alt": "Cocopeat Block (5 kg)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p46",
@@ -2303,7 +2437,8 @@
    "image": {
     "file": "perlite.jpg",
     "alt": "Perlite (1 L)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p47",
@@ -2343,7 +2478,8 @@
    "image": {
     "file": "all-purpose-plant-fertiliser.jpg",
     "alt": "All-purpose Plant Fertiliser (500 g)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p48",
@@ -2396,7 +2532,8 @@
    "image": {
     "file": "gardening-gloves.jpg",
     "alt": "Gardening Gloves"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p49",
@@ -2436,7 +2573,8 @@
    "image": {
     "file": "hand-trowel.jpg",
     "alt": "Hand Trowel"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p50",
@@ -2476,7 +2614,8 @@
    "image": {
     "file": "wooden-plant-stand.jpg",
     "alt": "Wooden Plant Stand"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p51",
@@ -2516,7 +2655,8 @@
    "image": {
     "file": "metal-plant-stand.jpg",
     "alt": "Metal Plant Stand"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p52",
@@ -2556,7 +2696,10 @@
    "image": {
     "file": "macrame-plant-hanger.jpg",
     "alt": "Macramé Plant Hanger"
-   }
+   },
+   "collectionSlugs": [
+    "baskets"
+   ]
   },
   {
    "id": "p53",
@@ -2596,7 +2739,8 @@
    "image": {
     "file": "decorative-pebbles.jpg",
     "alt": "Decorative Pebbles (1 kg)"
-   }
+   },
+   "collectionSlugs": []
   },
   {
    "id": "p54",
@@ -2636,7 +2780,10 @@
    "image": {
     "file": "bamboo-planter-stand.jpg",
     "alt": "Bamboo Planter Stand"
-   }
+   },
+   "collectionSlugs": [
+    "baskets"
+   ]
   },
   {
    "id": "p55",
@@ -2676,7 +2823,8 @@
    "image": {
     "file": "indoor-plant-shelf.jpg",
     "alt": "Indoor Plant Shelf"
-   }
+   },
+   "collectionSlugs": []
   }
  ],
  "reviews": [

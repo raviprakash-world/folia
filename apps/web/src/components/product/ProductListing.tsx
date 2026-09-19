@@ -16,6 +16,8 @@ interface ProductListingProps {
   title: string;
   description?: string;
   fixedCategory?: string;
+  /** A curated collection page fixes this to that collection's products. */
+  fixedCollection?: string;
   /** Marketplace Phase 4 — a seller storefront page fixes this to show
    * only that seller's own catalog. */
   fixedSellerId?: string;
@@ -29,11 +31,12 @@ export function ProductListing({
   title,
   description,
   fixedCategory,
+  fixedCollection,
   fixedSellerId,
   header,
 }: ProductListingProps) {
   const { filters, view, updateFilters, setPage, setSort, setView, resetFilters } =
-    useProductListState(fixedCategory, fixedSellerId);
+    useProductListState(fixedCategory, fixedSellerId, fixedCollection);
   const { data, isLoading, isError } = useProducts(filters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 

@@ -80,6 +80,7 @@ export class ProductsService {
       approvalStatus: 'ACTIVE',
     };
     if (query.category) where.category = { slug: query.category };
+    if (query.collection) where.collectionSlugs = { has: query.collection };
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.price = {
         ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),

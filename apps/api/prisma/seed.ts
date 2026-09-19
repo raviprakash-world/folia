@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 // See src/users/users.service.ts's top-of-file comment for why this
 // exemption exists — same root cause (PrismaClient typed `any`
 // pre-generation), applies here too since this file also can't run until
@@ -78,6 +77,7 @@ interface CatalogProduct {
   compareAtPrice: number | null;
   description: string;
   categorySlug: string;
+  collectionSlugs: string[];
   sellerSlug: string | null;
   badge: string | null;
   careLevel: string | null;
@@ -252,7 +252,10 @@ async function main() {
   // SEED_LOCK_DEMO_ACCOUNTS=true (production only) replaces those passwords
   // with random ones and revokes their sessions — a one-off cleanup for a
   // database that was already seeded that way.
-  if (!knownPasswordsAllowed && process.env.SEED_LOCK_DEMO_ACCOUNTS === 'true') {
+  if (
+    !knownPasswordsAllowed &&
+    process.env.SEED_LOCK_DEMO_ACCOUNTS === 'true'
+  ) {
     const knownEmails = [
       'demo@folia.example',
       'admin@folia.example',
@@ -260,7 +263,9 @@ async function main() {
     ];
     const locked = await prisma.user.updateMany({
       where: { email: { in: knownEmails } },
-      data: { passwordHash: await hashPassword(randomBytes(32).toString('hex')) },
+      data: {
+        passwordHash: await hashPassword(randomBytes(32).toString('hex')),
+      },
     });
     await prisma.session.deleteMany({
       where: { user: { email: { in: knownEmails } } },
@@ -270,7 +275,9 @@ async function main() {
       where: { slug: 'terracotta-and-fern', gstin: '27ABCDE1234F1Z0' },
       data: { gstin: null },
     });
-    console.log(`Locked ${locked.count} demo account(s): random password set, sessions revoked.`);
+    console.log(
+      `Locked ${locked.count} demo account(s): random password set, sessions revoked.`,
+    );
   }
 
   // Marketplace Phase 1 — a demo seller account, seeded directly with an
@@ -402,9 +409,22 @@ async function main() {
       );
     }
 
-    const sellerId = p.sellerSlug ? sellerIdBySlug.get(p.sellerSlug) : undefined;
+    const unknownCollection = p.collectionSlugs.find(
+      (slug) => !COLLECTIONS.some((c) => c.slug === slug),
+    );
+    if (unknownCollection) {
+      throw new Error(
+        `Product ${p.slug} lists unknown collection "${unknownCollection}".`,
+      );
+    }
+
+    const sellerId = p.sellerSlug
+      ? sellerIdBySlug.get(p.sellerSlug)
+      : undefined;
     if (p.sellerSlug && !sellerId) {
-      throw new Error(`Product ${p.slug} references unknown seller "${p.sellerSlug}".`);
+      throw new Error(
+        `Product ${p.slug} references unknown seller "${p.sellerSlug}".`,
+      );
     }
 
     // Price/description are refreshed on re-seed (they're demo-catalog
@@ -416,6 +436,7 @@ async function main() {
         price: p.price,
         compareAtPrice: p.compareAtPrice,
         description: p.description,
+        collectionSlugs: p.collectionSlugs,
       },
       create: {
         id: p.id,
@@ -425,9 +446,12 @@ async function main() {
         compareAtPrice: p.compareAtPrice,
         description: p.description,
         categoryId,
+        collectionSlugs: p.collectionSlugs,
         ...(sellerId && { sellerId, ownerType: 'SELLER_OWNED' as never }),
         badge: (p.badge ? BADGE_TO_ENUM[p.badge] : undefined) as never,
-        careLevel: (p.careLevel ? CARE_TO_ENUM[p.careLevel] : undefined) as never,
+        careLevel: (p.careLevel
+          ? CARE_TO_ENUM[p.careLevel]
+          : undefined) as never,
         rating: p.rating ?? undefined,
         reviewCount: p.reviewCount ?? 0,
         inStock: p.inStock,
@@ -444,7 +468,12 @@ async function main() {
       },
     });
 
-    if (p.image && (await prisma.productImage.count({ where: { productId: product.id } })) === 0) {
+    if (
+      p.image &&
+      (await prisma.productImage.count({
+        where: { productId: product.id },
+      })) === 0
+    ) {
       await prisma.productImage.create({
         data: {
           productId: product.id,

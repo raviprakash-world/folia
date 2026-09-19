@@ -109,6 +109,26 @@ describe('ProductsService.findMany', () => {
     );
   });
 
+  it("collection: filters on the product's collectionSlugs list", async () => {
+    const prisma = createMockPrisma();
+    prisma.$transaction.mockResolvedValue([0, []]);
+    const service = new ProductsService(prisma as never);
+
+    await service.findMany({
+      collection: 'pet-friendly',
+      page: 1,
+      pageSize: 12,
+    });
+
+    expect(prisma.product.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          collectionSlugs: { has: 'pet-friendly' },
+        }),
+      }),
+    );
+  });
+
   it("shipFromState: matches sellers whose business address is in that state (case-insensitive) and, for Folia's own dispatch state, Folia-owned products too", async () => {
     const prisma = createMockPrisma();
     prisma.$transaction.mockResolvedValue([0, []]);

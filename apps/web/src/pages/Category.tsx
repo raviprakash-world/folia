@@ -14,13 +14,14 @@ export default function Category() {
   const { data: collection, isLoading: collectionLoading } = useCollection(category ? undefined : slug);
   const meta = category ?? collection;
 
-  // Collections don't map to a single product.categorySlug filter (that's
-  // the whole point of a curated grouping), so only real categories narrow
-  // the product list; a real backend would resolve a collection's product
-  // set server-side.
+  // A curated collection spans categories, so it filters by collection
+  // membership instead of categorySlug.
   const fixedCategory = category ? category.slug : undefined;
+  const fixedCollection = category ? undefined : slug;
 
   const title = meta?.name ?? (collectionLoading ? 'Loading…' : (slug ?? 'Collection'));
 
-  return <ProductListing title={title} description={meta?.description} fixedCategory={fixedCategory} />;
+  return <ProductListing title={title} description={meta?.description} fixedCategory={fixedCategory}
+      fixedCollection={fixedCollection}
+    />;
 }

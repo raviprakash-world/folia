@@ -27,6 +27,13 @@ export class ProductQueryDto {
   @IsString()
   category?: string;
 
+  @ApiPropertyOptional({
+    description: 'Curated collection slug (e.g. pet-friendly).',
+  })
+  @IsOptional()
+  @IsString()
+  collection?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)

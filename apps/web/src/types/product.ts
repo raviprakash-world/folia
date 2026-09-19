@@ -70,6 +70,8 @@ export type SortKey = 'featured' | 'price-asc' | 'price-desc' | 'newest' | 'rati
 
 export interface ProductQuery {
   category?: string;
+  /** Curated collection slug — products listed in that collection. */
+  collection?: string;
   minPrice?: number;
   maxPrice?: number;
   inStockOnly?: boolean;
