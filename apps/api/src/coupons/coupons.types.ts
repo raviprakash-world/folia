@@ -19,5 +19,6 @@ export function toPublicCoupon(coupon: CouponRecord) {
     value: coupon.value.toNumber(),
     description: coupon.description,
     minSubtotal: coupon.minSubtotal?.toNumber(),
+    ...(coupon.expiresAt && { expiresAt: coupon.expiresAt.toISOString() }),
   };
 }

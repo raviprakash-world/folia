@@ -39,4 +39,6 @@ export interface Coupon {
   value: number;
   description: string;
   minSubtotal?: number;
+  /** ISO timestamp; only set for coupons that expire. */
+  expiresAt?: string;
 }

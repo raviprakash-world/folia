@@ -18,6 +18,8 @@ interface ProductListingProps {
   fixedCategory?: string;
   /** A curated collection page fixes this to that collection's products. */
   fixedCollection?: string;
+  /** The offers page fixes this to show only discounted products. */
+  fixedOnSale?: boolean;
   /** Marketplace Phase 4 — a seller storefront page fixes this to show
    * only that seller's own catalog. */
   fixedSellerId?: string;
@@ -32,11 +34,17 @@ export function ProductListing({
   description,
   fixedCategory,
   fixedCollection,
+  fixedOnSale,
   fixedSellerId,
   header,
 }: ProductListingProps) {
   const { filters, view, updateFilters, setPage, setSort, setView, resetFilters } =
-    useProductListState(fixedCategory, fixedSellerId, fixedCollection);
+    useProductListState({
+      category: fixedCategory,
+      sellerId: fixedSellerId,
+      collection: fixedCollection,
+      onSale: fixedOnSale,
+    });
   const { data, isLoading, isError } = useProducts(filters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 

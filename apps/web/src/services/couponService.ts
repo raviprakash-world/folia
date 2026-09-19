@@ -43,6 +43,13 @@ async function validateCouponReal(code: string, subtotal: number): Promise<Coupo
   }
 }
 
+/** Coupons shoppers can use right now, for the offers page. */
+export async function listCoupons(): Promise<Coupon[]> {
+  if (!useRealCouponsApi) return coupons;
+  const { data } = await apiClient.get<Coupon[]>('/coupons');
+  return data;
+}
+
 export async function validateCoupon(code: string, subtotal: number): Promise<Coupon> {
   return useRealCouponsApi ? validateCouponReal(code, subtotal) : validateCouponLocal(code, subtotal);
 }

@@ -5,7 +5,16 @@ import type { ProductQuery, SortKey } from '@/types/product';
 
 const PAGE_SIZE = 9;
 
-export function useProductListState(fixedCategory?: string, fixedSellerId?: string, fixedCollection?: string) {
+interface FixedFilters {
+  category?: string;
+  sellerId?: string;
+  collection?: string;
+  onSale?: boolean;
+}
+
+/** `fixed` holds filters a page pins (a category page, a storefront, the offers page) that the URL can't change. */
+export function useProductListState(fixed: FixedFilters = {}) {
+  const { category: fixedCategory, sellerId: fixedSellerId, collection: fixedCollection, onSale: fixedOnSale } = fixed;
   const [searchParams, setSearchParams] = useSearchParams();
   const locationState = useLocationStore((s) => s.location?.state || undefined);
   const nearMe = searchParams.get('nearMe') === 'true';
@@ -14,6 +23,7 @@ export function useProductListState(fixedCategory?: string, fixedSellerId?: stri
     () => ({
       category: fixedCategory ?? searchParams.get('category') ?? undefined,
       collection: fixedCollection,
+      onSale: fixedOnSale || undefined,
       minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
       maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
       inStockOnly: searchParams.get('inStock') === 'true',
@@ -28,7 +38,7 @@ export function useProductListState(fixedCategory?: string, fixedSellerId?: stri
       nearMe,
       shipFromState: nearMe ? locationState : undefined,
     }),
-    [searchParams, fixedCategory, fixedCollection, fixedSellerId, nearMe, locationState]
+    [searchParams, fixedCategory, fixedCollection, fixedOnSale, fixedSellerId, nearMe, locationState]
   );
 
   const view = (searchParams.get('view') as 'grid' | 'list') ?? 'grid';

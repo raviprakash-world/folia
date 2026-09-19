@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
@@ -39,6 +39,14 @@ export class ProductQueryDto {
   @Type(() => Number)
   @Min(0)
   minPrice?: number;
+
+  @ApiPropertyOptional({
+    description: 'Only products with a sale price (compareAtPrice set).',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  onSale?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

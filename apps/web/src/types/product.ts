@@ -72,6 +72,8 @@ export interface ProductQuery {
   category?: string;
   /** Curated collection slug — products listed in that collection. */
   collection?: string;
+  /** Only products with a sale price. */
+  onSale?: boolean;
   minPrice?: number;
   maxPrice?: number;
   inStockOnly?: boolean;

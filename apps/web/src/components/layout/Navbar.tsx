@@ -15,6 +15,7 @@ import { LocationBar } from '@/components/location/LocationPicker';
 
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
+  { label: 'Offers', to: '/offers' },
   { label: 'Sellers', to: '/sellers' },
   { label: 'Journal', to: '/blog' },
   { label: 'About', to: '/about' },
@@ -47,7 +48,7 @@ export function Navbar() {
           <Logo />
         </Link>
 
-        <nav aria-label="Primary" className="hidden md:flex items-center gap-4 lg:gap-8">
+        <nav aria-label="Primary" className="hidden lg:flex items-center gap-6 xl:gap-8">
           <button
             type="button"
             aria-expanded={megaMenuOpen}
@@ -130,7 +131,7 @@ export function Navbar() {
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen((v) => !v)}
-            className="md:hidden p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
+            className="lg:hidden p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
           >
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>

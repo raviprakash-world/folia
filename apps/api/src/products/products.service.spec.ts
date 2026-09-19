@@ -129,6 +129,20 @@ describe('ProductsService.findMany', () => {
     );
   });
 
+  it('onSale: only products that have a compare-at (was) price', async () => {
+    const prisma = createMockPrisma();
+    prisma.$transaction.mockResolvedValue([0, []]);
+    const service = new ProductsService(prisma as never);
+
+    await service.findMany({ onSale: true, page: 1, pageSize: 12 });
+
+    expect(prisma.product.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ compareAtPrice: { not: null } }),
+      }),
+    );
+  });
+
   it("shipFromState: matches sellers whose business address is in that state (case-insensitive) and, for Folia's own dispatch state, Folia-owned products too", async () => {
     const prisma = createMockPrisma();
     prisma.$transaction.mockResolvedValue([0, []]);

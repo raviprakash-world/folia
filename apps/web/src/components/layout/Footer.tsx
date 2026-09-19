@@ -10,7 +10,8 @@ const columns = [
     links: [
       { label: 'All plants', to: '/shop' },
       { label: 'Collections', to: '/collections' },
-      { label: 'Gift cards', to: '/shop/gift-cards' },
+      { label: 'Offers', to: '/offers' },
+      { label: 'Gifting', to: '/collections/gifting' },
     ],
   },
   {

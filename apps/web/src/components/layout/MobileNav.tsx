@@ -22,7 +22,7 @@ export function MobileNav({ open, onClose, links }: MobileNavProps) {
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="md:hidden overflow-hidden border-t border-stone-dark bg-stone-light"
+          className="lg:hidden overflow-hidden border-t border-stone-dark bg-stone-light"
         >
           <ul className="flex flex-col px-4 py-2">
             {links.map((link) => (

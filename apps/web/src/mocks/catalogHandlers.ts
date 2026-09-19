@@ -42,6 +42,7 @@ export const catalogHandlers = [
     const url = new URL(request.url);
     const category = url.searchParams.get('category');
     const collection = url.searchParams.get('collection');
+    const onSale = url.searchParams.get('onSale') === 'true';
     const minPrice = url.searchParams.get('minPrice');
     const maxPrice = url.searchParams.get('maxPrice');
     const inStockOnly = url.searchParams.get('inStockOnly') === 'true';
@@ -54,6 +55,7 @@ export const catalogHandlers = [
     let filtered = products;
     if (category) filtered = filtered.filter((p) => p.categorySlug === category);
     if (collection) filtered = filtered.filter((p) => collectionsByProduct.get(p.slug)?.includes(collection));
+    if (onSale) filtered = filtered.filter((p) => p.compareAtPrice !== undefined);
     if (minPrice) filtered = filtered.filter((p) => p.price >= Number(minPrice));
     if (maxPrice) filtered = filtered.filter((p) => p.price <= Number(maxPrice));
     if (inStockOnly) filtered = filtered.filter((p) => p.inStock);

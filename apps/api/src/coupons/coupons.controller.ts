@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CouponsService } from './coupons.service';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
@@ -9,6 +9,11 @@ import { Public } from '../auth/decorators/public.decorator';
 @Controller('coupons')
 export class CouponsController {
   constructor(private readonly couponsService: CouponsService) {}
+
+  @Get()
+  list() {
+    return this.couponsService.listActive();
+  }
 
   @Post('validate')
   validate(@Body() dto: ValidateCouponDto) {

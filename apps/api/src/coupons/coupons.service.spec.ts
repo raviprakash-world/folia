@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+// expect.objectContaining/any matchers are typed `any` by jest.
 import { BadRequestException } from '@nestjs/common';
 import { CouponsService } from './coupons.service';
 
@@ -111,5 +113,64 @@ describe('CouponsService.validate', () => {
       description: '10% off your order',
       minSubtotal: undefined,
     });
+  });
+});
+
+describe('CouponsService.listActive', () => {
+  it('lists only active, unexpired coupons in public shape (with expiry when set)', async () => {
+    const expiresAt = new Date('2099-01-01T00:00:00.000Z');
+    const prisma = {
+      coupon: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            code: 'FOLIA10',
+            type: 'PERCENT',
+            value: decimal(10),
+            description: '10% off your order',
+            minSubtotal: null,
+            isActive: true,
+            expiresAt: null,
+          },
+          {
+            code: 'WELCOME5',
+            type: 'FIXED',
+            value: decimal(200),
+            description: '₹200 off',
+            minSubtotal: decimal(1000),
+            isActive: true,
+            expiresAt,
+          },
+        ]),
+      },
+    };
+    const service = new CouponsService(prisma as never);
+
+    const result = await service.listActive();
+
+    expect(prisma.coupon.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
+        }),
+      }),
+    );
+    expect(result).toEqual([
+      {
+        code: 'FOLIA10',
+        type: 'percent',
+        value: 10,
+        description: '10% off your order',
+        minSubtotal: undefined,
+      },
+      {
+        code: 'WELCOME5',
+        type: 'fixed',
+        value: 200,
+        description: '₹200 off',
+        minSubtotal: 1000,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    ]);
   });
 });

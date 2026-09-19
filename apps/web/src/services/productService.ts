@@ -4,6 +4,7 @@ import type { Product, ProductQuery, ProductQueryResult } from '@/types/product'
 export async function fetchProducts(query: ProductQuery): Promise<ProductQueryResult> {
   const params: Record<string, string> = {};
   if (query.category) params.category = query.category;
+  if (query.onSale) params.onSale = 'true';
   if (query.collection) params.collection = query.collection;
   if (query.minPrice !== undefined) params.minPrice = String(query.minPrice);
   if (query.maxPrice !== undefined) params.maxPrice = String(query.maxPrice);

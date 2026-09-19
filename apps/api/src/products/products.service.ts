@@ -88,6 +88,7 @@ export class ProductsService {
       };
     }
     if (query.inStockOnly) where.inStock = true;
+    if (query.onSale) where.compareAtPrice = { not: null };
     if (query.search)
       where.name = { contains: query.search, mode: 'insensitive' };
     if (query.sellerId) where.sellerId = query.sellerId;

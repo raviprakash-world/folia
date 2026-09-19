@@ -18,6 +18,18 @@ import type { CouponRecord } from './coupons.types';
 export class CouponsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Coupons a shopper can use right now (active and not expired), for the public offers page. */
+  async listActive() {
+    const coupons = await this.prisma.coupon.findMany({
+      where: {
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return (coupons as CouponRecord[]).map(toPublicCoupon);
+  }
+
   async validate(code: string, subtotal: number) {
     const normalized = code.trim().toUpperCase();
     const coupon = await this.prisma.coupon.findUnique({
