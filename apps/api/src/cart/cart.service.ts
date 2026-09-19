@@ -17,7 +17,11 @@ const CART_INCLUDE = {
       // Folia-owned sellerId: null case already omits this at the
       // toPublicCartItem mapping layer).
       product: {
-        include: { category: true, seller: { select: { displayName: true } } },
+        include: {
+          category: true,
+          seller: { select: { displayName: true } },
+          images: { orderBy: { position: 'asc' }, take: 1 },
+        },
       },
       variant: true,
     },

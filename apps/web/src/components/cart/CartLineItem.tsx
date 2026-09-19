@@ -3,6 +3,8 @@ import { Trash2 } from 'lucide-react';
 import { QuantitySelector } from '@/components/product/QuantitySelector';
 import { formatCurrency } from '@/utils/currency';
 import { useCartStore } from '@/store/cartStore';
+import { products } from '@/data/products';
+import { ProductImage } from '@/components/product/ProductImage';
 import type { CartItem } from '@/types/cart';
 
 interface CartLineItemProps {
@@ -14,11 +16,14 @@ export function CartLineItem({ item, compact = false }: CartLineItemProps) {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const atMax = item.quantity >= item.maxQuantity;
+  const imageUrl = item.imageUrl ?? products.find((p) => p.id === item.productId)?.images?.[0]?.url;
 
   return (
     <div className="flex gap-3">
       <div className={compact ? 'w-16 h-16' : 'w-20 h-20'}>
-        <div className="w-full h-full rounded-[var(--radius-control)] bg-stone-dark" />
+        <div className="relative w-full h-full rounded-[var(--radius-control)] bg-stone-dark overflow-hidden">
+          <ProductImage src={imageUrl} alt={item.name} />
+        </div>
       </div>
 
       <div className="flex-1 min-w-0">

@@ -10,6 +10,7 @@ import { useSearchStore } from '@/store/searchStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { getTrendingSearches } from '@/data/trendingSearches';
 import { products as allProducts } from '@/data/products';
+import { ProductImage } from '@/components/product/ProductImage';
 import { cn } from '@/utils/cn';
 
 interface NavItem {
@@ -231,7 +232,9 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
                       onClick={() => selectProduct(p.slug, p.id)}
                       className="flex items-center gap-3 p-2 rounded-[var(--radius-control)] hover:bg-stone-dark/40 transition-colors text-left"
                     >
-                      <div className="w-10 h-10 rounded-[var(--radius-control)] bg-stone-dark shrink-0" />
+                      <div className="relative w-10 h-10 rounded-[var(--radius-control)] bg-stone-dark shrink-0 overflow-hidden">
+                        <ProductImage src={p.images?.[0]?.url} alt={p.name} />
+                      </div>
                       <div className="min-w-0">
                         <p className="text-sm text-ink truncate">{p.name}</p>
                         <p className="font-mono text-xs text-ink-soft">{formatCurrency(p.price)}</p>
@@ -318,7 +321,9 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
                       onClick={() => selectProduct(p.slug, p.id)}
                       className={rowClass(`product-${p.id}`)}
                     >
-                      <div className="w-10 h-10 rounded-[var(--radius-control)] bg-stone-dark shrink-0" />
+                      <div className="relative w-10 h-10 rounded-[var(--radius-control)] bg-stone-dark shrink-0 overflow-hidden">
+                        <ProductImage src={p.images?.[0]?.url} alt={p.name} />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-ink truncate">
                           <HighlightText text={p.name} query={query} />

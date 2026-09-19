@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
+import { ProductImage } from '@/components/product/ProductImage';
 import { Tag } from '@/components/ui/Tag';
 import { ArrowRight } from 'lucide-react';
 import { FeaturedCollections } from '@/components/home/FeaturedCollections';
@@ -39,10 +40,8 @@ export default function Home() {
               </Button>
             </div>
           </div>
-          <div className="aspect-[4/5] rounded-[var(--radius-card)] bg-fern/30 border border-stone-light/10 flex items-center justify-center">
-            <span className="font-mono text-xs text-stone-light/50 uppercase tracking-wider">
-              Hero image placeholder
-            </span>
+          <div className="relative aspect-[4/5] rounded-[var(--radius-card)] bg-fern/30 border border-stone-light/10 overflow-hidden">
+            <ProductImage src="/demo/products/monstera-deliciosa.jpg" alt="A healthy Monstera deliciosa with large split leaves" />
           </div>
         </Container>
       </section>

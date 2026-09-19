@@ -3,6 +3,7 @@ import { Star, Heart } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
 import { cn } from '@/utils/cn';
+import { ProductImage } from '@/components/product/ProductImage';
 import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
 import { formatCurrency } from '@/utils/currency';
 import type { Product } from '@/types/product';
@@ -28,6 +29,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
     <Card variant="raised" className={cn('p-4 group', className)}>
       <Link to={`/product/${product.slug}`} className="block">
         <div className="relative aspect-square rounded-[var(--radius-control)] bg-stone-dark mb-4 overflow-hidden">
+          <ProductImage
+            src={product.images?.[0]?.url}
+            alt={product.images?.[0]?.altText ?? product.name}
+            className="transition-transform duration-300 group-hover:scale-105"
+          />
           {product.badge && (
             <Tag tone={badgeTone[product.badge]} className="absolute top-3 left-3 z-10">
               {product.badge}

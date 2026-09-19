@@ -13,9 +13,9 @@ export const trending = [...products]
   .slice(0, 6);
 
 export const featuredCollections = [
-  { slug: 'low-light-plants', name: 'Low-light Plants', description: 'For north-facing rooms and shadier corners.' },
-  { slug: 'statement-vessels', name: 'Statement Vessels', description: 'Ceramics and stoneware built to be seen.' },
-  { slug: 'gifting', name: 'Gifting', description: 'Ready to arrive boxed, no assembly required.' },
+  { slug: 'low-light-plants', name: 'Low-light Plants', description: 'For north-facing rooms and shadier corners.', image: '/demo/products/snake-plant-laurentii.jpg' },
+  { slug: 'statement-vessels', name: 'Statement Vessels', description: 'Ceramics and stoneware built to be seen.', image: '/demo/products/fluted-ceramic-planter.jpg' },
+  { slug: 'gifting', name: 'Gifting', description: 'Ready to arrive boxed, no assembly required.', image: '/demo/products/peace-lily.jpg' },
 ];
 
 export const benefits = [

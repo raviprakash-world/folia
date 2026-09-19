@@ -120,7 +120,7 @@ export default function ProductDetail() {
       />
 
       <div className="grid md:grid-cols-2 gap-12">
-        <ProductGallery productName={product.name} />
+        <ProductGallery productName={product.name} images={product.images} />
 
         <div>
           {product.badge && (

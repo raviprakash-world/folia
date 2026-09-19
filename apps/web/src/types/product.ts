@@ -19,6 +19,11 @@ export interface ProductSeller {
   displayName: string;
 }
 
+export interface ProductImage {
+  url: string;
+  altText?: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -37,6 +42,8 @@ export interface Product {
   variants: ProductVariant[];
   specs: ProductSpec[];
   createdAt: string;
+  /** Ordered primary-first. Absent/empty means "no photo yet" — every image component falls back to the placeholder block. */
+  images?: ProductImage[];
   /** Marketplace Phase 16 — absent for a Folia-owned product, matching the real API's own omit-rather-than-null convention (see toPublicProduct). */
   seller?: ProductSeller;
 }

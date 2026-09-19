@@ -72,6 +72,22 @@ describe('toPublicProduct', () => {
     expect(result.compareAtPrice).toBeUndefined();
   });
 
+  it('maps images to {url, altText}, dropping null altText, and returns [] when none were loaded', () => {
+    const withImages = toPublicProduct(
+      makeProduct({
+        images: [
+          { url: '/demo/products/a.jpg', altText: 'A plant', position: 0 },
+          { url: '/demo/products/b.jpg', altText: null, position: 1 },
+        ],
+      }),
+    );
+    expect(withImages.images).toEqual([
+      { url: '/demo/products/a.jpg', altText: 'A plant' },
+      { url: '/demo/products/b.jpg', altText: undefined },
+    ]);
+    expect(toPublicProduct(makeProduct()).images).toEqual([]);
+  });
+
   it('derives category/categorySlug from the related Category record', () => {
     const result = toPublicProduct(makeProduct());
     expect(result.category).toBe('Plants');

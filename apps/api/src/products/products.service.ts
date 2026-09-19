@@ -12,6 +12,7 @@ const PRODUCT_INCLUDE = {
   category: true,
   variants: true,
   specs: true,
+  images: { orderBy: { position: 'asc' } },
   // Marketplace Phase 16 — every customer-facing product read now also
   // carries its seller's public storefront identity (null for a
   // Folia-owned product), so ProductDetail can attribute/link to it.

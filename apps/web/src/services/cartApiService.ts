@@ -14,6 +14,7 @@ interface RealCartItem {
   quantity: number;
   /** Marketplace Phase 16. */
   sellerName: string | null;
+  imageUrl: string | null;
 }
 
 interface RealCartResponse {

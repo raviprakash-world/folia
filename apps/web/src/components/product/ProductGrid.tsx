@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { ProductCard } from './ProductCard';
+import { ProductImage } from './ProductImage';
 import { Tag } from '@/components/ui/Tag';
 import { formatCurrency } from '@/utils/currency';
 import type { Product } from '@/types/product';
@@ -19,7 +20,9 @@ function ProductListRow({ product }: { product: Product }) {
       to={`/product/${product.slug}`}
       className="flex items-center gap-5 p-4 rounded-[var(--radius-card)] bg-stone-light border border-stone-dark hover:shadow-[var(--shadow-soft)] transition-shadow"
     >
-      <div className="w-20 h-20 rounded-[var(--radius-control)] bg-stone-dark shrink-0" />
+      <div className="relative w-20 h-20 rounded-[var(--radius-control)] bg-stone-dark shrink-0 overflow-hidden">
+        <ProductImage src={product.images?.[0]?.url} alt={product.images?.[0]?.altText ?? product.name} />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-ink truncate">{product.name}</h3>

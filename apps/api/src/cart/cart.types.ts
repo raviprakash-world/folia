@@ -25,6 +25,8 @@ export interface CartItemRecord {
     approvalStatus: ProductApprovalStatus;
     /** Marketplace Phase 16 — null for a Folia-owned line, matching sellerId's own nullability. */
     seller: { displayName: string } | null;
+    /** Primary photo only (the cart include takes 1, ordered by position). */
+    images?: { url: string }[];
   };
   variant: { label: string } | null;
 }
@@ -49,6 +51,7 @@ export function toPublicCartItem(item: CartItemRecord) {
     variantLabel: item.variant?.label ?? null,
     quantity: item.quantity,
     sellerName: item.product.seller?.displayName ?? null,
+    imageUrl: item.product.images?.[0]?.url ?? null,
   };
 }
 

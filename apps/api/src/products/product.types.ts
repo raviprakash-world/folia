@@ -42,6 +42,12 @@ export interface ReviewRecord {
   verified: boolean;
 }
 
+export interface ProductImageRecord {
+  url: string;
+  altText: string | null;
+  position: number;
+}
+
 export interface ProductSellerRecord {
   id: string;
   slug: string;
@@ -65,6 +71,8 @@ export interface ProductRecord {
   stockCount: number;
   variants: ProductVariantRecord[];
   specs: ProductSpecRecord[];
+  /** Optional so every existing include/fixture that doesn't load images still type-checks; callers that want images must include them ordered by position. */
+  images?: ProductImageRecord[];
   createdAt: Date;
   deletedAt: Date | null;
   /** Marketplace Phase 16 — null for a Folia-owned product, matching Product.sellerId's own nullability exactly. */
@@ -143,6 +151,10 @@ export function toPublicProduct(product: ProductRecord) {
       inStock: v.inStock,
     })),
     specs: product.specs.map((s) => ({ label: s.label, value: s.value })),
+    images: (product.images ?? []).map((i) => ({
+      url: i.url,
+      altText: i.altText ?? undefined,
+    })),
     createdAt: product.createdAt.toISOString().slice(0, 10),
     seller: product.seller ?? undefined,
   };
