@@ -26,6 +26,6 @@
   },
   "overrides": {
     "deepmerge-ts": "^8.0.2",
-    "multer": "$multer"
+    "multer": "2.4.0"
   }
 }
