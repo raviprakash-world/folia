@@ -53,6 +53,9 @@ real API, the same credentials continue to work unchanged:
 |---|---|---|
 | `demo@folia.example` | `folia-demo` | customer |
 | `admin@folia.example` | `folia-admin` | admin |
+| `seller@folia.example` | `folia-seller` | seller (owns 3 demo products) |
+
+**Local development only.** With `NODE_ENV=production` the seed does not create these passwords: demo accounts get random unusable ones, and an admin is created only from `SEED_ADMIN_EMAIL` + `SEED_ADMIN_PASSWORD` (12+ characters). `SEED_LOCK_DEMO_ACCOUNTS=true` locks demo accounts that already exist. The seed also loads a fictional demo catalog (`prisma/demo/catalog.json`). See `docs/MANUAL_SETUP_GUIDE.md`.
 
 ## Scripts
 
