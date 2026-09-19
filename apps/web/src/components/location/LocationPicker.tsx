@@ -21,14 +21,14 @@ export function LocationBar() {
   return (
     <div className="border-t border-stone-dark bg-stone-dark/40">
       <Container className="py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <MapPin size={14} className="text-fern shrink-0" aria-hidden="true" />
+        <MapPin size={14} className="text-fern-dark shrink-0" aria-hidden="true" />
         {location ? (
           <>
             <span className="text-ink-soft">
               Delivering to <span className="text-ink font-medium">{location.pincode}</span>
               {location.city && `, ${location.city}`}
             </span>
-            <button type="button" onClick={openPicker} className="text-fern hover:text-heading underline font-medium">
+            <button type="button" onClick={openPicker} className="text-fern-dark hover:text-heading underline font-medium">
               Change
             </button>
           </>
@@ -38,7 +38,7 @@ export function LocationBar() {
             <button
               type="button"
               onClick={openPickerAndDetect}
-              className="flex items-center gap-1 text-fern hover:text-heading underline font-medium"
+              className="flex items-center gap-1 text-fern-dark hover:text-heading underline font-medium"
             >
               <Crosshair size={12} aria-hidden="true" />
               Use my current location
@@ -46,7 +46,7 @@ export function LocationBar() {
             <span className="text-ink-soft" aria-hidden="true">
               or
             </span>
-            <button type="button" onClick={openPicker} className="text-fern hover:text-heading underline font-medium">
+            <button type="button" onClick={openPicker} className="text-fern-dark hover:text-heading underline font-medium">
               enter PIN code
             </button>
           </>

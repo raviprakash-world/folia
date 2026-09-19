@@ -95,7 +95,7 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
           />
           <span className="text-ink-soft">In stock only</span>
         </label>
-        <label className={cn('flex items-center gap-2.5 text-sm mt-3', location?.state ? 'cursor-pointer' : 'opacity-70')}>
+        <label className={cn('flex items-center gap-2.5 text-sm mt-3', location?.state ? 'cursor-pointer' : 'cursor-not-allowed')}>
           <input
             type="checkbox"
             checked={!!filters.nearMe}

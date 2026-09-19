@@ -44,7 +44,7 @@ export function MegaMenu({ open, onClose }: MegaMenuProps) {
           <Container className="grid grid-cols-3 gap-10 py-10">
             {megaMenuCategories.map((group) => (
               <div key={group.heading}>
-                <h3 className="font-mono text-xs uppercase tracking-wider text-fern mb-4">
+                <h3 className="font-mono text-xs uppercase tracking-wider text-fern-dark mb-4">
                   {group.heading}
                 </h3>
                 <ul className="flex flex-col gap-3">

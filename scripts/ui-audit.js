@@ -65,6 +65,7 @@
     if (cs.visibility === 'hidden' || cs.display === 'none') continue;
     let op = 1;
     for (let e = el; e; e = e.parentElement) op *= parseFloat(getComputedStyle(e).opacity);
+    if (el.parentElement && el.parentElement.querySelector(':scope > img[class*="absolute"]')) continue; // text laid over a photo can't be measured here
     if (op === 0 || el.closest(':disabled, [aria-disabled="true"]')) continue; // disabled controls are exempt
     const { c: bg, unknown } = bgOf(el);
     if (unknown) continue;
