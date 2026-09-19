@@ -13,6 +13,7 @@ import { SellerLayout } from '@/components/seller/SellerLayout';
 const Home = lazy(() => import('@/pages/Home'));
 const Shop = lazy(() => import('@/pages/Shop'));
 const Category = lazy(() => import('@/pages/Category'));
+const Collections = lazy(() => import('@/pages/Collections'));
 const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const Search = lazy(() => import('@/pages/Search'));
 const Sellers = lazy(() => import('@/pages/Sellers'));
@@ -88,6 +89,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: withSuspense(<Home />) },
       { path: 'shop', element: withSuspense(<Shop />) },
+      { path: 'collections', element: withSuspense(<Collections />) },
       { path: 'collections/:slug', element: withSuspense(<Category />) },
       { path: 'product/:slug', element: withSuspense(<ProductDetail />) },
       { path: 'search', element: withSuspense(<Search />) },
