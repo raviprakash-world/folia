@@ -40,16 +40,19 @@ export function Navbar() {
   const [condensed, setCondensed] = useState(false);
   useEffect(() => {
     let last = window.scrollY;
+    let travelled = 0; // distance scrolled in the current direction
     let frame = 0;
     const onScroll = () => {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         const y = window.scrollY;
-        if (y < 80) setCondensed(false);
-        else if (y - last > 8) setCondensed(true);
-        else if (last - y > 8) setCondensed(false);
+        const dy = y - last;
         last = y;
         frame = 0;
+        if (dy === 0) return;
+        travelled = Math.sign(dy) === Math.sign(travelled) ? travelled + dy : dy;
+        if (y < 80 || travelled < -24) setCondensed(false);
+        else if (travelled > 24) setCondensed(true);
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -64,6 +67,8 @@ export function Navbar() {
   const unreadCount = useUnreadNotificationCount();
   const openCartDrawer = useUIStore((s) => s.openCartDrawer);
   const openSearchOverlay = useUIStore((s) => s.openSearchOverlay);
+
+  const searchHidden = condensed || inCheckout || mobileOpen;
 
   const iconBtn =
     'relative size-11 items-center justify-center rounded-[var(--radius-control)] text-ink-soft transition-colors hover:bg-stone-dark hover:text-heading';
@@ -150,20 +155,23 @@ export function Navbar() {
           </div>
         </Container>
 
-        <div
-          inert={condensed || inCheckout}
-          className={`overflow-hidden transition-[max-height,opacity] duration-200 lg:hidden ${condensed || inCheckout ? 'max-h-0 opacity-0' : 'max-h-16 opacity-100'}`}
-        >
-        <Container className="pb-2.5">
-          <button
-            type="button"
-            onClick={openSearchOverlay}
-            className="flex h-11 w-full items-center gap-3 rounded-full border border-stone-dark bg-stone px-4 text-left text-[15px] text-ink-soft transition-colors hover:border-fern"
+        {/* Hangs below the header without taking layout space, so hiding or showing it can never move the page (moving the page is what made it flicker). */}
+        <div className="pointer-events-none absolute inset-x-0 top-full h-[54px] overflow-hidden lg:hidden">
+          <div
+            inert={searchHidden}
+            className={`pointer-events-auto border-b border-stone-dark bg-stone-light/95 backdrop-blur transition-transform duration-200 motion-reduce:transition-none ${searchHidden ? '-translate-y-full' : 'translate-y-0'}`}
           >
-            <Search size={18} aria-hidden="true" className="shrink-0" />
-            <span className="truncate">Search plants, planters &amp; more</span>
-          </button>
-        </Container>
+            <Container className="pb-2.5">
+              <button
+                type="button"
+                onClick={openSearchOverlay}
+                className="flex h-11 w-full items-center gap-3 rounded-full border border-stone-dark bg-stone px-4 text-left text-[15px] text-ink-soft transition-colors hover:border-fern"
+              >
+                <Search size={18} aria-hidden="true" className="shrink-0" />
+                <span className="truncate">Search plants, planters &amp; more</span>
+              </button>
+            </Container>
+          </div>
         </div>
 
         <MegaMenu open={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
@@ -174,6 +182,7 @@ export function Navbar() {
           </li>
         </MobileNav>
       </header>
+      {!inCheckout && <div aria-hidden="true" className="h-[54px] lg:hidden" />}
       {!inCheckout && <LocationBar />}
     </>
   );

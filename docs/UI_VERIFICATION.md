@@ -84,3 +84,11 @@ It never types card details; stop at the payment screen.
   cart and checkout keep two decimals (`₹899.00`) so line items and totals match.
 - **State only what a policy page or a working feature backs** (see the "Why
   Folia" block). No counts, awards, or testimonials that were not measured.
+- **Never resize a pinned element in response to scrolling.** Hiding the header's
+  search row used to shrink the sticky header, which moved the page, which the
+  browser reported as scrolling the other way, which showed the row again: a
+  flicker loop (41 flips in four slow scrolls). The row now hangs below the header
+  without taking layout space, and direction is measured by distance travelled
+  (24px), so small jitter does nothing. Test scroll-driven UI by scrolling
+  slowly and jittering, and count the state changes.
+
