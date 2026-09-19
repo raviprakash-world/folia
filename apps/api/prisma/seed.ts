@@ -247,6 +247,32 @@ async function main() {
     );
   }
 
+  // An earlier version of this seed created these accounts with their
+  // publicly-known passwords in whatever database it ran against. Setting
+  // SEED_LOCK_DEMO_ACCOUNTS=true (production only) replaces those passwords
+  // with random ones and revokes their sessions — a one-off cleanup for a
+  // database that was already seeded that way.
+  if (!knownPasswordsAllowed && process.env.SEED_LOCK_DEMO_ACCOUNTS === 'true') {
+    const knownEmails = [
+      'demo@folia.example',
+      'admin@folia.example',
+      'seller@folia.example',
+    ];
+    const locked = await prisma.user.updateMany({
+      where: { email: { in: knownEmails } },
+      data: { passwordHash: await hashPassword(randomBytes(32).toString('hex')) },
+    });
+    await prisma.session.deleteMany({
+      where: { user: { email: { in: knownEmails } } },
+    });
+    // The old demo seller carried a plausible-looking (but invented) GSTIN.
+    await prisma.seller.updateMany({
+      where: { slug: 'terracotta-and-fern', gstin: '27ABCDE1234F1Z0' },
+      data: { gstin: null },
+    });
+    console.log(`Locked ${locked.count} demo account(s): random password set, sessions revoked.`);
+  }
+
   // Marketplace Phase 1 — a demo seller account, seeded directly with an
   // ACTIVE Seller row (rather than left mid-application) so every later
   // marketplace phase can immediately exercise seller-dashboard
