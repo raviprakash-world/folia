@@ -4,8 +4,39 @@ import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+// Without these, a production build silently falls back to client-side mock
+// behaviour (fabricated orders, local-only cart, mock admin data) even though
+// the deployed API is real. See docs/MANUAL_SETUP_GUIDE.md ("Vercel").
+const REQUIRED_PRODUCTION_FLAGS = [
+  'VITE_REAL_AUTH_API',
+  'VITE_REAL_CATALOG_API',
+  'VITE_REAL_REVIEWS_API',
+  'VITE_REAL_CART_API',
+  'VITE_REAL_WISHLIST_API',
+  'VITE_REAL_ADDRESSES_API',
+  'VITE_REAL_SEARCH_API',
+  'VITE_REAL_RECOMMENDATIONS_API',
+  'VITE_REAL_NOTIFICATIONS_API',
+  'VITE_REAL_COUPONS_API',
+  'VITE_REAL_SHIPPING_API',
+  'VITE_REAL_ORDERS_API',
+  'VITE_REAL_ADMIN_API',
+  'VITE_REAL_SELLERS_API',
+];
+
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '');
+
+  if (command === 'build' && mode === 'production') {
+    const missing = REQUIRED_PRODUCTION_FLAGS.filter((flag) => env[flag] !== 'true');
+    if (missing.length > 0) {
+      console.warn(
+        `\n\x1b[33m[folia] WARNING: this production build has ${missing.length} mock-mode flag(s) OFF:\n  ${missing.join('\n  ')}\n` +
+          `The deployed site will use client-side mock behaviour for those areas (for example, checkout would fabricate orders). ` +
+          `Set them to "true" in the host's environment variables — see docs/MANUAL_SETUP_GUIDE.md.\x1b[0m\n`,
+      );
+    }
+  }
 
   return {
   plugins: [react(), tailwindcss()],
