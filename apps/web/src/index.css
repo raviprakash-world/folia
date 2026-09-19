@@ -161,3 +161,83 @@
     left: 0;
   }
 }
+
+/* Announcement ticker: the track holds two identical groups, so sliding it
+   by exactly half its width loops seamlessly. */
+@keyframes announce-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes announce-sheen {
+  from {
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  to {
+    transform: translateX(320%) skewX(-20deg);
+  }
+}
+.announce {
+  position: relative;
+  overflow: hidden;
+}
+.announce-viewport {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+.announce-track {
+  display: flex;
+  width: max-content;
+  animation: announce-scroll 38s linear infinite;
+}
+.announce-group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-around;
+  gap: 3rem;
+  padding-inline: 1.5rem;
+  min-width: 100vw;
+}
+.announce:hover .announce-track,
+.announce:focus-within .announce-track,
+.announce[data-paused='true'] .announce-track {
+  animation-play-state: paused;
+}
+.announce::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 18%;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.35), transparent);
+  animation: announce-sheen 7s ease-in-out infinite;
+}
+.announce[data-paused='true']::after {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .announce-track {
+    animation: none;
+    width: 100%;
+    justify-content: center;
+  }
+  .announce-group {
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 0.25rem 1.5rem;
+    justify-content: center;
+  }
+  .announce-group[inert] {
+    display: none;
+  }
+  .announce::after {
+    display: none;
+  }
+  .announce-viewport {
+    mask-image: none;
+  }
+}
