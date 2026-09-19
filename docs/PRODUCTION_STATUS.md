@@ -1,7 +1,7 @@
 # Folia — Production Status
 
 **Baseline established:** 2026-09-06 · Phase 0
-**Last updated:** 2026-09-07 · after Phase 6 gate passed
+**Last updated:** 2026-09-19 · after the demo-data / repository-fixes phase (P0-H); Phases 1–6 and P0-B…P0-G narrative below is historical
 **Rollback checkpoint (Phase 0 baseline):** `b617b9a` (origin/main, clean working tree at time of baseline)
 
 This document is the single source of truth for "does it actually work right now."
@@ -21,17 +21,55 @@ out not to exist).
 > of when each was written — only the tooling/lint/CI/security facts
 > below were stale.
 
+
+## Current status at a glance (2026-09-19)
+
+```text
+Engineering baseline:   verified (clean-clone gate run 2026-09-19, results below)
+External integrations:  credential-blocked (Razorpay, Resend, Shiprocket — none configured, none exercised)
+Infrastructure:         partially blocked (no backups, free Postgres expires ~2026-10-03,
+                        no durable object storage, Vercel production flags unverified)
+Business / legal:       pending (GST rates/HSN, invoicing entity, legal pages, payout model)
+Launch status:          NOT READY — external/infrastructure/business blockers remain
+```
+
+**Quality gate**, run in a fresh `git clone` of the branch with `npm ci` and the same steps as `.github/workflows/ci.yml`
+(local Postgres/Redis; test-only secrets):
+
+| Step | Result |
+|---|---|
+| `npm run prisma:generate` / `prisma migrate deploy` (empty DB) | pass |
+| `turbo run lint` | pass (0 warnings) |
+| `turbo run typecheck` | pass |
+| `turbo run test` | **865/865** unit tests, 67 suites |
+| `turbo run test:e2e` | **6/6**, 2 suites |
+| `turbo run build --force` (uncached — an earlier run was a cache hit and was not counted) | pass |
+| CI bundle scan for demo credential strings | clean |
+| `npm audit` | **0 vulnerabilities** after the multer override (see below) |
+| Seed on an empty DB, then again | 55 products / 55 images / 165 reviews / 8 sellers / 6 categories + 8 collections; second run identical |
+
+Things this pass found and fixed that earlier passes did not:
+
+- **`npm audit` had regressed** from clean to 6 high findings (four `multer <=2.2.0` advisories via `@nestjs/platform-express`, published after P0-B). Fixed with a direct `multer@2.4.0` dependency plus an override; verified with real multipart uploads (201 / 413 / 400), not just the audit number.
+- **Customers were shown one shipping price and charged another.** The API's authoritative delivery prices (`order.types.ts`) were still USD-era (₹6.50/14/19) while the frontend showed ₹79/199/299; the payment step's "Total due" also ignored the chosen delivery method. Found by placing a real COD order; fixed and re-verified (Payment = Review = confirmed order = ₹347.92).
+- **Seed hygiene:** demo/admin/seller accounts with publicly documented passwords are no longer created in production, and `SEED_LOCK_DEMO_ACCOUNTS=true` locks any that already exist.
+- **Seller forms** rejected the natural input for Country ("India" vs the API's required `IN`) and had no GSTIN or PIN validation; fixed.
+- **Product images** are now returned by the API and rendered everywhere; a 55-product fictional demo catalog with photographs/illustrations (credited at `/policies/photo-credits`) replaces the 24-product USD-priced one.
+- **Seller lifecycle verified against the real API:** applying grants the `seller` role and status `APPLIED` (deliberate: dashboard access); the storefront is 404 and product submission is refused with 403 until an admin approves; approval goes `APPLIED/UNDER_REVIEW → ACTIVE` directly (`APPROVED` is unused by design).
+
+**Live deployment (read-only check 2026-09-19):** `https://folia-api.onrender.com/api/health/ready` reports database/redis/storage up. The live catalog is still the **old 24 products at USD-scale prices (Monstera ₹68), no images** — this branch is not deployed and the production seed has not been re-run. Everything you must do yourself is in [`MANUAL_SETUP_GUIDE.md`](./MANUAL_SETUP_GUIDE.md).
+
 ## Build / lint / typecheck / test — corrected by P0-B/P0-C, see note above
 
 | Workspace | Build | Typecheck | Lint | Test |
 |---|---|---|---|---|
-| `apps/api` | ✅ pass | ✅ pass | ✅ **0 errors, 0 warnings** (fixed P0-B — was 33 errors/20 warnings) | ✅ 830/830 pass (unit, mocked Prisma — P0-C added 13 new security-regression tests: register-throttle e2e, changePassword session revocation, seller-suspension authorization) |
+| `apps/api` | ✅ pass | ✅ pass | ✅ **0 errors, 0 warnings** (fixed P0-B — was 33 errors/20 warnings) | ✅ 865/865 pass as of 2026-09-19 (unit, mocked Prisma) |
 | `apps/api` (e2e) | — | — | — | ✅ **FIXED (P0-B)** — 6/6 pass, including a real e2e proof that register/login/forgot-password/reset-password all genuinely return 429 on their (N+1)th request (`test/auth-rate-limit.e2e-spec.ts`, P0-C) |
 | `apps/web` | ✅ pass | ✅ pass | ✅ pass | ⚠️ **NO TEST SCRIPT / NO RUNNER** (unchanged — installing one was judged out of scope for a tooling/security phase; the P0-C demo-credential regression check is instead a CI-level production-bundle grep, not a unit test) |
 | `packages/*` | n/a | ⚠️ only `shared-types` has a `typecheck` script; `api-client`/`shared-utils` have none | — | — |
 | root (`turbo run *`) | ✅ **FIXED (P0-B)** — `packageManager` field added, all workspaces resolve | — | — | — |
 | CI | — | — | — | ✅ **NEW (P0-B)** — `.github/workflows/ci.yml`, real Postgres/Redis service containers, gates every PR + push to `main` |
-| `npm audit` | — | — | — | ✅ **0 vulnerabilities** (fixed P0-B, re-confirmed P0-C) |
+| `npm audit` | — | — | — | ✅ **0 vulnerabilities** as of 2026-09-19 (clean after P0-B; regressed to 6 high via `multer` advisories; fixed again with a `multer@2.4.0` override) |
 
 ## Phase 1 (Payments) + Phase 2 (Inventory concurrency) — what changed
 
@@ -112,9 +150,9 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`; per-sub-phase design not
 
 ### New findings this session (not in the prior audit)
 
-1. **Turbo can't run.** `npx turbo run build` fails immediately with `Could not resolve workspace: Missing devEngines.packageManager or legacy packageManager field`. Every `npm run <script>` at the root that delegates to Turbo (`build`, `dev`, `lint`, `test`, `test:e2e`, `typecheck`) is currently broken. Every verification in this document was run per-workspace directly instead. **Fix:** add a `packageManager` field to root `package.json` (e.g. `"packageManager": "npm@10.x.x"`). Trivial, not yet applied — deferred to whichever phase touches root tooling (candidate: Phase 8).
-2. **Backend lint currently fails outright.** 34 `@typescript-eslint/no-unnecessary-type-assertion` errors + 27 unused-`eslint-disable`-directive warnings, spread across ~15 service files (`users.service.ts`, `sessions.service.ts`, `warehouses.service.ts`, `wishlist.service.ts`, `roles.service.ts`, `reviews.service.ts`, and others). Pattern suggests a TypeScript version bump narrowed types enough that old `as` assertions and their accompanying `eslint-disable` comments became unnecessary. Fixable via `eslint --fix` per the tool's own output. Not fixed in Phase 0 (inspection-only); a real gate item before any phase claims a lint-clean state.
-3. **The E2E suite is broken independent of database access**, not merely "blocked by environment" as previously assumed. `test/jest-e2e.json` has no `transformIgnorePatterns` override; loading the full `AppModule` pulls in `@nestjs/event-emitter`, which ships ESM-only output, and ts-jest fails on `SyntaxError: Unexpected token 'export'`. The equivalent unit-test Jest config (in `apps/api/package.json`) has a working `transformIgnorePatterns` for `@nestjs/bullmq`/`@nestjs/bull-shared` but was never extended to cover `@nestjs/event-emitter` for the e2e config. This was verified directly: local Docker Postgres/Redis are live and reachable (`prisma migrate status` confirms schema is up to date against them), so a real DB was available and the failure is purely a Jest config gap, not an environment limitation.
+1. ~~**Turbo can't run.**~~ **RESOLVED (P0-B, re-verified 2026-09-19: `turbo run lint/typecheck/test/test:e2e/build` all run and pass).** Original finding, kept for history: **Turbo can't run.** `npx turbo run build` fails immediately with `Could not resolve workspace: Missing devEngines.packageManager or legacy packageManager field`. Every `npm run <script>` at the root that delegates to Turbo (`build`, `dev`, `lint`, `test`, `test:e2e`, `typecheck`) is currently broken. Every verification in this document was run per-workspace directly instead. **Fix:** add a `packageManager` field to root `package.json` (e.g. `"packageManager": "npm@10.x.x"`). Trivial, not yet applied — deferred to whichever phase touches root tooling (candidate: Phase 8).
+2. ~~**Backend lint currently fails outright.**~~ **RESOLVED (P0-B; `turbo run lint` passes with 0 warnings as of 2026-09-19).** Original finding: **Backend lint currently fails outright.** 34 `@typescript-eslint/no-unnecessary-type-assertion` errors + 27 unused-`eslint-disable`-directive warnings, spread across ~15 service files (`users.service.ts`, `sessions.service.ts`, `warehouses.service.ts`, `wishlist.service.ts`, `roles.service.ts`, `reviews.service.ts`, and others). Pattern suggests a TypeScript version bump narrowed types enough that old `as` assertions and their accompanying `eslint-disable` comments became unnecessary. Fixable via `eslint --fix` per the tool's own output. Not fixed in Phase 0 (inspection-only); a real gate item before any phase claims a lint-clean state.
+3. ~~**The E2E suite is broken independent of database access**~~ **RESOLVED (P0-B; 6/6 e2e pass as of 2026-09-19).** Original finding: **The E2E suite is broken independent of database access**, not merely "blocked by environment" as previously assumed. `test/jest-e2e.json` has no `transformIgnorePatterns` override; loading the full `AppModule` pulls in `@nestjs/event-emitter`, which ships ESM-only output, and ts-jest fails on `SyntaxError: Unexpected token 'export'`. The equivalent unit-test Jest config (in `apps/api/package.json`) has a working `transformIgnorePatterns` for `@nestjs/bullmq`/`@nestjs/bull-shared` but was never extended to cover `@nestjs/event-emitter` for the e2e config. This was verified directly: local Docker Postgres/Redis are live and reachable (`prisma migrate status` confirms schema is up to date against them), so a real DB was available and the failure is purely a Jest config gap, not an environment limitation.
 4. **`packages/api-client` and `packages/shared-utils` have no scripts at all** — not even a `typecheck`. Only `packages/shared-types` does.
 
 ### Carried forward from the pre-Phase-0 audit (full detail: see the published Folia Readiness Audit artifact from this session)
@@ -130,9 +168,9 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`; per-sub-phase design not
 - Backup/DR: **confirmed still missing as of P0-D** (2026-09-08) — no plan exists anywhere in this repo, and Render's free Postgres tier has no automated backups/PITR; the live production Postgres also auto-deletes ~30 days after creation. External-account blocker, not an engineering one — see `docs/SECURITY_STATUS.md`.
 - Graceful shutdown: **fixed as of P0-D** (2026-09-08) — `app.enableShutdownHooks()` added, and the Dockerfile `CMD` now `exec`s `node` so SIGTERM actually reaches it (previously silently swallowed by the wrapping shell). A separate real bug this surfaced — JobsModule's BullMQ Redis connection had no lifecycle hook and kept the process alive past `app.close()` — is also fixed. Verified live in Docker: `docker stop` now reaches `ExitCode 0` in under a second, versus hanging until SIGKILL every time before this fix. Full detail in `docs/SECURITY_STATUS.md`.
 - File retrieval: **fixed as of P0-D** — every uploaded file was previously a dead link (nothing served `/uploads/*`); a real authenticated `FilesController` now exists. Uploaded-file *durability across redeploys* is a separate, still-open gap (ephemeral disk, no object storage configured) — see `docs/SECURITY_STATUS.md`.
-- Zero product photography anywhere in the frontend.
+- Product photography: **fixed as of 2026-09-19 for demo purposes** — the frontend now renders product images everywhere (previously grey placeholder blocks), the API returns them, and the demo catalog ships 34 openly-licensed photographs + 21 original illustrations. These are **placeholders, not real seller photography**; real uploads need durable object storage (still open).
 - India-market shape: **largely fixed as of P0-F** (2026-09-08). What changed and what's still genuinely open — full detail in `docs/SECURITY_STATUS.md`'s P0-F section:
-  - **Fixed**: currency was already correctly INR/₹ (`Intl.NumberFormat('en-IN', {currency:'INR'})`) throughout — the real bug was underlying price *magnitudes* still being USD-shaped (a plant priced "$68" → "₹68.00" after the currency-code fix, absurdly cheap for India). Rescaled every seeded product price, coupon value, and shipping-cost constant 40x, consistently, across both the backend seed and the mirrored frontend mock catalog. Also fixed: address/phone/PIN-code validation was unenforced or US-shaped (backend address DTOs took any string; the frontend defaulted new addresses to "United States") — now enforced India-only end to end, real 6-digit-PIN + GSTIN-checksum validators, e2e-verified. Package weight/dimensions and product spec text (pot sizes, mature height) converted from lbs/inches to kg/cm. Date formatting switched `en-US` → `en-IN`. Mock/demo data (address book, geolocation, company invoice header) switched from Portland, OR to Bengaluru, Karnataka.
+  - **Fixed**: currency was already correctly INR/₹ (`Intl.NumberFormat('en-IN', {currency:'INR'})`) throughout — the real bug was underlying price *magnitudes* still being USD-shaped (a plant priced "$68" → "₹68.00" after the currency-code fix, absurdly cheap for India). Rescaled every seeded product price, coupon value, and shipping-cost constant 40x. **Superseded 2026-09-19:** that mechanical rescale left prices ~3x above real Indian nursery prices and left USD-era shipping values in three places (the API's order-time delivery prices, the web's local estimate, and the mock history). The demo catalog is now priced ₹149–₹1,499 with one placeholder rate card (₹79/₹129 estimate, ₹79/₹199/₹299 delivery options, free above ₹999) — still placeholders pending real Shiprocket rates. Also fixed: address/phone/PIN-code validation was unenforced or US-shaped (backend address DTOs took any string; the frontend defaulted new addresses to "United States") — now enforced India-only end to end, real 6-digit-PIN + GSTIN-checksum validators, e2e-verified. Package weight/dimensions and product spec text (pot sizes, mature height) converted from lbs/inches to kg/cm. Date formatting switched `en-US` → `en-IN`. Mock/demo data (address book, geolocation, company invoice header) switched from Portland, OR to Bengaluru, Karnataka.
   - **Still genuinely open, not fixed**: real HSN-code-based GST slab rates (0/5/12/18/28%, varying by product category) — this project has one flat hardcoded tax rate, not a real slab model; fixing that needs actual product-tax classification data from a real business/tax professional, not an engineering guess. A `Seller.gstin` field with real format+checksum validation now exists (structural readiness), and the customer-facing invoice now shows a real CGST+SGST or IGST split instead of one opaque "Tax" line — but the underlying *rate* being split is still the placeholder flat rate, and the invoice is still platform-level (Folia as the billing party), not per-seller. Do not read either fix as GST compliance — see `docs/SECURITY_STATUS.md`'s explicit note on this.
 
 ## Live deployment state
@@ -143,11 +181,12 @@ Gate passed — full report in `PRODUCTION_ROADMAP.md`; per-sub-phase design not
 - Confirmed the live deployment is actually running Phase 2's code, not stale: the old `POST /payments/orders/:orderId/retry` route returns 404 (removed in Phase 2) and the new `POST /payments/:id/retry` route returns 401 (exists, requires auth) — and since the container's own startup command is `prisma migrate deploy && node dist/main.js` (see `apps/api/Dockerfile`), a healthy DB connection here means the Phase 2 migration applied cleanly against the live production database too, not just the local dev one.
 - Free Postgres created ~2026-09-03, auto-deletes ~2026-10-03 without a plan upgrade.
 - **Razorpay keys are NOT set on the live Render service** (`render.yaml` declares them `sync: false`, prompted-for in the dashboard, never committed) — real card/UPI/net-banking/wallet checkout will fail loudly with "not available right now" on the live site until the business owner adds real keys there. COD works end-to-end live.
-- **This section was last confirmed current as of Phase 2** (the "actually running Phase 2's code" check above) and was not re-verified for Phases 3–5. **Phase 6 is confirmed NOT live**: its branch (`feat/phase-6a-refund-race-fix`) is 15 commits ahead of `origin/main` and has never been merged, so none of the returns/refund/replacement work — or its migrations — exists on the live Render deployment.
+- **2026-09-19 (read-only):** health is ok including `storage`; the live catalog is the pre-P0-F 24-product USD-scale set with no images; Phase 6 **is** merged to `main` (PR #14). The bullets below are historical, from earlier phases.
+- **This section was last confirmed current as of Phase 2** (the "actually running Phase 2's code" check above) and was not re-verified for Phases 3–5. *(Historical, superseded: Phase 6 was later merged via PR #14; the live API reports the P0-D `storage` health check, which only exists in merged code.)*
 
 ## Git safety
 
 - Working tree was clean before the Phase 0 baseline; `docs/` additions were the only change that phase.
 - Phase 0 rollback point: `b617b9a`.
 - `origin/main` currently sits at `ccf5813` (Phase 5's merge — Phases 0–5 are all merged; this line was last updated after Phase 2 and undercounted Phases 3–5, corrected here).
-- Phase 6 (`93db0cc`..`c70cb9b`, 15 commits) is **not merged** — it lives on `feat/phase-6a-refund-race-fix`, 15 commits ahead of `origin/main`.
+- *(Historical.)* Phase 6 was merged to `main` via PR #14, and later work via PR #15 and direct pushes. The old commit-hash list above is no longer current; use `git log`.
