@@ -47,6 +47,8 @@ export interface SellerProfile {
   logoUrl: string | null;
   contactEmail: string;
   contactPhone: string;
+  /** Seller-provided, shown to admins only — never on the public storefront, and not proof of GST compliance. */
+  gstin: string | null;
   status: SellerStatus;
   address: SellerAddress | null;
   appliedAt: string;

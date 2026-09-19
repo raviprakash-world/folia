@@ -24,3 +24,15 @@ const INDIA_PIN_CODE_PATTERN = /^[1-9][0-9]{5}$/;
 export function isValidPostalCode(postalCode: string): boolean {
   return INDIA_PIN_CODE_PATTERN.test(postalCode.trim());
 }
+
+/**
+ * Shape-only GSTIN check (15 chars: state code, PAN, entity, 'Z', checksum
+ * char). The real GST-council checksum is verified server-side
+ * (apps/api common/validators/india-locale.ts) — the API's message is
+ * surfaced in the form, so it isn't duplicated here.
+ */
+const GSTIN_SHAPE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
+export function isValidGstinShape(gstin: string): boolean {
+  return GSTIN_SHAPE.test(gstin.trim().toUpperCase());
+}

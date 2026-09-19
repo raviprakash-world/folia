@@ -18,6 +18,7 @@ import {
 } from '@/hooks/useSellerProfile';
 import { sellerStatusTone, sellerStatusLabel } from '@/utils/sellerStatus';
 import { formatDate } from '@/utils/currency';
+import { isValidGstinShape, isValidPostalCode } from '@/utils/region';
 import type { SellerVerification } from '@/types/sellerDashboard';
 
 const verificationStatusTone: Record<SellerVerification['status'], TagTone> = {
@@ -120,8 +121,10 @@ const profileSchema = z.object({
   addressLine1: z.string().min(1),
   city: z.string().min(1),
   state: z.string().min(1),
-  country: z.string().min(1),
-  postalCode: z.string().min(1),
+  postalCode: z.string().refine(isValidPostalCode, 'Enter a valid 6-digit PIN code.'),
+  gstin: z
+    .string()
+    .refine((v) => v.trim() === '' || isValidGstinShape(v), 'Enter a valid 15-character GSTIN, or leave blank.'),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -148,8 +151,8 @@ export default function SellerProfile() {
       addressLine1: profile.address?.addressLine1 ?? '',
       city: profile.address?.city ?? '',
       state: profile.address?.state ?? '',
-      country: profile.address?.country ?? '',
       postalCode: profile.address?.postalCode ?? '',
+      gstin: profile.gstin ?? '',
     });
   }, [profile, reset]);
 
@@ -180,13 +183,17 @@ export default function SellerProfile() {
       description: values.description,
       contactEmail: values.contactEmail,
       contactPhone: values.contactPhone,
+      // Blank is omitted, not sent — the API has no "clear GSTIN" path (an
+      // empty string fails its GSTIN validator), so a saved GSTIN can be
+      // corrected but not removed from this form.
+      gstin: values.gstin.trim().toUpperCase() || undefined,
       address: {
         addressLine1: values.addressLine1,
         addressLine2: null,
         city: values.city,
         state: values.state,
-        country: values.country,
-        postalCode: values.postalCode,
+        country: 'IN',
+        postalCode: values.postalCode.trim(),
       },
     });
     setSaved(true);
@@ -254,9 +261,14 @@ export default function SellerProfile() {
           <FormField label="State" error={errors.state?.message} {...register('state')} />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <FormField label="Country" error={errors.country?.message} {...register('country')} />
-          <FormField label="Postal code" error={errors.postalCode?.message} {...register('postalCode')} />
+          <FormField label="Country" value="India" readOnly disabled />
+          <FormField label="PIN code" inputMode="numeric" maxLength={6} error={errors.postalCode?.message} {...register('postalCode')} />
         </div>
+        <FormField label="GSTIN (optional)" error={errors.gstin?.message} {...register('gstin')} />
+        <p className="text-xs text-ink-soft -mt-3">
+          Only if you're GST-registered. It's visible to Folia admins for verification, not shown to customers, and
+          providing it does not by itself make your sales GST-compliant.
+        </p>
         <Button type="submit" variant="primary" disabled={updateMutation.isPending} className="self-start">
           {updateMutation.isPending ? 'Saving…' : 'Save changes'}
         </Button>

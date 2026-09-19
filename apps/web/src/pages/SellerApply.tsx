@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/common/Alert';
 import { useAuthStore } from '@/store/authStore';
 import { useApplyAsSeller } from '@/hooks/useSellerProfile';
+import { isValidGstinShape, isValidPostalCode } from '@/utils/region';
 
 /**
  * Marketplace Phase 15 — the one entry point that makes the seller
@@ -29,8 +30,10 @@ const applySchema = z.object({
   addressLine1: z.string().min(1, 'Enter your address'),
   city: z.string().min(1, 'Enter your city'),
   state: z.string().min(1, 'Enter your state'),
-  country: z.string().min(1, 'Enter your country'),
-  postalCode: z.string().min(1, 'Enter your postal code'),
+  postalCode: z.string().refine(isValidPostalCode, 'Enter a valid 6-digit PIN code.'),
+  gstin: z
+    .string()
+    .refine((v) => v.trim() === '' || isValidGstinShape(v), 'Enter a valid 15-character GSTIN, or leave blank.'),
 });
 
 type ApplyFormValues = z.infer<typeof applySchema>;
@@ -53,13 +56,14 @@ export default function SellerApply() {
       description: values.description,
       contactEmail: values.contactEmail,
       contactPhone: values.contactPhone,
+      gstin: values.gstin.trim().toUpperCase() || undefined,
       address: {
         addressLine1: values.addressLine1,
         addressLine2: null,
         city: values.city,
         state: values.state,
-        country: values.country,
-        postalCode: values.postalCode,
+        country: 'IN',
+        postalCode: values.postalCode.trim(),
       },
     });
     // The apply call just assigned the real 'seller' role server-side —
@@ -118,9 +122,14 @@ export default function SellerApply() {
           <FormField label="State" error={errors.state?.message} {...register('state')} />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <FormField label="Country" error={errors.country?.message} {...register('country')} />
-          <FormField label="Postal code" error={errors.postalCode?.message} {...register('postalCode')} />
+          <FormField label="Country" value="India" readOnly disabled />
+          <FormField label="PIN code" inputMode="numeric" maxLength={6} error={errors.postalCode?.message} {...register('postalCode')} />
         </div>
+        <FormField label="GSTIN (optional)" error={errors.gstin?.message} {...register('gstin')} />
+        <p className="text-xs text-ink-soft -mt-3">
+          Only if you're GST-registered. It's visible to Folia admins for verification, not shown to customers, and
+          providing it does not by itself make your sales GST-compliant.
+        </p>
         <Button type="submit" variant="primary" size="lg" disabled={applyMutation.isPending} className="self-start">
           {applyMutation.isPending ? 'Submitting…' : 'Submit application'}
         </Button>
