@@ -52,7 +52,12 @@ export interface ProductSellerRecord {
   id: string;
   slug: string;
   displayName: string;
+  /** Business-address city/state — used only to derive shipsFrom; never returned as part of `seller`. */
+  address?: { city: string; state: string } | null;
 }
+
+/** Where Folia-owned products dispatch from (matches the "Store Pickup at our Bengaluru studio" copy). */
+export const FOLIA_ORIGIN = { city: 'Bengaluru', state: 'Karnataka' } as const;
 
 export interface ProductRecord {
   id: string;
@@ -156,7 +161,25 @@ export function toPublicProduct(product: ProductRecord) {
       altText: i.altText ?? undefined,
     })),
     createdAt: product.createdAt.toISOString().slice(0, 10),
-    seller: product.seller ?? undefined,
+    seller: product.seller
+      ? {
+          id: product.seller.id,
+          slug: product.seller.slug,
+          displayName: product.seller.displayName,
+        }
+      : undefined,
+    // null = Folia-owned (dispatches from FOLIA_ORIGIN); undefined = the
+    // seller relation wasn't loaded for this query, or the seller has no
+    // address on file — either way, say nothing rather than guess.
+    shipsFrom:
+      product.seller === null
+        ? FOLIA_ORIGIN
+        : product.seller?.address
+          ? {
+              city: product.seller.address.city,
+              state: product.seller.address.state,
+            }
+          : undefined,
   };
 }
 

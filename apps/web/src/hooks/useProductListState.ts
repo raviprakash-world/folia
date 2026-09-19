@@ -1,11 +1,14 @@
 import { useSearchParams } from 'react-router-dom';
 import { useCallback, useMemo } from 'react';
+import { useLocationStore } from '@/store/locationStore';
 import type { ProductQuery, SortKey } from '@/types/product';
 
 const PAGE_SIZE = 9;
 
 export function useProductListState(fixedCategory?: string, fixedSellerId?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const locationState = useLocationStore((s) => s.location?.state || undefined);
+  const nearMe = searchParams.get('nearMe') === 'true';
 
   const filters: ProductQuery = useMemo(
     () => ({
@@ -21,8 +24,10 @@ export function useProductListState(fixedCategory?: string, fixedSellerId?: stri
       // so a customer can't widen the query past this one seller by
       // hand-editing query params.
       sellerId: fixedSellerId,
+      nearMe,
+      shipFromState: nearMe ? locationState : undefined,
     }),
-    [searchParams, fixedCategory, fixedSellerId]
+    [searchParams, fixedCategory, fixedSellerId, nearMe, locationState]
   );
 
   const view = (searchParams.get('view') as 'grid' | 'list') ?? 'grid';

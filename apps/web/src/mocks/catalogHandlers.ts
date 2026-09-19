@@ -43,6 +43,7 @@ export const catalogHandlers = [
     const inStockOnly = url.searchParams.get('inStockOnly') === 'true';
     const sort = url.searchParams.get('sort') as SortKey | null;
     const search = url.searchParams.get('search')?.toLowerCase().trim();
+    const shipFromState = url.searchParams.get('shipFromState')?.toLowerCase().trim();
     const page = Number(url.searchParams.get('page') ?? '1');
     const pageSize = Number(url.searchParams.get('pageSize') ?? '12');
 
@@ -52,6 +53,7 @@ export const catalogHandlers = [
     if (maxPrice) filtered = filtered.filter((p) => p.price <= Number(maxPrice));
     if (inStockOnly) filtered = filtered.filter((p) => p.inStock);
     if (search) filtered = filtered.filter((p) => p.name.toLowerCase().includes(search));
+    if (shipFromState) filtered = filtered.filter((p) => p.shipsFrom?.state.toLowerCase() === shipFromState);
 
     const sorted = sortProducts(filtered, sort);
     const total = sorted.length;

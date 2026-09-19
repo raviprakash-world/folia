@@ -11,6 +11,7 @@ import { useCurrentUser } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { LocationButton } from '@/components/location/LocationPicker';
 
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
@@ -22,7 +23,7 @@ const primaryLinks = [
 function NavBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
-    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ochre text-heading text-[10px] font-mono font-medium">
+    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ochre text-pine text-[10px] font-mono font-medium">
       {count > 99 ? '99+' : count}
     </span>
   );
@@ -77,6 +78,7 @@ export function Navbar() {
           <div className="hidden sm:block">
             <ThemeToggle compact />
           </div>
+          <LocationButton />
           <Link
             to={user ? '/account' : '/account/login'}
             aria-label={user ? `Account — ${user.firstName}` : 'Sign in'}

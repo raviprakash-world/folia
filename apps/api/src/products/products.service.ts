@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ProductQueryDto, SortKey } from './dto/product-query.dto';
+import { FOLIA_ORIGIN } from './product.types';
 import type { ProductRecord, ProductBadge, CareLevel } from './product.types';
 
 const PRODUCT_INCLUDE = {
@@ -19,7 +20,14 @@ const PRODUCT_INCLUDE = {
   // Never selects anything beyond what's already public on
   // /sellers/:slug (SellersService.getPublicStorefront) — no email/
   // phone/internal status.
-  seller: { select: { id: true, slug: true, displayName: true } },
+  seller: {
+    select: {
+      id: true,
+      slug: true,
+      displayName: true,
+      address: { select: { city: true, state: true } },
+    },
+  },
 } as const;
 
 /**
@@ -82,6 +90,17 @@ export class ProductsService {
     if (query.search)
       where.name = { contains: query.search, mode: 'insensitive' };
     if (query.sellerId) where.sellerId = query.sellerId;
+    if (query.shipFromState) {
+      const state = { equals: query.shipFromState, mode: 'insensitive' };
+      where.OR = [
+        { seller: { is: { address: { is: { state } } } } },
+        // Folia-owned products (no seller) dispatch from FOLIA_ORIGIN.
+        ...(FOLIA_ORIGIN.state.toLowerCase() ===
+        query.shipFromState.trim().toLowerCase()
+          ? [{ sellerId: null }]
+          : []),
+      ];
+    }
 
     const page = query.page || 1;
     const pageSize = query.pageSize || 12;

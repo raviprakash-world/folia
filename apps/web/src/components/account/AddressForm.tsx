@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/common/Alert';
 import { countries } from '@/data/countries';
 import { checkDeliveryAvailability } from '@/services/deliveryService';
+import { detectPlace, GeoError } from '@/utils/geo';
 import { addressSchema } from '@/utils/validation';
 import type { AddressFormValues } from '@/utils/validation';
 import type { Address, AddressType, DeliveryTimeSlot, GeoPlaceholder } from '@/types/address';
@@ -38,7 +39,9 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
     message: null,
     ok: false,
   });
-  const [geo, setGeo] = useState<GeoPlaceholder | null>(initialValues?.geo ?? null);
+  // Kept only so an existing address's stored pin round-trips unchanged; detection no longer produces one.
+  const [geo] = useState<GeoPlaceholder | null>(initialValues?.geo ?? null);
+  const [detect, setDetect] = useState<{ busy: boolean; message: string | null; ok: boolean }>({ busy: false, message: null, ok: false });
 
   const {
     register,
@@ -105,14 +108,26 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
     }
   }
 
-  function handleDetectLocation() {
-    // Explicitly a placeholder — no real browser geolocation permission is
-    // requested. A small jitter around a fixed point (Bengaluru — P0-F,
-    // was Portland, OR) keeps it from looking hard-coded while staying
-    // clearly labeled as mock.
-    const lat = 12.9716 + (Math.random() - 0.5) * 0.02;
-    const lng = 77.5946 + (Math.random() - 0.5) * 0.02;
-    setGeo({ lat: Math.round(lat * 10000) / 10000, lng: Math.round(lng * 10000) / 10000, source: 'mock' });
+  async function handleDetectLocation() {
+    setDetect({ busy: true, message: null, ok: false });
+    try {
+      const place = await detectPlace();
+      const fill = { shouldDirty: true, shouldValidate: true } as const;
+      if (place.addressLine1 && !addressLine1?.trim()) setValue('addressLine1', place.addressLine1, fill);
+      if (place.city) setValue('city', place.city, fill);
+      if (place.state) setValue('state', place.state, fill);
+      if (place.postalCode) setValue('postalCode', place.postalCode, fill);
+      setValue('country', 'IN', fill);
+      setDetect({
+        busy: false,
+        ok: true,
+        message: place.postalCode
+          ? 'Filled in from your location — please check the details, especially the house/flat number.'
+          : 'Filled in what we could from your location, but not the PIN code — please enter it.',
+      });
+    } catch (e) {
+      setDetect({ busy: false, ok: false, message: e instanceof GeoError ? e.message : "Couldn't detect your location." });
+    }
   }
 
   async function handleFormSubmit(values: AddressFormValues) {
@@ -207,22 +222,23 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-ink-soft">Location pin</p>
-          <button
-            type="button"
-            onClick={handleDetectLocation}
-            className="flex items-center gap-1.5 text-xs text-fern hover:text-heading transition-colors"
-          >
-            <MapPin size={12} />
-            Detect my location (mock)
-          </button>
-        </div>
-        {geo && (
-          <p className="font-mono text-xs text-ink-soft">
-            {geo.lat.toFixed(4)}, {geo.lng.toFixed(4)} — mock pin, not real GPS
-          </p>
+        <button
+          type="button"
+          onClick={() => void handleDetectLocation()}
+          disabled={detect.busy}
+          className="flex items-center gap-1.5 text-sm text-fern hover:text-heading transition-colors disabled:opacity-60"
+        >
+          {detect.busy ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+          {detect.busy ? 'Finding your location…' : 'Use my current location to fill in this address'}
+        </button>
+        {detect.message && (
+          <Alert tone={detect.ok ? 'success' : 'error'} className="mt-2">
+            {detect.message}
+          </Alert>
         )}
+        <p className="text-xs text-ink-soft mt-1.5">
+          Your coordinates are sent once to OpenStreetMap to look up the address; they aren&apos;t saved.
+        </p>
       </div>
 
       <div>
@@ -236,7 +252,7 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
               aria-pressed={type === opt.value}
               className={cn(
                 'px-3.5 py-1.5 rounded-full text-sm border transition-colors',
-                type === opt.value ? 'bg-pine text-stone-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
+                type === opt.value ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
               )}
             >
               {opt.label}

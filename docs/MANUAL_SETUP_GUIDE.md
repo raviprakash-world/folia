@@ -305,6 +305,17 @@ For every external integration record, with dates: what you did → what you obs
 
 ---
 
+## 13a. Location features rely on two free third-party services
+
+The delivery-location picker, "Use my current location" and the address-form autofill call, **from the visitor's browser**:
+
+- **OpenStreetMap Nominatim** (`nominatim.openstreetmap.org/reverse`) — turns coordinates into an address. It is a free community service with a usage policy (light, user-initiated use; no bulk; identifiable traffic) and no uptime guarantee. Fine for a demo or low traffic; **for a real launch switch to a paid geocoder** (for example Google Maps, Mapbox or Ola Maps) — the only file to change is `apps/web/src/utils/geo.ts`.
+- **India Post PIN data** (`api.postalpincode.in`) — PIN → city/state for manually entered PIN codes. Unofficial and unguaranteed. When it is unreachable the PIN still works for delivery estimates, but the state is unknown and the "Ships from my state" filter is disabled with an explanation.
+
+Privacy as built: coordinates are used for one lookup and never stored; only PIN, city and state are kept, in the visitor's own browser (`localStorage`). Update your privacy policy to say that a lookup is sent to OpenStreetMap when someone clicks the button. "Ships from" comes from each seller's business-address state (and Folia's Bengaluru dispatch for Folia-owned products); **it is not a serviceability check** — real per-PIN serviceability needs Shiprocket (section 6).
+
+---
+
 ## 13. Launch blocker register
 
 **P0 — must be resolved before any real customer or payment**

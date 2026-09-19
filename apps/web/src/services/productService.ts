@@ -10,6 +10,7 @@ export async function fetchProducts(query: ProductQuery): Promise<ProductQueryRe
   if (query.sort) params.sort = query.sort;
   if (query.search) params.search = query.search;
   if (query.sellerId) params.sellerId = query.sellerId;
+  if (query.shipFromState) params.shipFromState = query.shipFromState;
   params.page = String(query.page ?? 1);
   params.pageSize = String(query.pageSize ?? 12);
 

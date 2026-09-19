@@ -154,7 +154,7 @@ export default function ProductDetail() {
 
           <div className="flex items-baseline gap-3 mt-4 font-mono text-2xl">
             <span className={onSale ? 'text-rust' : 'text-ink'}>{formatCurrency(product.price)}</span>
-            {onSale && <span className="text-ink-soft/50 line-through text-lg">{formatCurrency(product.compareAtPrice!)}</span>}
+            {onSale && <span className="text-ink-soft line-through text-lg">{formatCurrency(product.compareAtPrice!)}</span>}
           </div>
 
           {product.careLevel && (
@@ -212,7 +212,7 @@ export default function ProductDetail() {
             <ShareButtons title={product.name} url={typeof window !== 'undefined' ? window.location.href : ''} />
           </div>
 
-          <DeliveryInfo />
+          <DeliveryInfo price={product.price} shipsFrom={product.shipsFrom} />
         </div>
       </div>
 

@@ -24,6 +24,11 @@ export interface ProductImage {
   altText?: string;
 }
 
+export interface ShipsFrom {
+  city: string;
+  state: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -44,6 +49,8 @@ export interface Product {
   createdAt: string;
   /** Ordered primary-first. Absent/empty means "no photo yet" — every image component falls back to the placeholder block. */
   images?: ProductImage[];
+  /** Dispatch location: the seller's business address, or Folia's Bengaluru studio for Folia-owned products. Absent if unknown. */
+  shipsFrom?: ShipsFrom;
   /** Marketplace Phase 16 — absent for a Folia-owned product, matching the real API's own omit-rather-than-null convention (see toPublicProduct). */
   seller?: ProductSeller;
 }
@@ -72,6 +79,10 @@ export interface ProductQuery {
   search?: string;
   /** Marketplace Phase 4 — filter to one seller's storefront. */
   sellerId?: string;
+  /** UI-only (URL param): the "ships from my state" checkbox. Turned into shipFromState using the saved location; never sent as-is. */
+  nearMe?: boolean;
+  /** Sent to the API: only products dispatching from this state. */
+  shipFromState?: string;
 }
 
 export interface ProductQueryResult {

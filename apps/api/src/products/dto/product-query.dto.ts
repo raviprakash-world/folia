@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -61,6 +62,15 @@ export class ProductQueryDto {
   @IsOptional()
   @IsString()
   sellerId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Only products that ship from this Indian state (a seller product: the seller's business-address state; a Folia-owned product: Folia's Bengaluru dispatch state). Case-insensitive.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  shipFromState?: string;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

@@ -109,6 +109,44 @@ describe('ProductsService.findMany', () => {
     );
   });
 
+  it("shipFromState: matches sellers whose business address is in that state (case-insensitive) and, for Folia's own dispatch state, Folia-owned products too", async () => {
+    const prisma = createMockPrisma();
+    prisma.$transaction.mockResolvedValue([0, []]);
+    const service = new ProductsService(prisma as never);
+
+    await service.findMany({
+      shipFromState: 'karnataka',
+      page: 1,
+      pageSize: 12,
+    });
+    const karnatakaWhere = (
+      prisma.product.count.mock.calls[0] as [{ where: { OR: unknown[] } }]
+    )[0].where;
+    expect(karnatakaWhere.OR).toEqual([
+      {
+        seller: {
+          is: {
+            address: {
+              is: { state: { equals: 'karnataka', mode: 'insensitive' } },
+            },
+          },
+        },
+      },
+      { sellerId: null },
+    ]);
+
+    prisma.product.count.mockClear();
+    await service.findMany({
+      shipFromState: 'Maharashtra',
+      page: 1,
+      pageSize: 12,
+    });
+    const maharashtraWhere = (
+      prisma.product.count.mock.calls[0] as [{ where: { OR: unknown[] } }]
+    )[0].where;
+    expect(maharashtraWhere.OR).toHaveLength(1); // no Folia-owned products dispatch from Maharashtra
+  });
+
   it('Marketplace Phase 3: excludes non-ACTIVE products (a seller draft/submission never appears in the public marketplace)', async () => {
     const prisma = createMockPrisma();
     prisma.$transaction.mockResolvedValue([0, []]);

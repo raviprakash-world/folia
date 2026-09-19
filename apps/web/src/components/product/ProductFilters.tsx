@@ -2,6 +2,7 @@ import { Check } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import type { ProductQuery } from '@/types/product';
 import { cn } from '@/utils/cn';
+import { useLocationStore } from '@/store/locationStore';
 
 interface ProductFiltersProps {
   filters: ProductQuery;
@@ -9,11 +10,13 @@ interface ProductFiltersProps {
   onReset: () => void;
 }
 
-const PRICE_MAX = 100;
+const PRICE_MAX = 2000;
 
 export function ProductFilters({ filters, onChange, onReset }: ProductFiltersProps) {
   const { data: categories } = useCategories();
-  const hasActiveFilters = !!(filters.category || filters.minPrice || filters.maxPrice || filters.inStockOnly);
+  const location = useLocationStore((s) => s.location);
+  const openPicker = useLocationStore((s) => s.openPicker);
+  const hasActiveFilters = !!(filters.category || filters.minPrice || filters.maxPrice || filters.inStockOnly || filters.nearMe);
 
   return (
     <div className="flex flex-col gap-8">
@@ -92,6 +95,25 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
           />
           <span className="text-ink-soft">In stock only</span>
         </label>
+        <label className={cn('flex items-center gap-2.5 text-sm mt-3', location?.state ? 'cursor-pointer' : 'opacity-70')}>
+          <input
+            type="checkbox"
+            checked={!!filters.nearMe}
+            disabled={!location?.state}
+            onChange={(e) => onChange({ nearMe: e.target.checked || undefined })}
+            className="w-4 h-4 accent-fern"
+          />
+          <span className="text-ink-soft">Ships from my state</span>
+        </label>
+        {!location ? (
+          <button type="button" onClick={openPicker} className="mt-1.5 ml-6 text-xs text-fern hover:text-heading underline">
+            Set your location
+          </button>
+        ) : !location.state ? (
+          <p className="mt-1.5 ml-6 text-xs text-ink-soft">We couldn&apos;t find the state for PIN {location.pincode}.</p>
+        ) : (
+          <p className="mt-1.5 ml-6 text-xs text-ink-soft">{location.state}</p>
+        )}
       </fieldset>
     </div>
   );

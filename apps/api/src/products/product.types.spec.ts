@@ -88,6 +88,43 @@ describe('toPublicProduct', () => {
     expect(toPublicProduct(makeProduct()).images).toEqual([]);
   });
 
+  it("shipsFrom: Folia-owned products dispatch from Bengaluru; a seller product from its business address; unknown when the seller relation wasn't loaded or has no address", () => {
+    expect(toPublicProduct(makeProduct({ seller: null })).shipsFrom).toEqual({
+      city: 'Bengaluru',
+      state: 'Karnataka',
+    });
+    const withAddress = toPublicProduct(
+      makeProduct({
+        seller: {
+          id: 's1',
+          slug: 'urban-roots',
+          displayName: 'Urban Roots',
+          address: { city: 'Hyderabad', state: 'Telangana' },
+        },
+      }),
+    );
+    expect(withAddress.shipsFrom).toEqual({
+      city: 'Hyderabad',
+      state: 'Telangana',
+    });
+    // the address is used to derive shipsFrom and is NOT leaked through `seller`
+    expect(withAddress.seller).toEqual({
+      id: 's1',
+      slug: 'urban-roots',
+      displayName: 'Urban Roots',
+    });
+    expect(
+      toPublicProduct(
+        makeProduct({
+          seller: { id: 's2', slug: 'x', displayName: 'X', address: null },
+        }),
+      ).shipsFrom,
+    ).toBeUndefined();
+    const notLoaded = makeProduct();
+    delete (notLoaded as { seller?: unknown }).seller;
+    expect(toPublicProduct(notLoaded).shipsFrom).toBeUndefined();
+  });
+
   it('derives category/categorySlug from the related Category record', () => {
     const result = toPublicProduct(makeProduct());
     expect(result.category).toBe('Plants');

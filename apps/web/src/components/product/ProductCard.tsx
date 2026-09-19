@@ -6,6 +6,7 @@ import { cn } from '@/utils/cn';
 import { ProductImage } from '@/components/product/ProductImage';
 import { useIsWishlisted, useToggleWishlist } from '@/hooks/useWishlist';
 import { formatCurrency } from '@/utils/currency';
+import { useLocationStore } from '@/store/locationStore';
 import type { Product } from '@/types/product';
 
 interface ProductCardProps {
@@ -24,6 +25,9 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const onSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const wishlisted = useIsWishlisted(product.id);
   const toggleWishlist = useToggleWishlist();
+  const locationState = useLocationStore((s) => s.location?.state);
+  const inYourState =
+    !!locationState && product.shipsFrom?.state.toLowerCase() === locationState.toLowerCase();
 
   return (
     <Card variant="raised" className={cn('p-4 group', className)}>
@@ -59,12 +63,18 @@ export function ProductCard({ product, className }: ProductCardProps) {
         </div>
 
         <h3 className="font-medium text-ink text-sm">{product.name}</h3>
+        {product.shipsFrom && (
+          <p className="text-xs text-ink-soft mt-0.5">
+            Ships from {product.shipsFrom.city}
+            {inYourState && <span className="text-fern"> · in your state</span>}
+          </p>
+        )}
 
         <div className="mt-1.5 flex items-center justify-between">
           <div className="flex items-baseline gap-2 font-mono text-sm">
             <span className={onSale ? 'text-rust' : 'text-ink-soft'}>{formatCurrency(product.price)}</span>
             {onSale && (
-              <span className="text-ink-soft/50 line-through text-xs">
+              <span className="text-ink-soft line-through text-xs">
                 {formatCurrency(product.compareAtPrice!)}
               </span>
             )}

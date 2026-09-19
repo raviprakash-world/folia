@@ -9,6 +9,8 @@ import type { Product } from '@/types/product';
  * (MSW in dev, and the few components that still read the array directly).
  * Everything in it is fictional demo content.
  */
+// Mirrors apps/api's FOLIA_ORIGIN (product.types.ts).
+const FOLIA_ORIGIN = { city: 'Bengaluru', state: 'Karnataka' };
 const categoryNameBySlug = new Map(catalog.categories.map((c) => [c.slug, c.name]));
 const sellerBySlug = new Map(catalog.sellers.map((s) => [s.slug, s]));
 
@@ -33,6 +35,7 @@ export const products: Product[] = catalog.products.map((p) => {
     variants: p.variants.map((v) => ({ id: v.id, label: v.label, swatch: v.swatch ?? undefined, inStock: v.inStock })),
     specs: p.specs,
     createdAt: p.createdAt,
+    shipsFrom: seller ? { city: seller.city, state: seller.state } : FOLIA_ORIGIN,
     images: image ? [{ url: `/demo/products/${image.file}`, altText: image.alt }] : undefined,
     seller: seller ? { id: `demo-seller-${seller.slug}`, slug: seller.slug, displayName: seller.displayName } : undefined,
   };
