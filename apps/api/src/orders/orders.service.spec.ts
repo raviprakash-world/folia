@@ -377,15 +377,15 @@ describe('OrdersService.checkout', () => {
 
     await service.checkout('user-1', BASE_DTO);
 
-    // subtotal = 30 * 2 = 60; tax = 60 * 0.08 = 4.8; shipping (standard) = 6.5; total = 60 + 4.8 + 6.5 = 71.3
+    // subtotal = 30 * 2 = 60; tax = 60 * 0.08 = 4.8; shipping (standard) = 79; total = 60 + 4.8 + 79 = 143.8
     const call = paymentsService.createForOrder.mock.calls[0][0] as {
       amount: number;
       checkoutSnapshot: { subtotal: number; tax: number; total: number };
     };
     expect(call.checkoutSnapshot.subtotal).toBe(60);
     expect(call.checkoutSnapshot.tax).toBeCloseTo(4.8);
-    expect(call.checkoutSnapshot.total).toBeCloseTo(71.3);
-    expect(call.amount).toBeCloseTo(71.3);
+    expect(call.checkoutSnapshot.total).toBeCloseTo(143.8);
+    expect(call.amount).toBeCloseTo(143.8);
   });
 
   it('applies a percent coupon correctly to the discount and total', async () => {
@@ -399,12 +399,12 @@ describe('OrdersService.checkout', () => {
 
     await service.checkout('user-1', { ...BASE_DTO, couponCode: 'folia10' });
 
-    // subtotal 60, discount = 10% of 60 = 6, taxable = 54, tax = 4.32, total = 60-6+6.5+4.32 = 64.82
+    // subtotal 60, discount = 10% of 60 = 6, taxable = 54, tax = 4.32, total = 60-6+79+4.32 = 137.32
     const call = paymentsService.createForOrder.mock.calls[0][0] as {
       checkoutSnapshot: { discount: number; total: number; couponCode: string };
     };
     expect(call.checkoutSnapshot.discount).toBe(6);
-    expect(call.checkoutSnapshot.total).toBeCloseTo(64.82);
+    expect(call.checkoutSnapshot.total).toBeCloseTo(137.32);
     expect(call.checkoutSnapshot.couponCode).toBe('FOLIA10');
   });
 
@@ -510,7 +510,7 @@ describe('OrdersService.checkout', () => {
       expect.objectContaining({
         userId: 'user-1',
         method: 'COD',
-        amount: 71.3,
+        amount: 143.8,
         displayLabel: 'Pay on delivery',
         checkoutSnapshot: expect.objectContaining({
           orderId: expect.stringMatching(/^FOL-\d{8}-\d{4}$/),

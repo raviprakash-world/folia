@@ -8,6 +8,7 @@ import { processPayment, PaymentError } from '@/services/paymentService';
 import { useCheckoutStore } from '@/store/checkoutStore';
 import { useCartTotals } from '@/hooks/useCart';
 import { formatCurrency } from '@/utils/currency';
+import { computeTotal } from '@/utils/pricing';
 import { cn } from '@/utils/cn';
 import { NewCardForm, SavedCardForm, SavedCardPicker, UpiForm, NetBankingForm } from '@/components/checkout/PaymentForms';
 import type { PaymentMethodType } from '@/types/order';
@@ -27,7 +28,13 @@ export default function CheckoutPayment() {
   const navigate = useNavigate();
   const setPayment = useCheckoutStore((s) => s.setPayment);
   const deliveryMethod = useCheckoutStore((s) => s.deliveryMethod);
-  const { total } = useCartTotals();
+  const deliveryCost = useCheckoutStore((s) => s.deliveryCost);
+  // The cart's own total has no delivery cost yet (only a PIN-code estimate,
+  // often unset) — the amount due must include the delivery method the
+  // customer actually picked, same as the Review step does, otherwise the
+  // wallet check and "Pay ₹X" button quote a different number than the order.
+  const { subtotal, discount, tax } = useCartTotals();
+  const total = computeTotal(subtotal, discount, deliveryCost, tax);
 
   const [method, setMethod] = useState<PaymentMethodType>('credit-card');
   const [savedCardId, setSavedCardId] = useState<string | null>(null);

@@ -3,7 +3,7 @@ import { apiClient } from './apiClient';
 import { isFarRegion } from '@/utils/region';
 
 const ESTIMATE_DELAY_MS = 450;
-const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
+const FREE_SHIPPING_THRESHOLD = 999; // placeholder — must match apps/api/src/shipping/shipping.service.ts
 const useRealShippingApi = import.meta.env.VITE_REAL_SHIPPING_API === 'true';
 
 export class ShippingError extends Error {}
@@ -37,7 +37,7 @@ async function estimateShippingRateLocal(pincode: string, subtotal: number): Pro
 
   const farRegion = isFarRegion(pincode);
   return {
-    cost: farRegion ? 9.5 : 6.5,
+    cost: farRegion ? 129 : 79, // mirrors ShippingService.heuristicEstimate (apps/api)
     etaDays: farRegion ? '4–6 business days' : '2–4 business days',
   };
 }

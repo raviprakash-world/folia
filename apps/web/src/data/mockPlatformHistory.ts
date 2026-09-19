@@ -67,7 +67,7 @@ function generateHistory(): MockHistoricalOrder[] {
       const subtotal = orderProducts.reduce((sum, p) => sum + p.price, 0);
       const hasDiscount = rand() < 0.25;
       const discount = hasDiscount ? Math.round(subtotal * 0.1 * 100) / 100 : 0;
-      const shipping = subtotal >= 75 ? 0 : seededPick(rand, [6.5, 9.5]);
+      const shipping = subtotal >= 999 ? 0 : seededPick(rand, [79, 129]);
       const taxable = subtotal - discount;
       const tax = Math.round(taxable * 0.08 * 100) / 100;
       const total = Math.round((taxable + shipping + tax) * 100) / 100;

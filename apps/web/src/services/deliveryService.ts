@@ -7,7 +7,7 @@ const DELIVERY_CHECK_DELAY_MS = 500;
 // actual threshold used here again — it used to say "orders over ₹75"
 // (stale USD-shaped text left behind when this number was rescaled 40x)
 // while checkout silently required ₹3,000.
-export const FREE_SHIPPING_THRESHOLD = 3000; // P0-F: was 75 (USD-shaped), rescaled 40x to match product-price rescale
+export const FREE_SHIPPING_THRESHOLD = 999; // placeholder — must match apps/api/src/shipping/shipping.service.ts
 
 export interface DeliveryAvailability {
   postalCode: string;

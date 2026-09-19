@@ -9,9 +9,9 @@ export const DELIVERY_METHOD_DEFS: Record<
   DeliveryMethodType,
   { cost: number; etaDays: string }
 > = {
-  STANDARD: { cost: 6.5, etaDays: '3–5 business days' },
-  EXPRESS: { cost: 14, etaDays: '1–2 business days' },
-  SAME_DAY: { cost: 19, etaDays: 'Today, by 9pm' },
+  STANDARD: { cost: 79, etaDays: '3–5 business days' },
+  EXPRESS: { cost: 199, etaDays: '1–2 business days' },
+  SAME_DAY: { cost: 299, etaDays: 'Today, by 9pm' },
   PICKUP: { cost: 0, etaDays: 'Ready in 2 hours' },
 };
 
