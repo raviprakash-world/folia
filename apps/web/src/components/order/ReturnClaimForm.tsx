@@ -151,7 +151,7 @@ export function ReturnClaimForm({ order, onSubmit, onCancel, submitError, isSubm
       </div>
 
       {isMixed && (
-        <p className="flex items-start gap-2 text-xs text-rust">
+        <p className="flex items-start gap-2 text-xs text-rust-text">
           <AlertTriangle size={14} className="shrink-0 mt-0.5" />
           Plants and other items can&apos;t be claimed together — an order can only have one return/DOA claim
           in total, so please select items from just one group.
@@ -212,13 +212,13 @@ export function ReturnClaimForm({ order, onSubmit, onCancel, submitError, isSubm
               className="hidden"
             />
           </label>
-          {fileError && <p className="text-xs text-rust mt-1.5">{fileError}</p>}
+          {fileError && <p className="text-xs text-rust-text mt-1.5">{fileError}</p>}
           {evidence.length > 0 && (
             <ul className="flex flex-col gap-1.5 mt-2">
               {evidence.map((file, i) => (
                 <li key={`${file.name}-${i}`} className="flex items-center justify-between text-xs bg-stone-dark/40 rounded-[var(--radius-control)] px-2.5 py-1.5">
                   <span className="truncate">{file.name}</span>
-                  <button type="button" onClick={() => removeFile(i)} aria-label={`Remove ${file.name}`} className="text-ink-soft hover:text-rust shrink-0 ml-2">
+                  <button type="button" onClick={() => removeFile(i)} aria-label={`Remove ${file.name}`} className="text-ink-soft hover:text-rust-text shrink-0 ml-2">
                     <X size={14} />
                   </button>
                 </li>
@@ -232,7 +232,7 @@ export function ReturnClaimForm({ order, onSubmit, onCancel, submitError, isSubm
         You can only file one return/DOA claim per order.
       </p>
 
-      {submitError && <p className="text-sm text-rust">{submitError}</p>}
+      {submitError && <p className="text-sm text-rust-text">{submitError}</p>}
 
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>

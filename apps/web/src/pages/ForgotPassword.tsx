@@ -35,7 +35,7 @@ export default function ForgotPassword() {
 
   if (submitted) {
     return (
-      <Container className="py-20 max-w-sm text-center">
+      <Container className="py-10 sm:py-20 max-w-sm text-center">
         <Mail size={28} className="text-fern mx-auto mb-4" />
         <h1 className="font-display text-2xl font-semibold text-heading">Check your email</h1>
         <p className="text-sm text-ink-soft mt-2">
@@ -60,7 +60,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <Container className="py-20 max-w-sm">
+    <Container className="py-10 sm:py-20 max-w-sm">
       <h1 className="font-display text-3xl font-semibold text-heading">Reset your password</h1>
       <p className="text-sm text-ink-soft mt-2">Enter your email and we'll send a link to reset it.</p>
 

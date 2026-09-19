@@ -20,6 +20,8 @@ export interface CartItem {
   sellerName?: string | null;
   /** Primary product photo from the real cart API; local-cart lines fall back to the catalog lookup in CartLineItem. */
   imageUrl?: string | null;
+  /** Display-only snapshot of the original price, so the cart can show what the shopper saves. Never used in totals. */
+  compareAtPrice?: number | null;
 }
 
 export interface WishlistItem {

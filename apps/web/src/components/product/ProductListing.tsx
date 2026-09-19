@@ -87,7 +87,7 @@ export function ProductListing({
                   aria-label="Grid view"
                   aria-pressed={view === 'grid'}
                   onClick={() => setView('grid')}
-                  className={cn('p-2.5', view === 'grid' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
+                  className={cn('flex size-10 items-center justify-center', view === 'grid' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
                 >
                   <LayoutGrid size={16} />
                 </button>
@@ -96,7 +96,7 @@ export function ProductListing({
                   aria-label="List view"
                   aria-pressed={view === 'list'}
                   onClick={() => setView('list')}
-                  className={cn('p-2.5', view === 'list' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
+                  className={cn('flex size-10 items-center justify-center', view === 'list' ? 'bg-pine text-cream-light' : 'text-ink-soft')}
                 >
                   <List size={16} />
                 </button>

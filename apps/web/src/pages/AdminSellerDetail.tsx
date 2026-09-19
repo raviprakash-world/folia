@@ -144,18 +144,18 @@ export default function AdminSellerDetail() {
             <Button variant="primary" disabled={approve.isPending} onClick={() => void approve.mutateAsync()}>
               {approve.isPending ? 'Approving…' : 'Approve'}
             </Button>
-            <Button variant="outline" className="!border-rust !text-rust" onClick={() => setRejectOpen(true)}>
+            <Button variant="outline" className="!border-rust !text-rust-text" onClick={() => setRejectOpen(true)}>
               Reject
             </Button>
           </>
         )}
         {canSuspend && (
-          <Button variant="outline" className="!border-rust !text-rust" onClick={() => setSuspendOpen(true)}>
+          <Button variant="outline" className="!border-rust !text-rust-text" onClick={() => setSuspendOpen(true)}>
             Suspend
           </Button>
         )}
         {canDeactivate && (
-          <Button variant="outline" className="!border-rust !text-rust" onClick={() => setDeactivateOpen(true)}>
+          <Button variant="outline" className="!border-rust !text-rust-text" onClick={() => setDeactivateOpen(true)}>
             Deactivate
           </Button>
         )}
@@ -171,9 +171,9 @@ export default function AdminSellerDetail() {
           View balance & payouts
         </Link>
       </div>
-      {approve.isError && <p className="text-sm text-rust mt-3">{errorMessage(approve.error, "Couldn't approve this seller.")}</p>}
+      {approve.isError && <p className="text-sm text-rust-text mt-3">{errorMessage(approve.error, "Couldn't approve this seller.")}</p>}
       {reactivate.isError && (
-        <p className="text-sm text-rust mt-3">{errorMessage(reactivate.error, "Couldn't reactivate this seller.")}</p>
+        <p className="text-sm text-rust-text mt-3">{errorMessage(reactivate.error, "Couldn't reactivate this seller.")}</p>
       )}
 
       <Modal open={rejectOpen} onClose={() => setRejectOpen(false)} title="Reject this application?">

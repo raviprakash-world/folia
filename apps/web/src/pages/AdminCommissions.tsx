@@ -67,7 +67,7 @@ export default function AdminCommissions() {
             {setRate.isPending ? 'Saving…' : 'Set'}
           </Button>
         </div>
-        {setRate.isError && <p className="text-xs text-rust mt-2">{errorMessage(setRate.error, "Couldn't set that rate.")}</p>}
+        {setRate.isError && <p className="text-xs text-rust-text mt-2">{errorMessage(setRate.error, "Couldn't set that rate.")}</p>}
       </div>
 
       <div>

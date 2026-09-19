@@ -134,7 +134,7 @@ export default function AdminSellerProducts() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="!border-rust !text-rust"
+                        className="!border-rust !text-rust-text"
                         onClick={() => setReasonTarget({ product: p, action: 'reject' })}
                       >
                         Reject
@@ -148,7 +148,7 @@ export default function AdminSellerProducts() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="!border-rust !text-rust"
+                      className="!border-rust !text-rust-text"
                       disabled={deactivate.isPending}
                       onClick={() => void deactivate.mutateAsync(p.id)}
                     >

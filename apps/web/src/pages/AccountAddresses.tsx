@@ -107,7 +107,7 @@ export default function AccountAddresses() {
       )}
 
       {initialLoading && (
-        <div className="flex items-center gap-2 text-sm text-ink-soft py-12">
+        <div className="flex items-center gap-2 text-sm text-ink-soft py-6 sm:py-12">
           <Loader2 size={16} className="animate-spin" />
           Loading your addresses…
         </div>

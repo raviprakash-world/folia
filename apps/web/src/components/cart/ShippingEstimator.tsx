@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Truck } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
+import { useLocationStore } from '@/store/locationStore';
 import { formatCurrency } from '@/utils/currency';
 
 export function ShippingEstimator() {
@@ -11,6 +12,12 @@ export function ShippingEstimator() {
   const status = useCartStore((s) => s.shippingStatus);
   const error = useCartStore((s) => s.shippingError);
   const estimateShipping = useCartStore((s) => s.estimateShipping);
+
+  // A shopper who already told us their PIN shouldn't have to type it again.
+  const savedPin = useLocationStore((s) => s.location?.pincode);
+  useEffect(() => {
+    if (savedPin && shippingZip === null && status === 'idle') void estimateShipping(savedPin);
+  }, [savedPin, shippingZip, status, estimateShipping]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,27 +37,27 @@ export function ShippingEstimator() {
           aria-label="PIN code for shipping estimate"
           aria-invalid={status === 'error'}
           maxLength={6}
-          className="flex-1 min-w-0 rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3 py-2 text-sm font-mono focus:border-fern transition-colors"
+          className="h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-stone-dark bg-stone px-3 text-[15px] tabular-nums focus:border-fern transition-colors"
         />
         <button
           type="submit"
           disabled={status === 'pending' || !zip.trim()}
-          className="shrink-0 flex items-center justify-center px-4 rounded-[var(--radius-control)] border border-stone-dark text-ink text-sm font-medium disabled:opacity-40 transition-opacity"
+          className="flex h-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-stone-dark px-4 text-[15px] font-medium text-ink transition-opacity disabled:opacity-40"
         >
           {status === 'pending' ? <Loader2 size={15} className="animate-spin" /> : 'Estimate'}
         </button>
       </form>
 
       {error && (
-        <p role="alert" className="text-xs text-rust mt-1.5">
+        <p role="alert" className="mt-1.5 text-sm text-rust-text">
           {error}
         </p>
       )}
 
       {shippingCost !== null && status !== 'error' && (
-        <p className="flex items-center gap-1.5 text-xs text-fern-dark mt-1.5">
+        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-fern-dark">
           <Truck size={13} />
-          {shippingCost === 0 ? 'Free shipping' : `${formatCurrency(shippingCost)} shipping`} to {shippingZip} — {shippingEta}
+          {shippingCost === 0 ? 'Free shipping' : `${formatCurrency(shippingCost)} shipping`} to {shippingZip} — estimated {shippingEta}
         </p>
       )}
     </div>

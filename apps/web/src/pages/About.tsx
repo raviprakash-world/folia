@@ -1,6 +1,5 @@
-import { Link } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { PageHeader } from '@/components/common/PageHeader';
 
 const values = [
@@ -22,7 +21,7 @@ export default function About() {
   return (
     <>
       <div className="bg-pine text-cream-light">
-        <Container className="py-24">
+        <Container className="py-12 sm:py-24">
           <p className="font-mono text-xs uppercase tracking-wider text-ochre mb-4">About Folia</p>
           <h1 className="font-display text-4xl md:text-5xl font-semibold max-w-[20ch] leading-tight">
             We think a plant should still be alive a year after you buy it.
@@ -34,7 +33,7 @@ export default function About() {
         </Container>
       </div>
 
-      <Container className="py-20">
+      <Container className="py-10 sm:py-20">
         <PageHeader eyebrow="What we believe" title="A few things we won't compromise on" />
         <div className="grid sm:grid-cols-3 gap-8">
           {values.map((v) => (
@@ -52,9 +51,7 @@ export default function About() {
           <p className="text-ink-soft mt-2 max-w-[50ch] mx-auto">
             We answer care questions even if you haven't bought anything yet — happy to help you figure out what'll actually survive your space.
           </p>
-          <Button variant="primary" className="mt-6">
-            <Link to="/contact">Get in touch</Link>
-          </Button>
+          <ButtonLink variant="primary" className="mt-6" to="/contact">Get in touch</ButtonLink>
         </div>
       </Container>
     </>

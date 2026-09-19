@@ -5,6 +5,7 @@ import { useWishlistStore } from '@/store/wishlistStore';
 import { useMoveToCart } from '@/hooks/useWishlist';
 import { formatCurrency } from '@/utils/currency';
 import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { Card } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
 import type { WishlistItem } from '@/types/cart';
@@ -25,7 +26,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
           type="button"
           onClick={() => void removeItem(item.productId)}
           aria-label={`Remove ${item.name} from wishlist`}
-          className="p-1.5 text-ink-soft hover:text-rust transition-colors shrink-0"
+          className="p-1.5 text-ink-soft hover:text-rust-text transition-colors shrink-0"
         >
           <Trash2 size={16} />
         </button>
@@ -56,14 +57,12 @@ function WishlistRow({ item }: { item: WishlistItem }) {
           {product.badge && <Tag tone={product.badge === 'Sale' ? 'rust' : 'stone'}>{product.badge}</Tag>}
         </div>
         <p className="font-mono text-sm text-ink-soft mt-1">{formatCurrency(product.price)}</p>
-        {!product.inStock && <p className="text-xs text-rust mt-1">Out of stock</p>}
+        {!product.inStock && <p className="text-xs text-rust-text mt-1">Out of stock</p>}
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
         {hasVariants ? (
-          <Button variant="outline" size="sm">
-            <Link to={`/product/${product.slug}`}>Select options</Link>
-          </Button>
+          <ButtonLink variant="outline" size="sm" to={`/product/${product.slug}`}>Select options</ButtonLink>
         ) : (
           <Button
             variant="outline"
@@ -79,7 +78,7 @@ function WishlistRow({ item }: { item: WishlistItem }) {
           type="button"
           onClick={() => void removeItem(item.productId)}
           aria-label={`Remove ${product.name} from wishlist`}
-          className="p-1.5 text-ink-soft hover:text-rust transition-colors"
+          className="p-1.5 text-ink-soft hover:text-rust-text transition-colors"
         >
           <Trash2 size={16} />
         </button>

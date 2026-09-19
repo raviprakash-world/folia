@@ -72,7 +72,7 @@ export default function AdminSearch() {
           </div>
           <div>
             <h2 className="font-display text-lg font-semibold text-heading mb-4 flex items-center gap-2">
-              <SearchX size={16} className="text-rust" />
+              <SearchX size={16} className="text-rust-text" />
               No-result searches (session)
             </h2>
             <TableWidget

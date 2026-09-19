@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Pagination } from '@/components/common/Pagination';
 import { OrderRow } from '@/components/order/OrderRow';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { useOrders, useRealOrdersApi } from '@/hooks/useOrders';
 import { getEffectiveOrderStatus } from '@/utils/refund';
 import { cn } from '@/utils/cn';
@@ -97,9 +96,7 @@ export default function AccountOrders() {
           title="No orders yet"
           description="Once you place an order, it'll show up here."
           action={
-            <Button variant="primary">
-              <Link to="/shop">Browse the shop</Link>
-            </Button>
+            <ButtonLink variant="primary" to="/shop">Browse the shop</ButtonLink>
           }
         />
       </div>

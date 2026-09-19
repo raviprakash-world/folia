@@ -7,6 +7,8 @@ interface ProductImageProps {
   className?: string;
   /** How wide the image is drawn at each breakpoint, so the browser can pick the smaller file on phones. */
   sizes?: string;
+  /** The main photo on a page: load right away instead of lazily. */
+  priority?: boolean;
 }
 
 const DEMO_DIR = '/demo/products/';
@@ -17,7 +19,7 @@ const DEMO_DIR = '/demo/products/';
  * a missing/broken photo degrades to the old placeholder, never a broken-
  * image icon. The parent must be `relative` with a fixed size/aspect.
  */
-export function ProductImage({ src, alt, className, sizes = '(min-width: 1024px) 25vw, 50vw' }: ProductImageProps) {
+export function ProductImage({ src, alt, className, sizes = '(min-width: 1024px) 25vw, 50vw', priority = false }: ProductImageProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   if (!src || failedSrc === src) return null;
   return (
@@ -26,7 +28,8 @@ export function ProductImage({ src, alt, className, sizes = '(min-width: 1024px)
       srcSet={src.startsWith(DEMO_DIR) ? `${src.replace(DEMO_DIR, `${DEMO_DIR}sm/`)} 480w, ${src} 900w` : undefined}
       sizes={src.startsWith(DEMO_DIR) ? sizes : undefined}
       alt={alt}
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : undefined}
       decoding="async"
       onError={() => setFailedSrc(src)}
       className={cn('absolute inset-0 w-full h-full object-cover', className)}

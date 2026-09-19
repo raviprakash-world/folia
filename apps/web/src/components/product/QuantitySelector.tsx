@@ -14,11 +14,11 @@ export function QuantitySelector({ value, onChange, max = 10 }: QuantitySelector
         onClick={() => onChange(Math.max(1, value - 1))}
         disabled={value <= 1}
         aria-label="Decrease quantity"
-        className="p-2.5 text-ink-soft hover:text-heading disabled:opacity-30 disabled:pointer-events-none"
+        className="flex size-11 items-center justify-center text-ink-soft hover:text-heading disabled:opacity-30 disabled:pointer-events-none"
       >
-        <Minus size={14} />
+        <Minus size={16} />
       </button>
-      <span className="w-8 text-center font-mono text-sm" aria-live="polite">
+      <span className="w-9 text-center text-base font-medium tabular-nums" aria-live="polite">
         {value}
       </span>
       <button
@@ -26,9 +26,9 @@ export function QuantitySelector({ value, onChange, max = 10 }: QuantitySelector
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
         aria-label="Increase quantity"
-        className="p-2.5 text-ink-soft hover:text-heading disabled:opacity-30 disabled:pointer-events-none"
+        className="flex size-11 items-center justify-center text-ink-soft hover:text-heading disabled:opacity-30 disabled:pointer-events-none"
       >
-        <Plus size={14} />
+        <Plus size={16} />
       </button>
     </div>
   );

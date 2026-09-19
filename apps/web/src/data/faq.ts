@@ -58,17 +58,12 @@ export const faqEntries: FaqEntry[] = [
   {
     category: 'Account',
     question: 'Do I need an account to order?',
-    answer: "No — guest checkout is fully supported. An account just lets you see order history and save details for next time.",
+    answer: "Yes. You can browse and fill your cart without one, but you need to sign in (or create an account) at checkout. That is how we show your order history and let you track deliveries.",
   },
   {
     category: 'Account',
     question: 'How do I reset my password?',
     answer: 'Use the "Forgot password" link on the login page. You\u2019ll get a reset link by email — for security, we don\u2019t confirm whether an email is registered either way.',
-  },
-  {
-    category: 'Account',
-    question: 'Can I merge my guest cart into my account after logging in?',
-    answer: "Right now guest and account carts are kept separate. This is on the roadmap — see the project README for details.",
   },
 ];
 

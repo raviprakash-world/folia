@@ -29,7 +29,7 @@ export function CouponInput() {
           type="button"
           onClick={removeCoupon}
           aria-label="Remove coupon"
-          className="p-1 text-ink-soft hover:text-rust transition-colors"
+          className="p-1 text-ink-soft hover:text-rust-text transition-colors"
         >
           <X size={14} />
         </button>
@@ -58,7 +58,7 @@ export function CouponInput() {
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-xs text-rust">
+        <p role="alert" className="text-xs text-rust-text">
           {error}
         </p>
       )}

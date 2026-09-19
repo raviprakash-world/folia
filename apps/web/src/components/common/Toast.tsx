@@ -14,7 +14,7 @@ export function ToastViewport() {
   const dismissToast = useToastStore((s) => s.dismissToast);
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div className="pointer-events-none fixed inset-x-4 bottom-20 z-[60] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-full sm:max-w-sm lg:bottom-4">
       <AnimatePresence>
         {toasts.map((toast) => {
           const { container, Icon } = toneStyles[toast.tone];
@@ -37,9 +37,9 @@ export function ToastViewport() {
                 type="button"
                 onClick={() => dismissToast(toast.id)}
                 aria-label="Dismiss"
-                className="shrink-0 opacity-70 hover:opacity-100"
+                className="-mr-2 flex size-11 shrink-0 items-center justify-center opacity-70 hover:opacity-100"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </motion.div>
           );

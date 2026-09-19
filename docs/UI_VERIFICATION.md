@@ -45,3 +45,42 @@ header uses `backdrop-blur`, and any ancestor with `backdrop-filter`, `filter` o
 `transform` becomes the containing block for `position: fixed` children. `Modal`
 now renders through a portal into `document.body`; new overlays must too.
 
+
+## 6. Phone checks: `scripts/viewport-audit.mjs`
+A real Chrome (over the DevTools protocol) loads each route at each width and
+reports, per page:
+
+- **OVERFLOW** — the page scrolls sideways; **CLIPPED** — something sticks out
+  past the screen but is hidden (this is how a cut-off product column and Sort
+  dropdown hid from a plain overflow check);
+- interactive elements smaller than 40px (tap targets), text under 12px,
+  images without dimensions, images decoded far larger than shown.
+
+```bash
+node scripts/viewport-audit.mjs                       # every public route, 320 → 1440
+node scripts/viewport-audit.mjs --widths 360,390,412 --routes / /shop --shots out/ --full
+BASE_URL=http://localhost:5175 node scripts/viewport-audit.mjs \
+  --login demo@folia.example:folia-demo --cart hand-trowel --routes /account /checkout/shipping
+```
+
+The signed-in screens need a dev server running in mock-auth mode
+(`VITE_REAL_AUTH_API=false VITE_REAL_SELLERS_API=false npx vite --port 5175`).
+It never types card details; stop at the payment screen.
+
+## 7. Rules that came out of the mobile phase
+- **Tap targets are 44px.** Icon buttons are `size-11`; text links in lists get
+  `min-h-11`. `Button` has real minimum heights (`sm` 40, `md` 44, `lg` 48).
+- **Never nest `<Link>` inside `<Button>`** (only the text is then tappable).
+  Use `ButtonLink`.
+- **Fields are 16px on phones** or iOS Safari zooms the page on focus (a global
+  rule in `index.css` enforces it). Inputs are `w-full min-w-0` so one wide
+  field can't stretch a one-column grid past the screen.
+- **Nothing is hover-only.** The wishlist heart used to appear only on hover, so
+  on a phone it was invisible.
+- **Sticky bars need clearance.** The product page and cart have their own bottom
+  bars, so the bottom navigation is hidden there and those pages reserve space
+  under their content. Toasts sit above both.
+- **Use the same money format where money is settled.** Browsing shows `₹899`;
+  cart and checkout keep two decimals (`₹899.00`) so line items and totals match.
+- **State only what a policy page or a working feature backs** (see the "Why
+  Folia" block). No counts, awards, or testimonials that were not measured.

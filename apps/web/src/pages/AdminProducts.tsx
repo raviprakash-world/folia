@@ -208,7 +208,7 @@ export default function AdminProducts() {
                       type="button"
                       onClick={() => setDeleteTarget(p)}
                       aria-label={`Delete ${p.name}`}
-                      className="p-1.5 rounded-full border border-stone-dark hover:border-rust text-ink-soft hover:text-rust"
+                      className="p-1.5 rounded-full border border-stone-dark hover:border-rust text-ink-soft hover:text-rust-text"
                     >
                       <Trash2 size={13} />
                     </button>

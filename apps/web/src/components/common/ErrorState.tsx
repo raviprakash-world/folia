@@ -15,7 +15,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div role="alert" className="flex flex-col items-center px-2 py-14 text-center sm:py-20">
-      <h3 className="font-display text-2xl font-semibold text-heading">{title}</h3>
+      <h2 className="font-display text-2xl font-semibold text-heading">{title}</h2>
       <p className="mt-2 max-w-[40ch] text-[15px] leading-relaxed text-ink-soft">{description}</p>
       {onRetry && (
         <Button variant="primary" className="mt-6" icon={<RefreshCw size={16} />} onClick={onRetry}>

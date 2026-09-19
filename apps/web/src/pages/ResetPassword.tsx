@@ -6,6 +6,7 @@ import { isAxiosError } from 'axios';
 import { CheckCircle2 } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { PasswordInput } from '@/components/common/PasswordInput';
 import { Alert } from '@/components/common/Alert';
 import { resetPassword } from '@/services/authService';
@@ -40,7 +41,7 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <Container className="py-20 max-w-sm text-center">
+      <Container className="py-10 sm:py-20 max-w-sm text-center">
         <h1 className="font-display text-2xl font-semibold text-heading">Missing reset link</h1>
         <p className="text-sm text-ink-soft mt-2">
           This page needs a reset token from the email link.{' '}
@@ -52,19 +53,17 @@ export default function ResetPassword() {
 
   if (submitted) {
     return (
-      <Container className="py-20 max-w-sm text-center">
+      <Container className="py-10 sm:py-20 max-w-sm text-center">
         <CheckCircle2 size={28} className="text-fern mx-auto mb-4" />
         <h1 className="font-display text-2xl font-semibold text-heading">Password updated</h1>
         <p className="text-sm text-ink-soft mt-2">You can sign in with your new password now.</p>
-        <Button variant="primary" className="mt-6">
-          <Link to="/account/login">Sign in</Link>
-        </Button>
+        <ButtonLink variant="primary" className="mt-6" to="/account/login">Sign in</ButtonLink>
       </Container>
     );
   }
 
   return (
-    <Container className="py-20 max-w-sm">
+    <Container className="py-10 sm:py-20 max-w-sm">
       <h1 className="font-display text-3xl font-semibold text-heading">Set a new password</h1>
 
       {errorMessage && (

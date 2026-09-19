@@ -231,7 +231,7 @@ export default function SellerProductEditor() {
             ))}
           </select>
           {errors.categoryId && (
-            <p role="alert" className="text-xs text-rust">
+            <p role="alert" className="text-xs text-rust-text">
               {errors.categoryId.message}
             </p>
           )}
@@ -303,13 +303,13 @@ export default function SellerProductEditor() {
               </Button>
             )}
             {product.approvalStatus === 'ACTIVE' && (
-              <Button variant="outline" className="!border-rust !text-rust" disabled={archive.isPending} onClick={() => void archive.mutateAsync()}>
+              <Button variant="outline" className="!border-rust !text-rust-text" disabled={archive.isPending} onClick={() => void archive.mutateAsync()}>
                 {archive.isPending ? 'Archiving…' : 'Archive product'}
               </Button>
             )}
           </div>
-          {submit.isError && <p className="text-sm text-rust mt-2">{errorMessage(submit.error, 'Could not submit for review.')}</p>}
-          {archive.isError && <p className="text-sm text-rust mt-2">{errorMessage(archive.error, 'Could not archive.')}</p>}
+          {submit.isError && <p className="text-sm text-rust-text mt-2">{errorMessage(submit.error, 'Could not submit for review.')}</p>}
+          {archive.isError && <p className="text-sm text-rust-text mt-2">{errorMessage(archive.error, 'Could not archive.')}</p>}
         </>
       )}
     </div>

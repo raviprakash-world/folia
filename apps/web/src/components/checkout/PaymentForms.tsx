@@ -187,7 +187,7 @@ export function NetBankingForm({ onSubmit, processing }: NetBankingFormProps) {
             </option>
           ))}
         </select>
-        {errors.bank && <p className="text-xs text-rust">{errors.bank.message}</p>}
+        {errors.bank && <p className="text-xs text-rust-text">{errors.bank.message}</p>}
       </div>
       <PayButton processing={processing} />
     </form>

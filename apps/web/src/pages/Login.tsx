@@ -43,7 +43,7 @@ export default function Login() {
   }
 
   return (
-    <Container className="py-20 max-w-sm">
+    <Container className="py-10 sm:py-20 max-w-sm">
       <h1 className="font-display text-3xl font-semibold text-heading">Sign in</h1>
       {import.meta.env.DEV && (
         <p className="text-sm text-ink-soft mt-2">
@@ -61,12 +61,12 @@ export default function Login() {
         <FormField label="Email" type="email" error={errors.email?.message} {...register('email')} />
         <PasswordInput label="Password" error={errors.password?.message} {...register('password')} />
 
-        <div className="flex items-center justify-between text-sm">
-          <label className="flex items-center gap-2 cursor-pointer text-ink-soft">
-            <input type="checkbox" className="w-4 h-4 accent-fern" {...register('rememberMe')} onChange={() => clearError()} />
+        <div className="flex items-center justify-between text-[15px]">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-ink-soft">
+            <input type="checkbox" className="size-5 accent-fern" {...register('rememberMe')} onChange={() => clearError()} />
             Remember me
           </label>
-          <Link to="/account/forgot-password" className="text-fern hover:text-heading transition-colors">
+          <Link to="/account/forgot-password" className="inline-flex min-h-11 items-center text-fern-dark transition-colors hover:text-heading">
             Forgot password?
           </Link>
         </div>

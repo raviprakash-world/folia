@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Plus, Loader2 } from 'lucide-react';
 import { AddressCard } from '@/components/account/AddressCard';
 import { AddressForm } from '@/components/account/AddressForm';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAddressStore } from '@/store/addressStore';
 import { useAddressBootstrap, useDefaultShippingAddress, useDefaultBillingAddress } from '@/hooks/useAddresses';
@@ -145,9 +146,7 @@ export default function CheckoutShipping() {
       )}
 
       <div className="flex justify-between pt-4 border-t border-stone-dark">
-        <Button variant="ghost" icon={<ArrowLeft size={15} />}>
-          <Link to="/cart">Back to cart</Link>
-        </Button>
+        <ButtonLink variant="ghost" icon={<ArrowLeft size={15} />} to="/cart">Back to cart</ButtonLink>
         <Button
           variant="primary"
           icon={<ArrowRight size={15} />}

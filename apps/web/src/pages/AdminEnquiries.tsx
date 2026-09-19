@@ -132,7 +132,7 @@ export default function AdminEnquiries() {
               ]}
             />
           )}
-          {markHandled.isError && <p className="text-sm text-rust mt-3">Couldn&apos;t update that enquiry. Please try again.</p>}
+          {markHandled.isError && <p className="text-sm text-rust-text mt-3">Couldn&apos;t update that enquiry. Please try again.</p>}
 
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>

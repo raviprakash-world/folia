@@ -92,7 +92,7 @@ export default function AdminCustomers() {
                         onClick={() => deactivateMutation.mutate(u.id)}
                         disabled={isSelf || deactivateMutation.isPending}
                         title={isSelf ? "You can't deactivate your own account" : undefined}
-                        className="text-xs px-2.5 py-1 rounded-full border border-stone-dark hover:border-rust hover:text-rust disabled:opacity-40 disabled:pointer-events-none"
+                        className="text-xs px-2.5 py-1 rounded-full border border-stone-dark hover:border-rust hover:text-rust-text disabled:opacity-40 disabled:pointer-events-none"
                       >
                         Deactivate
                       </button>

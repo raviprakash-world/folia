@@ -29,7 +29,7 @@ export default function FAQ() {
   }, [query]);
 
   return (
-    <Container className="py-16 max-w-3xl">
+    <Container className="py-8 sm:py-16 max-w-3xl">
       <PageHeader
         eyebrow="Support"
         title="Frequently asked questions"

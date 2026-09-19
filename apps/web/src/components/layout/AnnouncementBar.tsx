@@ -43,7 +43,7 @@ export function AnnouncementBar() {
           {saleCount} {saleCount === 1 ? 'product' : 'products'} on sale now
         </Item>
       )}
-      <Link to="/offers" className="shrink-0 whitespace-nowrap underline underline-offset-2 hover:no-underline">
+      <Link to="/offers" className="inline-flex shrink-0 items-center whitespace-nowrap py-3 underline underline-offset-2 hover:no-underline">
         See all offers
       </Link>
     </>
@@ -56,7 +56,7 @@ export function AnnouncementBar() {
       data-paused={paused}
       className="announce bg-ochre text-pine text-sm font-medium"
     >
-      <div className="announce-viewport py-2 pr-10">
+      <div className="announce-viewport pr-11">
         <div className="announce-track">
           <div className="announce-group">{items}</div>
           <div className="announce-group" aria-hidden="true" inert>
@@ -69,7 +69,7 @@ export function AnnouncementBar() {
         onClick={() => setPaused((p) => !p)}
         aria-pressed={paused}
         aria-label={paused ? 'Play announcements' : 'Pause announcements'}
-        className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-ochre p-1.5 text-pine hover:bg-ochre-light"
+        className="absolute right-0 top-0 z-10 flex h-full w-11 items-center justify-center bg-ochre text-pine hover:bg-ochre-light"
       >
         {paused ? <Play size={14} /> : <Pause size={14} />}
       </button>

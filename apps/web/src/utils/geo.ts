@@ -20,6 +20,14 @@ export class GeoError extends Error {
 const NOMINATIM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
 const INDIA_POST_PINCODE = 'https://api.postalpincode.in/pincode';
 
+export const INDIAN_STATES = [
+  'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh',
+  'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+  'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+];
+
 // Only what the app's own data uses; anything else passes through untouched.
 const STATE_ALIASES: Record<string, string> = {
   'nct of delhi': 'Delhi',

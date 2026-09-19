@@ -82,7 +82,7 @@ function SellerPayoutPanel({ sellerId }: { sellerId: string }) {
             key: 'amount',
             label: 'Amount',
             align: 'right',
-            render: (e) => <span className={e.amount < 0 ? 'text-rust' : 'text-fern'}>{formatCurrency(e.amount)}</span>,
+            render: (e) => <span className={e.amount < 0 ? 'text-rust-text' : 'text-fern'}>{formatCurrency(e.amount)}</span>,
           },
           { key: 'note', label: 'Note', render: (e) => e.note ?? '—' },
           { key: 'date', label: 'Date', render: (e) => formatDate(e.createdAt) },
@@ -143,7 +143,7 @@ function PayoutDetailModal({ payoutId, onClose }: { payoutId: string; onClose: (
             {detail.items.map((item) => (
               <li key={item.id} className="flex items-center justify-between border-b border-stone-dark py-1.5 last:border-0">
                 <span className="text-ink-soft">{item.ledgerEntry.type}</span>
-                <span className={Number(item.ledgerEntry.amount) < 0 ? 'text-rust font-mono' : 'text-fern font-mono'}>
+                <span className={Number(item.ledgerEntry.amount) < 0 ? 'text-rust-text font-mono' : 'text-fern font-mono'}>
                   {formatCurrency(Number(item.ledgerEntry.amount))}
                 </span>
               </li>
@@ -252,7 +252,7 @@ export default function AdminPayouts() {
                   )}
                   {(p.status === 'PENDING' || p.status === 'PROCESSING') && (
                     <>
-                      <Button variant="outline" size="sm" className="!border-rust !text-rust" onClick={() => setFailTarget(p)}>
+                      <Button variant="outline" size="sm" className="!border-rust !text-rust-text" onClick={() => setFailTarget(p)}>
                         Mark failed
                       </Button>
                       <Button variant="ghost" size="sm" disabled={cancel.isPending} onClick={() => void cancel.mutateAsync(p.id)}>

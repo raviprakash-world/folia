@@ -23,7 +23,7 @@ export function MetricCard({ label, value, Icon, trend, positiveDirection = 'up'
       <div className="flex items-start justify-between">
         <Icon size={16} className="text-fern" aria-hidden="true" />
         {trend && TrendIcon && (
-          <span className={cn('flex items-center gap-0.5 text-xs font-mono', isGood ? 'text-fern-dark' : 'text-rust')}>
+          <span className={cn('flex items-center gap-0.5 text-xs font-mono', isGood ? 'text-fern-dark' : 'text-rust-text')}>
             <TrendIcon size={11} />
             {Math.abs(trend.value)}%
           </span>

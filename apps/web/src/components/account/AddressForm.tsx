@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, MapPinCheck, MapPin, AlertTriangle } from 'lucide-react';
 import { FormField } from '@/components/common/FormField';
+import { SelectField } from '@/components/common/SelectField';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/common/Alert';
 import { countries } from '@/data/countries';
 import { checkDeliveryAvailability } from '@/services/deliveryService';
-import { detectPlace, GeoError } from '@/utils/geo';
+import { detectPlace, GeoError, INDIAN_STATES, lookupPincode } from '@/utils/geo';
+import { isValidPostalCode } from '@/utils/region';
 import { addressSchema } from '@/utils/validation';
 import type { AddressFormValues } from '@/utils/validation';
 import type { Address, AddressType, DeliveryTimeSlot, GeoPlaceholder } from '@/types/address';
@@ -48,6 +50,7 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
     handleSubmit,
     control,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
@@ -82,6 +85,31 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
   const addressLine2 = useWatch({ control, name: 'addressLine2' });
   const landmark = useWatch({ control, name: 'landmark' });
   const selectedCountry = countries.find((c) => c.code === country);
+  const state = useWatch({ control, name: 'state' });
+  const stateOptions = useMemo(() => (state && !INDIAN_STATES.includes(state) ? [state, ...INDIAN_STATES] : INDIAN_STATES), [state]);
+
+  // Typing a valid PIN fills in the city and state (India Post data), never overwriting what the shopper already entered.
+  const [pinNote, setPinNote] = useState<string | null>(null);
+  const lastLookup = useRef<string | null>(initialValues?.postalCode ?? null);
+  useEffect(() => {
+    const pin = (postalCode ?? '').trim();
+    if (country !== 'IN' || !isValidPostalCode(pin) || lastLookup.current === pin) return;
+    lastLookup.current = pin;
+    void lookupPincode(pin).then((found) => {
+      if (!found) return;
+      const fill = { shouldDirty: true, shouldValidate: true } as const;
+      let filled = false;
+      if (!getValues('city')?.trim() && found.city) {
+        setValue('city', found.city, fill);
+        filled = true;
+      }
+      if (!getValues('state')?.trim() && found.state) {
+        setValue('state', found.state, fill);
+        filled = true;
+      }
+      if (filled) setPinNote('City and state filled in from your PIN code. Please check them.');
+    });
+  }, [postalCode, country, getValues, setValue]);
 
   // Real rule-based heuristics over the entered fields — not random, not
   // network-validated, just structural advice a reviewer can verify by reading it.
@@ -102,7 +130,7 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
     try {
       const result = await checkDeliveryAvailability(postalCode.trim(), 0);
       const methods = result.options.map((o) => o.label).join(', ');
-      setAvailability({ checking: false, ok: true, message: `Delivery available: ${methods}.` });
+      setAvailability({ checking: false, ok: true, message: `Delivery options for ${postalCode.trim()}: ${methods}.` });
     } catch {
       setAvailability({ checking: false, ok: false, message: "Couldn't check availability — try again." });
     }
@@ -136,27 +164,14 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
 
   return (
     <form onSubmit={(e) => void handleSubmit(handleFormSubmit)(e)} noValidate className="flex flex-col gap-4">
-      <div className="grid sm:grid-cols-2 gap-4">
-        <FormField label="Full name" error={errors.fullName?.message} {...register('fullName')} />
-        <FormField label="Company (optional)" error={errors.companyName?.message} {...register('companyName')} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Full name" autoComplete="name" error={errors.fullName?.message} {...register('fullName')} />
+        <FormField label="Mobile number" type="tel" inputMode="tel" autoComplete="tel" error={errors.phone?.message} {...register('phone')} />
       </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <FormField label="Phone" type="tel" error={errors.phone?.message} {...register('phone')} />
-        <FormField label="Alternate phone (optional)" type="tel" error={errors.alternatePhone?.message} {...register('alternatePhone')} />
-      </div>
-      <FormField label="Email (optional)" type="email" error={errors.email?.message} {...register('email')} />
 
-      <FormField label="Address line 1" error={errors.addressLine1?.message} {...register('addressLine1')} />
-      <FormField label="Address line 2 (optional)" error={errors.addressLine2?.message} {...register('addressLine2')} />
-      <FormField label="Landmark (optional)" error={errors.landmark?.message} {...register('landmark')} />
-      <FormField
-        as="textarea"
-        rows={2}
-        label="Delivery instructions (optional)"
-        placeholder="e.g. Leave with the front desk, gate code, etc."
-        error={errors.deliveryInstructions?.message}
-        {...register('deliveryInstructions')}
-      />
+      <FormField label="Flat, house no., building" autoComplete="address-line1" error={errors.addressLine1?.message} {...register('addressLine1')} />
+      <FormField label="Area, street, locality (optional)" autoComplete="address-line2" error={errors.addressLine2?.message} {...register('addressLine2')} />
+      <FormField label="Landmark (optional)" placeholder="e.g. Near Cubbon Park" error={errors.landmark?.message} {...register('landmark')} />
 
       {warnings.length > 0 && (
         <div className="flex flex-col gap-1.5">
@@ -171,16 +186,28 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
         </div>
       )}
 
-      <div className="grid sm:grid-cols-3 gap-4">
-        <FormField label="City" error={errors.city?.message} {...register('city')} />
-        <FormField label="State / Province" error={errors.state?.message} {...register('state')} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <FormField
+          label={selectedCountry?.postalLabel ?? 'PIN code'}
+          inputMode="numeric"
+          maxLength={6}
+          autoComplete="postal-code"
+          error={errors.postalCode?.message}
+          {...register('postalCode')}
+        />
+        <FormField label="City" autoComplete="address-level2" error={errors.city?.message} {...register('city')} />
+        <SelectField label="State" options={stateOptions} placeholder="Select state" autoComplete="address-level1" error={errors.state?.message} {...register('state')} />
+      </div>
+      {pinNote && <p className="-mt-2 text-sm text-ink-soft">{pinNote}</p>}
+
+      {countries.length > 1 ? (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="address-country" className="text-sm font-medium text-ink-soft">
             Country
           </label>
           <select
             id="address-country"
-            className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm text-ink focus:border-fern transition-colors"
+            className="h-11 rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 text-[15px] text-ink transition-colors focus:border-fern"
             {...register('country')}
           >
             {countries.map((c) => (
@@ -190,27 +217,14 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
             ))}
           </select>
         </div>
-      </div>
+      ) : (
+        <input type="hidden" {...register('country')} />
+      )}
 
       <div>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <FormField
-              label={selectedCountry?.postalLabel ?? 'Postal code'}
-              error={errors.postalCode?.message}
-              {...register('postalCode')}
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="md"
-            onClick={() => void handleCheckAvailability()}
-            disabled={availability.checking || !postalCode?.trim()}
-          >
-            {availability.checking ? <Loader2 size={15} className="animate-spin" /> : 'Check delivery'}
-          </Button>
-        </div>
+        <Button type="button" variant="outline" onClick={() => void handleCheckAvailability()} disabled={availability.checking || !isValidPostalCode(postalCode ?? '')}>
+          {availability.checking ? <Loader2 size={15} className="animate-spin" /> : 'Check delivery for this PIN'}
+        </Button>
         {availability.message && (
           <Alert tone={availability.ok ? 'success' : 'error'} className="mt-2">
             <span className="flex items-center gap-1.5">
@@ -220,6 +234,23 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
           </Alert>
         )}
       </div>
+
+      <details className="rounded-[var(--radius-control)] border border-stone-dark px-4">
+        <summary className="flex min-h-12 cursor-pointer items-center text-[15px] font-medium text-ink">More details (optional)</summary>
+        <div className="flex flex-col gap-4 pb-4">
+          <FormField label="Company" autoComplete="organization" error={errors.companyName?.message} {...register('companyName')} />
+          <FormField label="Alternate mobile number" type="tel" inputMode="tel" error={errors.alternatePhone?.message} {...register('alternatePhone')} />
+          <FormField label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
+          <FormField
+            as="textarea"
+            rows={2}
+            label="Delivery instructions"
+            placeholder="e.g. Leave with the front desk, gate code, etc."
+            error={errors.deliveryInstructions?.message}
+            {...register('deliveryInstructions')}
+          />
+        </div>
+      </details>
 
       <div>
         <button
@@ -281,12 +312,12 @@ export function AddressForm({ initialValues, onSubmit, onCancel, submitLabel }: 
       <FormField label="Nickname (optional)" placeholder="e.g. Mom's house" error={errors.label?.message} {...register('label')} />
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 accent-fern" {...register('isDefaultShipping')} />
+        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px]">
+          <input type="checkbox" className="size-5 accent-fern" {...register('isDefaultShipping')} />
           <span className="text-ink-soft">Set as default shipping address</span>
         </label>
-        <label className="flex items-center gap-2.5 text-sm cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 accent-fern" {...register('isDefaultBilling')} />
+        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px]">
+          <input type="checkbox" className="size-5 accent-fern" {...register('isDefaultBilling')} />
           <span className="text-ink-soft">Set as default billing address</span>
         </label>
       </div>

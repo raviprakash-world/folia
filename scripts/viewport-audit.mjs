@@ -10,6 +10,7 @@
  *
  *   node scripts/viewport-audit.mjs                       # all routes, all widths
  *   node scripts/viewport-audit.mjs --widths 360,390 --routes / /shop --shots out/ [--full] [--dark]
+ *   BASE_URL=http://localhost:5175 node scripts/viewport-audit.mjs --login demo@folia.example:folia-demo --cart hand-trowel --routes /account /checkout/shipping
  *
  * Needs the dev server running (default http://localhost:5173) and Chrome
  * (CHROME_PATH to override the macOS default). See docs/UI_VERIFICATION.md.
@@ -60,8 +61,31 @@ const MEASURE = `(() => {
   const imgs = [...document.querySelectorAll('img')].filter(vis);
   const noSize = imgs.filter((i) => !(i.getAttribute('width') && i.getAttribute('height')) && !/aspect|h-|absolute|inset/.test(i.className + i.parentElement.className)).length;
   const oversize = imgs.filter((i) => i.naturalWidth > 0 && i.naturalWidth > i.getBoundingClientRect().width * devicePixelRatio * 2).map((i) => (i.currentSrc || i.src).split('/').pop() + ' ' + i.naturalWidth + 'px for ' + Math.round(i.getBoundingClientRect().width)).slice(0, 3);
-  return { innerW: innerWidth, clientW: document.documentElement.clientWidth, docScrollW: document.documentElement.scrollWidth, bodyScrollW: document.body.scrollWidth, overflowX: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > vw + 1, overflowEls, small: small.length, smallEx: small.slice(0, 4), tinyText: tiny, imgs: imgs.length, imgNoSize: noSize, oversize };
+  return { innerW: innerWidth, clientW: document.documentElement.clientWidth, docScrollW: document.documentElement.scrollWidth, bodyScrollW: document.body.scrollWidth, overflowX: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > vw + 1, overflowEls, small: small.length, smallEx: small.slice(0, 40), tinyText: tiny, imgs: imgs.length, imgNoSize: noSize, oversize };
 })()`;
+
+// Optional: sign in first (mock-auth dev server) and/or put one item in the cart, so account and checkout screens can be audited.
+//   --login demo@folia.example:folia-demo  --cart hand-trowel
+const gotoAndWait = async (path, sel = 'h1, h2') => {
+  await send('Page.navigate', { url: BASE + path });
+  for (let i = 0; i < 40; i++) { await sleep(400); if (await ev(`!!document.querySelector('${sel}')`)) break; }
+  await sleep(800);
+};
+const setValue = (sel, value) => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, ${JSON.stringify(value)}); e.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+if (arg('login', '')) {
+  const [email, password] = arg('login', '').split(':');
+  await gotoAndWait('/account/login', 'input[name=password]');
+  await setValue('input[name=email]', email);
+  await setValue('input[name=password]', password);
+  await ev(`document.querySelector('input[name=password]').form.querySelector('button[type=submit]').click()`);
+  await sleep(2500);
+}
+if (arg('cart', '')) {
+  await gotoAndWait('/product/' + arg('cart', ''));
+  await ev(`[...document.querySelectorAll('.fixed.bottom-0 button')].find((b) => /Add to cart/.test(b.textContent))?.click()`);
+  await sleep(1200);
+}
 
 const rows = [];
 for (const route of ROUTES) {

@@ -121,7 +121,7 @@ export default function AdminOrders() {
                           Ship via courier
                         </button>
                         {shipMutation.isError && shipMutation.variables === o.id && (
-                          <span className="text-[11px] text-rust text-right max-w-[16rem]">
+                          <span className="text-[11px] text-rust-text text-right max-w-[16rem]">
                             {shipMutation.error instanceof Error ? shipMutation.error.message : 'Shipment failed.'}
                           </span>
                         )}

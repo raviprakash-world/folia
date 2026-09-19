@@ -24,7 +24,7 @@ export default function BlogList() {
   }
 
   return (
-    <Container className="py-16">
+    <Container className="py-8 sm:py-16">
       <PageHeader
         eyebrow="The journal"
         title="Notes on plant care & design"
@@ -39,7 +39,7 @@ export default function BlogList() {
             type="button"
             onClick={() => handleCategoryClick(undefined)}
             className={cn(
-              'px-3 py-1.5 rounded-full text-sm border transition-colors',
+              'inline-flex min-h-11 items-center px-4 py-1.5 rounded-full text-[15px] border transition-colors',
               !category ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
             )}
           >
@@ -51,7 +51,7 @@ export default function BlogList() {
               type="button"
               onClick={() => handleCategoryClick(cat)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                'inline-flex min-h-11 items-center px-4 py-1.5 rounded-full text-[15px] border transition-colors',
                 category === cat ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft hover:border-fern'
               )}
             >
@@ -71,7 +71,7 @@ export default function BlogList() {
             }}
             placeholder="Search articles…"
             aria-label="Search articles"
-            className="w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light pl-9 pr-3 py-2 text-sm focus:border-fern transition-colors"
+            className="h-11 w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light pl-9 pr-3 text-[15px] transition-colors focus:border-fern"
           />
         </div>
       </div>

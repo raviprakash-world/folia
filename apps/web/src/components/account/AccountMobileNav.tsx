@@ -18,7 +18,7 @@ export function AccountMobileNav({ onLogoutClick }: AccountMobileNavProps) {
             end={end}
             className={({ isActive }) =>
               cn(
-                'px-3.5 py-1.5 rounded-full text-sm border whitespace-nowrap transition-colors',
+                'inline-flex min-h-11 items-center px-4 py-1.5 rounded-full text-[15px] border whitespace-nowrap transition-colors',
                 isActive ? 'bg-pine text-cream-light border-pine' : 'border-stone-dark text-ink-soft'
               )
             }
@@ -29,7 +29,7 @@ export function AccountMobileNav({ onLogoutClick }: AccountMobileNavProps) {
         <button
           type="button"
           onClick={onLogoutClick}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm border border-rust/40 text-rust whitespace-nowrap transition-colors hover:bg-rust-light"
+          className="flex items-center gap-1.5 min-h-11 px-4 py-1.5 rounded-full text-[15px] border border-rust/40 text-rust-text whitespace-nowrap transition-colors hover:bg-rust-light"
         >
           <LogOut size={14} />
           Log out

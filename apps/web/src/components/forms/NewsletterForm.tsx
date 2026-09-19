@@ -64,14 +64,14 @@ export function NewsletterForm() {
           placeholder="you@example.com"
           aria-invalid={!!errors.email || !!errorMessage}
           aria-describedby={errors.email || errorMessage ? 'newsletter-email-error' : undefined}
-          className="flex-1 min-w-0 rounded-[var(--radius-control)] bg-cream-light/10 border border-cream-light/20 px-3 py-2 text-sm text-cream placeholder:text-cream/40 focus:border-ochre transition-colors"
+          className="flex-1 min-w-0 rounded-[var(--radius-control)] bg-cream-light/10 border border-cream-light/20 px-3 min-h-11 text-[15px] text-cream placeholder:text-cream/40 focus:border-ochre transition-colors"
           {...register('email')}
         />
         <button
           type="submit"
           disabled={isSubmitting}
           aria-label="Subscribe"
-          className="shrink-0 flex items-center justify-center w-9 h-9 rounded-[var(--radius-control)] bg-ochre text-pine hover:bg-ochre-light transition-colors disabled:opacity-50"
+          className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-ochre text-pine hover:bg-ochre-light transition-colors disabled:opacity-50"
         >
           <ArrowRight size={16} />
         </button>

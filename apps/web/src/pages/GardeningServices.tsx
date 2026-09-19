@@ -18,7 +18,7 @@ const steps = [
 
 export default function GardeningServices() {
   return (
-    <Container className="py-16 max-w-4xl">
+    <Container className="py-8 sm:py-16 max-w-4xl">
       <PageHeader
         eyebrow="Services"
         title="Gardening services"

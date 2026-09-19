@@ -27,7 +27,7 @@ export function Price({ price, compareAtPrice, size = 'sm', className }: PricePr
             <span className="sr-only">Original price </span>
             {formatPrice(compareAtPrice!)}
           </span>
-          <span className={cn('font-medium text-rust', s.off)}>{off}% off</span>
+          <span className={cn('font-medium text-rust-text', s.off)}>{off}% off</span>
         </>
       )}
     </p>

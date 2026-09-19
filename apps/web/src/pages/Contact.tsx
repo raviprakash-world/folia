@@ -14,7 +14,7 @@ export default function Contact() {
   const state = (location.state as ContactLocationState | null) ?? {};
 
   return (
-    <Container className="py-16">
+    <Container className="py-8 sm:py-16">
       <PageHeader
         eyebrow="Get in touch"
         title="Contact us"

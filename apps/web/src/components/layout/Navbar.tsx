@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Search, Heart, ShoppingBag, Menu, X, ChevronDown, User, Bell } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { Container } from '@/components/ui/Container';
@@ -34,7 +34,30 @@ function NavBadge({ count }: { count: number }) {
 /** Sticky top nav with a mega menu on "Shop", a full search drawer, and live cart/wishlist counts. */
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const inCheckout = useLocation().pathname.startsWith('/checkout');
   const [megaMenuOpen, setMegaMenuOpen] = useState(false);
+  // Phones: the search row tucks away while reading down the page and returns on the first scroll up.
+  const [condensed, setCondensed] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        if (y < 80) setCondensed(false);
+        else if (y - last > 8) setCondensed(true);
+        else if (last - y > 8) setCondensed(false);
+        last = y;
+        frame = 0;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
   const cartCount = useCartItemCount();
   const wishlistCount = useWishlistCount();
   const user = useCurrentUser();
@@ -127,7 +150,11 @@ export function Navbar() {
           </div>
         </Container>
 
-        <Container className="pb-2.5 lg:hidden">
+        <div
+          inert={condensed || inCheckout}
+          className={`overflow-hidden transition-[max-height,opacity] duration-200 lg:hidden ${condensed || inCheckout ? 'max-h-0 opacity-0' : 'max-h-16 opacity-100'}`}
+        >
+        <Container className="pb-2.5">
           <button
             type="button"
             onClick={openSearchOverlay}
@@ -137,6 +164,7 @@ export function Navbar() {
             <span className="truncate">Search plants, planters &amp; more</span>
           </button>
         </Container>
+        </div>
 
         <MegaMenu open={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
         <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} links={[{ label: 'Shop', to: '/shop' }, ...primaryLinks]}>
@@ -146,7 +174,7 @@ export function Navbar() {
           </li>
         </MobileNav>
       </header>
-      <LocationBar />
+      {!inCheckout && <LocationBar />}
     </>
   );
 }

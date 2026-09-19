@@ -12,7 +12,7 @@ interface AlertProps {
 
 const toneStyles: Record<AlertTone, { container: string; Icon: typeof CheckCircle2 }> = {
   success: { container: 'bg-fern/10 border-fern/40 text-fern-dark', Icon: CheckCircle2 },
-  error: { container: 'bg-rust-light border-rust/40 text-rust', Icon: AlertCircle },
+  error: { container: 'bg-rust-light border-rust/40 text-rust-text', Icon: AlertCircle },
   info: { container: 'bg-stone-dark/40 border-stone-dark text-ink-soft', Icon: Info },
 };
 

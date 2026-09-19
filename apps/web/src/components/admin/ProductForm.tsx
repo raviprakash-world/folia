@@ -75,7 +75,7 @@ export function ProductForm({ categories, initialValues, onSubmit, onCancel, sub
           ))}
         </select>
         {errors.categoryId && (
-          <p role="alert" className="text-xs text-rust">
+          <p role="alert" className="text-xs text-rust-text">
             {errors.categoryId.message}
           </p>
         )}

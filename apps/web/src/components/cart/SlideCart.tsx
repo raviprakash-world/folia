@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, ShoppingBag } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { CartLineItem } from './CartLineItem';
+import { X, Sprout } from 'lucide-react';
+import { ButtonLink } from '@/components/ui/ButtonLink';
+import { CartGroupList } from './CartGroupList';
 import { useCartStore } from '@/store/cartStore';
 import { useCartTotals } from '@/hooks/useCart';
 import { useUIStore } from '@/store/uiStore';
@@ -52,9 +51,9 @@ export function SlideCart() {
                 type="button"
                 onClick={closeCartDrawer}
                 aria-label="Close cart"
-                className="p-1.5 text-ink-soft hover:text-heading"
+                className="flex size-11 items-center justify-center text-ink-soft hover:text-heading"
               >
-                <X size={20} />
+                <X size={22} />
               </button>
             </div>
 
@@ -65,28 +64,26 @@ export function SlideCart() {
                   <div className="h-20 bg-stone-dark/40 rounded-[var(--radius-control)]" />
                 </div>
               ) : items.length === 0 ? (
-                <div className="flex flex-col items-center text-center py-16">
-                  <ShoppingBag size={32} className="text-ink-soft/40 mb-3" />
-                  <p className="text-sm text-ink-soft">Your cart is empty.</p>
+                <div className="flex flex-col items-center py-16 text-center">
+                  <Sprout size={36} className="mb-3 text-fern" aria-hidden="true" />
+                  <p className="font-display text-xl font-semibold text-heading">Your green corner is waiting</p>
+                  <p className="mt-1 max-w-[30ch] text-[15px] text-ink-soft">Discover plants, planters and everything you need to grow your space.</p>
+                  <ButtonLink to="/shop" onClick={closeCartDrawer} className="mt-5">
+                    Start shopping
+                  </ButtonLink>
                 </div>
               ) : (
-                <div className="flex flex-col gap-5">
-                  {items.map((item) => (
-                    <CartLineItem key={item.lineId} item={item} compact />
-                  ))}
-                </div>
+                <CartGroupList items={items} compact />
               )}
             </div>
 
             {hasHydrated && items.length > 0 && (
               <div className="border-t border-stone-dark px-5 py-4 flex flex-col gap-3">
-                <div className="flex justify-between text-sm font-mono">
+                <div className="flex justify-between text-[15px] tabular-nums">
                   <span className="text-ink-soft">Subtotal</span>
                   <span className="text-ink">{formatCurrency(subtotal)}</span>
                 </div>
-                <Button variant="primary" size="lg" className="w-full" onClick={closeCartDrawer}>
-                  <Link to="/cart">View cart & checkout</Link>
-                </Button>
+                <ButtonLink variant="primary" size="lg" className="w-full" onClick={closeCartDrawer} to="/cart">View cart & checkout</ButtonLink>
               </div>
             )}
           </motion.div>

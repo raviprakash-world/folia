@@ -18,7 +18,7 @@ type TextareaFieldProps = BaseProps &
 type FormFieldProps = InputFieldProps | TextareaFieldProps;
 
 const fieldStyles =
-  'rounded-[var(--radius-control)] border bg-stone-light px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-soft/50 transition-colors';
+  'w-full min-w-0 rounded-[var(--radius-control)] border bg-stone-light px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-soft/60 transition-colors';
 
 export const FormField = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormFieldProps>(
   ({ label, error, hideLabel = false, id, className, ...props }, ref) => {
@@ -51,7 +51,7 @@ export const FormField = forwardRef<HTMLInputElement | HTMLTextAreaElement, Form
           />
         )}
         {error && (
-          <p id={errorId} role="alert" className="text-xs text-rust">
+          <p id={errorId} role="alert" className="text-xs text-rust-text">
             {error}
           </p>
         )}

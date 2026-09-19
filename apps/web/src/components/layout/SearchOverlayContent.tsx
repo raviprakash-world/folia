@@ -171,7 +171,7 @@ export function SearchOverlayContent({ onClose }: { onClose: () => void }) {
                     <Clock size={12} />
                     Recent searches
                   </p>
-                  <button type="button" onClick={clearRecentSearches} className="min-h-10 px-1 text-sm text-ink-soft hover:text-rust underline">
+                  <button type="button" onClick={clearRecentSearches} className="min-h-10 px-1 text-sm text-ink-soft hover:text-rust-text underline">
                     Clear
                   </button>
                 </div>

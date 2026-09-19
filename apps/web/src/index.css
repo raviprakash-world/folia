@@ -31,6 +31,8 @@
   --color-ochre-light: #d9a555;
   --color-rust: #a6553c;
   --color-rust-light: #f3e2dc;
+  /* Small text in the rust family: darker than --color-rust so it clears 4.5:1 on the warm backgrounds. */
+  --color-rust-text: #93472f;
   /*
     Light text for fixed dark fills (the pine hero/footer/buttons). `stone` and
     `stone-light` invert in dark mode — right for surfaces, wrong for text that
@@ -94,6 +96,7 @@
   --color-ochre-light: #e6bc7e;
   --color-rust: #c97e62;
   --color-rust-light: #3d2420;
+  --color-rust-text: #e39a82;
 
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.24);
   --shadow-lifted: 0 4px 12px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.3);
@@ -249,4 +252,18 @@
 }
 .animate-heart-pop {
   animation: heart-pop 0.35s ease-out;
+}
+
+/* iOS Safari zooms the whole page when a field under 16px gets focus. Keep every field at 16px on phones. */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Grid children may shrink below their content width, so one wide child (a field, a long word) can't push the page sideways. */
+:where(.grid) > * {
+  min-width: 0;
 }

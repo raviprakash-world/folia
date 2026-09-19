@@ -46,7 +46,7 @@ const socials = [
 export function Footer() {
   return (
     <footer className="bg-pine text-cream mt-24">
-      <Container className="py-16">
+      <Container className="py-8 sm:py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
           <div className="col-span-2 md:col-span-2">
             <Logo tone="light" />
@@ -61,7 +61,7 @@ export function Footer() {
                   aria-label={label}
                   target="_blank"
                   rel="noreferrer"
-                  className="p-2 rounded-full border border-cream-light/15 text-cream/70 hover:text-cream hover:border-cream-light/40 transition-colors"
+                  className="flex size-11 items-center justify-center rounded-full border border-cream-light/15 text-cream/70 transition-colors hover:border-cream-light/40 hover:text-cream"
                 >
                   <Icon size={16} />
                 </a>
@@ -73,10 +73,10 @@ export function Footer() {
               <h3 className="font-mono text-xs uppercase tracking-wider text-cream/65 mb-4">
                 {col.heading}
               </h3>
-              <ul className="flex flex-col gap-2.5">
+              <ul className="flex flex-col">
                 {col.links.map((link) => (
                   <li key={link.to}>
-                    <Link to={link.to} className="text-sm text-cream/85 hover:text-cream transition-colors">
+                    <Link to={link.to} className="inline-flex min-h-11 items-center pr-3 text-[15px] text-cream/85 transition-colors hover:text-cream lg:min-h-9">
                       {link.label}
                     </Link>
                   </li>

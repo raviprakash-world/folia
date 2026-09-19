@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Package, Heart, ArrowRight, Clock, TrendingUp, Award, Eye } from 'lucide-react';
+import { MapPin, Package, Heart, ArrowRight, Clock, TrendingUp, Eye } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { OrderRow } from '@/components/order/OrderRow';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -33,10 +33,7 @@ export default function AccountOverview() {
 
   const activeOrderCount = orders.filter((o) => ACTIVE_STATUSES.includes(getEffectiveOrderStatus(o))).length;
   const deliveredOrderCount = orders.filter((o) => getEffectiveOrderStatus(o) === 'delivered').length;
-  const totalSpend = orders.reduce((sum, o) => sum + o.total, 0);
   const totalSavings = orders.reduce((sum, o) => sum + o.discount, 0);
-  // Mock loyalty program: 1 point per dollar spent, nothing more — no real rewards backend exists.
-  const rewardPoints = Math.floor(totalSpend);
 
   const statCards = [
     { label: 'Total orders', value: orders.length, Icon: Package, to: '/account/orders' },
@@ -45,7 +42,6 @@ export default function AccountOverview() {
     { label: 'Wishlist items', value: wishlistCount, Icon: Heart, to: '/wishlist' },
     { label: 'Saved addresses', value: addressCount, Icon: MapPin, to: '/account/addresses' },
     { label: 'Total savings', value: formatCurrency(totalSavings), Icon: TrendingUp, to: '/account/orders' },
-    { label: 'Reward points', value: rewardPoints, Icon: Award, to: '/account/settings' },
   ];
 
   const recentlyViewedProducts = recentlyViewed
@@ -57,16 +53,16 @@ export default function AccountOverview() {
     <div>
       <PageHeader title={`Welcome back, ${user.firstName}`} description={user.email} />
 
-      <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-12">
+      <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
         {statCards.map(({ label, value, Icon, to }) => (
           <Link
             key={label}
             to={to}
-            className="p-4 rounded-[var(--radius-card)] bg-stone-light border border-stone-dark hover:border-fern transition-colors"
+            className="flex min-h-24 flex-col justify-between rounded-[var(--radius-card)] border border-stone-dark bg-stone-light p-3.5 transition-colors hover:border-fern"
           >
             <Icon size={16} className="text-fern mb-2" />
             <p className="font-display text-2xl font-semibold text-heading">{value}</p>
-            <p className="text-xs text-ink-soft mt-0.5">{label}</p>
+            <p className="mt-0.5 text-sm text-ink-soft">{label}</p>
           </Link>
         ))}
       </div>

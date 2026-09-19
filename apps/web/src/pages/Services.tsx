@@ -4,7 +4,7 @@ import { ServiceCards } from '@/components/services/ServiceCards';
 
 export default function Services() {
   return (
-    <Container className="py-16">
+    <Container className="py-8 sm:py-16">
       <PageHeader
         eyebrow="Services"
         title="Beyond the shop"

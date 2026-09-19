@@ -36,7 +36,7 @@ export default function Register() {
   }
 
   return (
-    <Container className="py-20 max-w-sm">
+    <Container className="py-10 sm:py-20 max-w-sm">
       <h1 className="font-display text-3xl font-semibold text-heading">Create an account</h1>
       <p className="text-sm text-ink-soft mt-2">Or check out as a guest any time — an account just saves your order history.</p>
 

@@ -201,7 +201,7 @@ export default function AdminReturnDetail() {
       {claim.status === 'pending' && (
         <div className="flex flex-wrap gap-3">
           <Button variant="primary" onClick={() => setApproveOpen(true)}>Approve</Button>
-          <Button variant="outline" className="!border-rust !text-rust" onClick={() => setRejectOpen(true)}>Reject</Button>
+          <Button variant="outline" className="!border-rust !text-rust-text" onClick={() => setRejectOpen(true)}>Reject</Button>
         </div>
       )}
 
@@ -228,9 +228,9 @@ export default function AdminReturnDetail() {
               {resolve.isPending ? 'Resolving…' : 'Resolve claim'}
             </Button>
           </div>
-          {resolve.isError && <p className="text-sm text-rust">{errorMessage(resolve.error, 'Resolution failed.')}</p>}
+          {resolve.isError && <p className="text-sm text-rust-text">{errorMessage(resolve.error, 'Resolution failed.')}</p>}
           {markReceived.isError && (
-            <p className="text-sm text-rust">{errorMessage(markReceived.error, 'Could not mark item received.')}</p>
+            <p className="text-sm text-rust-text">{errorMessage(markReceived.error, 'Could not mark item received.')}</p>
           )}
         </div>
       )}
@@ -270,7 +270,7 @@ export default function AdminReturnDetail() {
             rows={2}
             className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm"
           />
-          {approve.isError && <p className="text-sm text-rust">{errorMessage(approve.error, 'Approval failed.')}</p>}
+          {approve.isError && <p className="text-sm text-rust-text">{errorMessage(approve.error, 'Approval failed.')}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setApproveOpen(false)} disabled={approve.isPending}>Cancel</Button>
             <Button variant="primary" onClick={() => void handleApprove()} disabled={approve.isPending}>
@@ -295,7 +295,7 @@ export default function AdminReturnDetail() {
               className="rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3.5 py-2.5 text-sm"
             />
           </div>
-          {reject.isError && <p className="text-sm text-rust">{errorMessage(reject.error, 'Rejection failed.')}</p>}
+          {reject.isError && <p className="text-sm text-rust-text">{errorMessage(reject.error, 'Rejection failed.')}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setRejectOpen(false)} disabled={reject.isPending}>Cancel</Button>
             <Button

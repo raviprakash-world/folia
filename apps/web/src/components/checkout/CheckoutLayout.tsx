@@ -17,7 +17,7 @@ export function CheckoutLayout() {
   }
 
   return (
-    <Container className="py-12 max-w-3xl">
+    <Container className="max-w-3xl py-6 sm:py-12">
       <CheckoutStepper pathname={location.pathname} />
       <AnimatePresence mode="wait">
         <motion.div

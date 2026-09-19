@@ -33,7 +33,7 @@ export function VariantSelector({ variants, selectedId, onSelect }: VariantSelec
                 aria-label={`${variant.label}${!variant.inStock ? ' (out of stock)' : ''}`}
                 aria-pressed={selected}
                 className={cn(
-                  'relative w-9 h-9 rounded-full border-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed',
+                  'relative size-11 rounded-full border-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed',
                   selected ? 'border-pine' : 'border-transparent hover:border-stone-dark'
                 )}
                 style={{ backgroundColor: variant.swatch }}
@@ -54,7 +54,7 @@ export function VariantSelector({ variants, selectedId, onSelect }: VariantSelec
               onClick={() => onSelect(variant.id)}
               aria-pressed={selected}
               className={cn(
-                'px-4 py-2 rounded-[var(--radius-control)] border text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:line-through',
+                'min-h-11 px-4 py-2 rounded-[var(--radius-control)] border text-[15px] transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:line-through',
                 selected
                   ? 'border-pine bg-pine text-cream-light'
                   : 'border-stone-dark text-ink hover:border-fern'

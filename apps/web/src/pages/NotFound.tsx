@@ -1,6 +1,5 @@
-import { Link } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
-import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { Tag } from '@/components/ui/Tag';
 
 export default function NotFound() {
@@ -15,12 +14,8 @@ export default function NotFound() {
         or head back home.
       </p>
       <div className="mt-8 flex justify-center gap-3">
-        <Button variant="primary">
-          <Link to="/">Back home</Link>
-        </Button>
-        <Button variant="outline">
-          <Link to="/shop">Browse shop</Link>
-        </Button>
+        <ButtonLink variant="primary" to="/">Back home</ButtonLink>
+        <ButtonLink variant="outline" to="/shop">Browse shop</ButtonLink>
       </div>
     </Container>
   );

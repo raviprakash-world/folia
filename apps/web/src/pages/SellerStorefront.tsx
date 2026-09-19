@@ -29,29 +29,27 @@ export default function SellerStorefront() {
   }
 
   const hero = (
-    <div className="mb-10 flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-8 border-b border-stone-dark">
-      <div className="w-20 h-20 rounded-full bg-stone flex items-center justify-center shrink-0 overflow-hidden">
-        {seller.logoUrl ? (
-          <img src={seller.logoUrl} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <Store size={28} className="text-ink-soft" />
-        )}
-      </div>
-      <div className="min-w-0">
-        <h1 className="font-display text-3xl font-semibold text-heading">{seller.displayName}</h1>
-        <p className="text-ink-soft mt-1 max-w-[60ch]">{seller.description}</p>
-        <div className="flex items-center gap-4 mt-3 text-sm text-ink-soft font-mono">
-          <span>
-            {seller.productCount} {seller.productCount === 1 ? 'product' : 'products'}
-          </span>
-          {seller.averageRating !== null && (
-            <span className="flex items-center gap-1">
-              <Star size={14} className="fill-ochre text-ochre" />
-              {seller.averageRating.toFixed(1)}
+    <div className="mb-6 border-b border-stone-dark pb-6 sm:mb-10 sm:pb-8">
+      <div className="flex items-center gap-4">
+        <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone sm:size-20">
+          {seller.logoUrl ? <img src={seller.logoUrl} alt="" className="h-full w-full object-cover" /> : <Store size={26} className="text-ink-soft" aria-hidden="true" />}
+        </div>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold leading-tight text-heading sm:text-3xl">{seller.displayName}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-soft">
+            <span>
+              {seller.productCount} {seller.productCount === 1 ? 'product' : 'products'}
             </span>
-          )}
+            {seller.averageRating !== null && (
+              <span className="flex items-center gap-1">
+                <Star size={14} className="fill-ochre text-ochre" aria-hidden="true" />
+                {seller.averageRating.toFixed(1)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
+      <p className="mt-3 max-w-[60ch] text-[15px] leading-relaxed text-ink-soft">{seller.description}</p>
     </div>
   );
 

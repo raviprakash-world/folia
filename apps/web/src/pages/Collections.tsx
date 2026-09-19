@@ -8,7 +8,7 @@ import { collectionImages, productPhoto } from '@/data/collectionImages';
 
 export default function Collections() {
   return (
-    <Container className="py-16">
+    <Container className="py-8 sm:py-16">
       <PageHeader
         eyebrow="Curated"
         title="Shop by collection"

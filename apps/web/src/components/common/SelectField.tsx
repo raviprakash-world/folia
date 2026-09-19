@@ -26,7 +26,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
           aria-invalid={!!error}
           aria-describedby={error ? errorId : undefined}
           className={cn(
-            'rounded-[var(--radius-control)] border bg-stone-light px-3.5 py-2.5 text-sm text-ink transition-colors',
+            'h-11 w-full min-w-0 rounded-[var(--radius-control)] border bg-stone-light px-3.5 text-[15px] text-ink transition-colors',
             error ? 'border-rust' : 'border-stone-dark focus:border-fern',
             className
           )}
@@ -40,7 +40,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
           ))}
         </select>
         {error && (
-          <p id={errorId} role="alert" className="text-xs text-rust">
+          <p id={errorId} role="alert" className="text-xs text-rust-text">
             {error}
           </p>
         )}

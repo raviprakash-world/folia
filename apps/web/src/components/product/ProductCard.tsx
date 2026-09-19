@@ -68,7 +68,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             onAnimationEnd={() => setPopping(false)}
             className={cn(
               'flex size-8 items-center justify-center rounded-full bg-stone-light/90 shadow-sm transition-colors',
-              wishlisted ? 'text-rust' : 'text-ink-soft hover:text-rust',
+              wishlisted ? 'text-rust-text' : 'text-ink-soft hover:text-rust-text',
               popping && 'animate-heart-pop'
             )}
           >

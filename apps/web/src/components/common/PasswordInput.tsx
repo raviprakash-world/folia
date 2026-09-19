@@ -28,7 +28,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             aria-invalid={!!error}
             aria-describedby={error ? errorId : undefined}
             className={cn(
-              'w-full rounded-[var(--radius-control)] border bg-stone-light px-3.5 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-soft/50 transition-colors',
+              'h-11 w-full min-w-0 rounded-[var(--radius-control)] border bg-stone-light pl-3.5 pr-11 text-[15px] text-ink placeholder:text-ink-soft/60 transition-colors',
               error ? 'border-rust' : 'border-stone-dark focus:border-fern',
               className
             )}
@@ -38,13 +38,13 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             type="button"
             onClick={() => setVisible((v) => !v)}
             aria-label={visible ? 'Hide password' : 'Show password'}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-soft hover:text-heading transition-colors"
+            className="absolute right-0 top-0 flex size-11 items-center justify-center text-ink-soft transition-colors hover:text-heading"
           >
-            {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+            {visible ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
         {error && (
-          <p id={errorId} role="alert" className="text-xs text-rust">
+          <p id={errorId} role="alert" className="text-xs text-rust-text">
             {error}
           </p>
         )}

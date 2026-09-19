@@ -191,7 +191,7 @@ export default function AccountNotifications() {
                     type="button"
                     onClick={() => void deleteNotification(n.id)}
                     aria-label="Delete"
-                    className="p-1.5 text-ink-soft hover:text-rust transition-colors"
+                    className="p-1.5 text-ink-soft hover:text-rust-text transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>

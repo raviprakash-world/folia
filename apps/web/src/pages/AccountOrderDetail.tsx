@@ -304,7 +304,7 @@ export default function AccountOrderDetail() {
           Reorder & checkout
         </Button>
         {canCancelOrder(order) && (
-          <Button variant="outline" size="sm" icon={<XCircle size={14} />} className="!border-rust !text-rust" onClick={() => setCancelOpen(true)}>
+          <Button variant="outline" size="sm" icon={<XCircle size={14} />} className="!border-rust !text-rust-text" onClick={() => setCancelOpen(true)}>
             Cancel order
           </Button>
         )}

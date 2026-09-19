@@ -33,7 +33,7 @@ export function AccountLayout() {
   }
 
   return (
-    <Container className="py-12">
+    <Container className="py-6 sm:py-12">
       <Breadcrumb
         items={[
           { label: 'Home', to: '/' },

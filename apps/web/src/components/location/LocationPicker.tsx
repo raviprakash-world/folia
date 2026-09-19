@@ -24,7 +24,7 @@ export function LocationBar() {
         <button
           type="button"
           onClick={openPicker}
-          className="flex min-h-11 w-full items-center gap-2 text-left text-sm sm:hidden"
+          className="flex min-h-11 w-full items-center gap-2 text-left text-sm lg:hidden"
         >
           <MapPin size={16} className="shrink-0 text-fern-dark" aria-hidden="true" />
           {location ? (
@@ -41,7 +41,7 @@ export function LocationBar() {
           </span>
         </button>
 
-        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-xs sm:flex">
+        <div className="hidden flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-xs lg:flex">
           <MapPin size={14} className="shrink-0 text-fern-dark" aria-hidden="true" />
           {location ? (
             <>

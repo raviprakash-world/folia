@@ -123,7 +123,7 @@ export default function AccountProfile() {
             Change photo
           </Button>
           <p className="text-xs text-ink-soft mt-1.5">Mock upload — stored only in your browser, under 2MB.</p>
-          {avatarError && <p className="text-xs text-rust mt-1">{avatarError}</p>}
+          {avatarError && <p className="text-xs text-rust-text mt-1">{avatarError}</p>}
         </div>
       </div>
 

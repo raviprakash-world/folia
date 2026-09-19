@@ -11,6 +11,43 @@ interface ProductGalleryProps {
   imageCount?: number;
 }
 
+/** Phones: full-bleed, swipe between photos (native scroll-snap), dots below when there are several. */
+function MobileGallery({ productName, images }: { productName: string; images: ProductImageData[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [index, setIndex] = useState(0);
+  return (
+    <div className="-mx-4 md:hidden">
+      <div
+        ref={ref}
+        onScroll={() => {
+          const el = ref.current;
+          if (el) setIndex(Math.round(el.scrollLeft / el.clientWidth));
+        }}
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {images.length === 0 ? (
+          <div className="flex aspect-square w-full shrink-0 items-center justify-center bg-stone-dark font-mono text-xs uppercase tracking-wider text-ink-soft">
+            {productName}
+          </div>
+        ) : (
+          images.map((img, i) => (
+            <div key={img.url} className="relative aspect-square w-full shrink-0 snap-center bg-stone-dark">
+              <ProductImage src={img.url} alt={img.altText ?? `${productName} — photo ${i + 1}`} sizes="100vw" priority={i === 0} />
+            </div>
+          ))
+        )}
+      </div>
+      {images.length > 1 && (
+        <div className="mt-3 flex justify-center gap-1.5" role="group" aria-label={`Photo ${index + 1} of ${images.length}`}>
+          {images.map((img, i) => (
+            <span key={img.url} aria-hidden="true" className={cn('h-1.5 rounded-full transition-all', i === index ? 'w-5 bg-pine dark:bg-fern' : 'w-1.5 bg-ink-soft/40')} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Zoom is a CSS transform-origin trick driven by mouse position, not a separate
  * lightbox component — simpler, no extra dependency, and it's the interaction
@@ -34,6 +71,8 @@ export function ProductGallery({ productName, images = [], imageCount = 4 }: Pro
 
   return (
     <div>
+      <MobileGallery productName={productName} images={images} />
+      <div className="hidden md:block">
       <div
         ref={imageRef}
         onMouseEnter={() => setZoomActive(true)}
@@ -53,6 +92,8 @@ export function ProductGallery({ productName, images = [], imageCount = 4 }: Pro
               key={images[activeIndex]?.url}
               src={images[activeIndex]?.url}
               alt={images[activeIndex]?.altText ?? `${productName} — photo ${activeIndex + 1}`}
+              sizes="(min-width: 768px) 45vw, 100vw"
+              priority
             />
           ) : (
             <span className="font-mono text-xs text-ink-soft uppercase tracking-wider">
@@ -78,6 +119,7 @@ export function ProductGallery({ productName, images = [], imageCount = 4 }: Pro
             {hasPhotos && <ProductImage src={images[i]?.url} alt="" />}
           </button>
         ))}
+      </div>
       </div>
     </div>
   );

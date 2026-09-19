@@ -64,3 +64,7 @@ The ten journal articles use these Wikimedia Commons photographs (in `journal/`,
 | `ceramic-vs-terracotta-vs-plastic.jpg` | Noom Peerapong imnoom | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [Potted Succulents (Unsplash).jpg](https://commons.wikimedia.org/wiki/File:Potted_Succulents_(Unsplash).jpg) |
 | `the-humidity-tray-myth.jpg` | Hillebrand Steve, U.S. Fish and Wildlife Service | Public domain | [The morning dew gently rests on the fern leaf providing life giving moisture.jpg](https://commons.wikimedia.org/wiki/File:The_morning_dew_gently_rests_on_the_fern_leaf_providing_life_giving_moisture.jpg) |
 | `gifting-a-plant-that-survives-shipping.jpg` | Querle | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [Two potted succulents.jpg](https://commons.wikimedia.org/wiki/File:Two_potted_succulents.jpg) |
+
+## Smaller copies
+
+`products/sm/` holds 480px-wide copies of every product photo above, generated from the same files (same authors and licences), so phones download about 60% fewer bytes. Regenerate them if a photo changes.

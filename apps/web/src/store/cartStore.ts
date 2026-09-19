@@ -19,6 +19,9 @@ interface AddItemInput {
   variantLabel: string | null;
   quantity: number;
   maxQuantity: number;
+  sellerName?: string | null;
+  imageUrl?: string | null;
+  compareAtPrice?: number | null;
 }
 
 interface AddItemResult {
@@ -103,6 +106,9 @@ export const useCartStore = create<CartState>()(
           variantLabel: input.variantLabel,
           quantity: nextQuantity,
           maxQuantity: input.maxQuantity,
+          sellerName: input.sellerName ?? null,
+          imageUrl: input.imageUrl ?? null,
+          compareAtPrice: input.compareAtPrice ?? null,
         };
         set({ items: [...get().items, newItem] });
         return { clampedToMax: nextQuantity < input.quantity };

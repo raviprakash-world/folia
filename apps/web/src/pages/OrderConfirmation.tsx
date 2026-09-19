@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, Package, ArrowRight } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
+import { ButtonLink } from '@/components/ui/ButtonLink';
 import { OrderSummary } from '@/components/order/OrderSummary';
 import { ShareButtons } from '@/components/product/ShareButtons';
 import { useOrderStore } from '@/store/orderStore';
@@ -53,7 +54,7 @@ export default function OrderConfirmation() {
 
   if (!order) {
     return (
-      <Container className="py-24 text-center">
+      <Container className="py-12 sm:py-24 text-center">
         <h1 className="font-display text-2xl font-semibold text-heading">Order not found</h1>
         <p className="text-ink-soft mt-2">
           <Link to="/account/orders" className="text-fern underline">View your orders</Link>.
@@ -63,7 +64,7 @@ export default function OrderConfirmation() {
   }
 
   return (
-    <Container className="py-16 max-w-2xl">
+    <Container className="py-8 sm:py-16 max-w-2xl">
       <div className="flex flex-col items-center text-center mb-12">
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
@@ -83,12 +84,8 @@ export default function OrderConfirmation() {
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
-        <Button variant="primary">
-          <Link to="/shop">Continue shopping</Link>
-        </Button>
-        <Button variant="outline">
-          <Link to={`/account/orders/${order.id}`}>Track order</Link>
-        </Button>
+        <ButtonLink variant="primary" to="/shop">Continue shopping</ButtonLink>
+        <ButtonLink variant="outline" to={`/account/orders/${order.id}`}>Track order</ButtonLink>
         <Button variant="outline" icon={<Package size={14} />} onClick={() => void downloadInvoice(order)}>
           Download invoice
         </Button>

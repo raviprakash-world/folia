@@ -20,7 +20,7 @@ export function ProductTabs({ description, specs }: ProductTabsProps) {
             aria-selected={tab === t}
             onClick={() => setTab(t)}
             className={cn(
-              'pb-3 text-sm font-medium capitalize border-b-2 -mb-px transition-colors',
+              'min-h-11 text-[15px] font-medium capitalize border-b-2 -mb-px transition-colors',
               tab === t ? 'border-pine text-heading' : 'border-transparent text-ink-soft hover:text-ink'
             )}
           >

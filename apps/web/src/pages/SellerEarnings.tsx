@@ -80,7 +80,7 @@ export default function SellerEarnings() {
                 label: 'Amount',
                 align: 'right',
                 render: (e: SellerLedgerEntry) => (
-                  <span className={e.amount < 0 ? 'text-rust' : 'text-fern'}>{formatCurrency(e.amount)}</span>
+                  <span className={e.amount < 0 ? 'text-rust-text' : 'text-fern'}>{formatCurrency(e.amount)}</span>
                 ),
               },
               { key: 'note', label: 'Note', render: (e: SellerLedgerEntry) => e.note ?? '—' },

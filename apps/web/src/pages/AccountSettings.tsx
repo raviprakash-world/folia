@@ -66,7 +66,7 @@ export default function AccountSettings() {
         </div>
 
         <div className="p-4 rounded-[var(--radius-card)] border border-rust/30 bg-rust-light">
-          <h2 className="text-sm font-medium text-rust mb-1 flex items-center gap-1.5">
+          <h2 className="text-sm font-medium text-rust-text mb-1 flex items-center gap-1.5">
             <AlertTriangle size={14} />
             Danger zone
           </h2>
@@ -74,7 +74,7 @@ export default function AccountSettings() {
             Permanently delete your account. This demo doesn't have a real deletion backend — see
             what actually happens before you confirm.
           </p>
-          <Button variant="outline" size="sm" className="!border-rust !text-rust" onClick={() => setDeleteOpen(true)}>
+          <Button variant="outline" size="sm" className="!border-rust !text-rust-text" onClick={() => setDeleteOpen(true)}>
             Delete account
           </Button>
         </div>

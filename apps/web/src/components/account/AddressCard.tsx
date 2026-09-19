@@ -43,8 +43,14 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
       <div className="flex items-center gap-2 mb-2">
         <TypeIcon size={14} className="text-fern" />
         <span className="text-sm font-medium text-ink">{address.label || address.fullName}</span>
-        {address.isDefaultShipping && <Tag tone="pine">Default shipping</Tag>}
-        {address.isDefaultBilling && <Tag tone="ochre">Default billing</Tag>}
+        {address.isDefaultShipping && address.isDefaultBilling ? (
+          <Tag tone="pine">Default</Tag>
+        ) : (
+          <>
+            {address.isDefaultShipping && <Tag tone="pine">Default shipping</Tag>}
+            {address.isDefaultBilling && <Tag tone="ochre">Default billing</Tag>}
+          </>
+        )}
       </div>
 
       <p className="text-sm text-ink-soft">{address.fullName}</p>
@@ -53,9 +59,9 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
         {address.addressLine1}
         {address.addressLine2 ? `, ${address.addressLine2}` : ''}
       </p>
-      {address.landmark && <p className="text-xs text-ink-soft/80">Near {address.landmark}</p>}
+      {address.landmark && <p className="text-sm text-ink-soft">Landmark: {address.landmark}</p>}
       <p className="text-sm text-ink-soft">
-        {address.city}, {address.state} {address.postalCode}
+        {address.city}, {address.state} – {address.postalCode}
       </p>
       <p className="font-mono text-xs text-ink-soft mt-1">{address.phone}</p>
       {address.deliveryInstructions && (
@@ -66,7 +72,7 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
       )}
 
       {(onEdit || onDelete) && (
-        <div className="flex gap-3 mt-3 pt-3 border-t border-stone-dark">
+        <div className="mt-3 flex gap-2 border-t border-stone-dark pt-1">
           {onEdit && (
             <button
               type="button"
@@ -74,7 +80,7 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
                 e.stopPropagation();
                 onEdit();
               }}
-              className="flex items-center gap-1.5 text-xs text-ink-soft hover:text-heading transition-colors"
+              className="flex min-h-11 items-center gap-1.5 px-2 text-sm text-ink-soft transition-colors hover:text-heading"
             >
               <Pencil size={12} />
               Edit
@@ -87,7 +93,7 @@ export function AddressCard({ address, onEdit, onDelete, selectable, selected, o
                 e.stopPropagation();
                 onDelete();
               }}
-              className="flex items-center gap-1.5 text-xs text-ink-soft hover:text-rust transition-colors"
+              className="flex min-h-11 items-center gap-1.5 px-2 text-sm text-ink-soft transition-colors hover:text-rust-text"
             >
               <Trash2 size={12} />
               Remove

@@ -40,8 +40,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!this.state.error) return this.props.children;
 
     return (
-      <Container className="py-24 max-w-sm text-center">
-        <AlertTriangle size={32} className="mx-auto text-rust" />
+      <Container className="py-12 sm:py-24 max-w-sm text-center">
+        <AlertTriangle size={32} className="mx-auto text-rust-text" />
         <h1 className="font-display text-2xl font-semibold text-heading mt-4">Something went wrong</h1>
         <p className="text-sm text-ink-soft mt-2">
           This page hit an unexpected error. Reloading usually fixes it — your cart and account are unaffected.

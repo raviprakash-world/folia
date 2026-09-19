@@ -87,7 +87,7 @@ function WriteReviewForm({ productId, productSlug }: { productId: string; produc
         render={({ field }) => <StarPicker value={field.value} onChange={field.onChange} />}
       />
       {errors.rating && (
-        <p role="alert" className="text-xs text-rust -mt-2">
+        <p role="alert" className="text-xs text-rust-text -mt-2">
           {errors.rating.message}
         </p>
       )}

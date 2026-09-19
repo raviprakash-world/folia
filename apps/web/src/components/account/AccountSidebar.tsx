@@ -29,7 +29,7 @@ export function AccountSidebar({ onLogoutClick }: AccountSidebarProps) {
       <button
         type="button"
         onClick={onLogoutClick}
-        className="flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-control)] text-sm text-rust hover:bg-rust-light transition-colors mt-2"
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--radius-control)] text-sm text-rust-text hover:bg-rust-light transition-colors mt-2"
       >
         <LogOut size={16} />
         Log out

@@ -103,7 +103,7 @@ export const policies: Policy[] = [
       },
       {
         heading: 'Accounts',
-        body: 'You\u2019re responsible for keeping your account credentials secure. Guest checkout is always available if you\u2019d rather not create an account.',
+        body: 'You\u2019re responsible for keeping your account credentials secure. You need an account to place an order, so we can show your order history and let you track deliveries.',
       },
       {
         heading: 'About this page',
