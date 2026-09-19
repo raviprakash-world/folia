@@ -8,22 +8,26 @@ interface ProductFiltersProps {
   filters: ProductQuery;
   onChange: (next: Partial<ProductQuery>) => void;
   onReset: () => void;
+  /** On a category page the category is part of the address, so picking another one is a navigation, not a URL parameter. */
+  onCategorySelect?: (slug: string | undefined) => void;
+  /** The category the page itself is about; it is not counted as a filter the shopper applied. */
+  pageCategory?: string;
 }
 
 const PRICE_MAX = 2000;
 
-export function ProductFilters({ filters, onChange, onReset }: ProductFiltersProps) {
+export function ProductFilters({ filters, onChange, onReset, onCategorySelect, pageCategory }: ProductFiltersProps) {
   const { data: categories } = useCategories();
   const location = useLocationStore((s) => s.location);
   const openPicker = useLocationStore((s) => s.openPicker);
-  const hasActiveFilters = !!(filters.category || filters.minPrice || filters.maxPrice || filters.inStockOnly || filters.nearMe);
+  const hasActiveFilters = !!((filters.category && filters.category !== pageCategory) || filters.minPrice || filters.maxPrice || filters.inStockOnly || filters.nearMe);
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h2 className="font-mono text-xs uppercase tracking-wider text-ink-soft">Filters</h2>
+      <div className="flex items-center justify-end lg:justify-between">
+        <h2 className="hidden font-mono text-xs uppercase tracking-wider text-ink-soft lg:block">Filters</h2>
         {hasActiveFilters && (
-          <button type="button" onClick={onReset} className="text-xs text-fern hover:text-heading underline">
+          <button type="button" onClick={onReset} className="min-h-11 px-1 text-sm text-fern-dark underline hover:text-heading">
             Clear all
           </button>
         )}
@@ -31,20 +35,24 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
 
       <fieldset>
         <legend className="text-sm font-medium text-ink mb-3">Category</legend>
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col">
           {categories?.map((cat) => {
             const active = filters.category === cat.slug;
             return (
               <button
                 key={cat.slug}
                 type="button"
-                onClick={() => onChange({ category: active ? undefined : cat.slug })}
+                onClick={() => {
+                  const next = active ? undefined : cat.slug;
+                  if (onCategorySelect) onCategorySelect(next);
+                  else onChange({ category: next });
+                }}
                 aria-pressed={active}
-                className="flex items-center gap-2.5 text-sm text-left"
+                className="flex min-h-11 items-center gap-3 text-[15px] text-left"
               >
                 <span
                   className={cn(
-                    'flex items-center justify-center w-4 h-4 rounded border shrink-0',
+                    'flex size-5 shrink-0 items-center justify-center rounded border',
                     active ? 'bg-fern border-fern' : 'border-stone-dark'
                   )}
                 >
@@ -68,7 +76,7 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
             aria-label="Minimum price"
             value={filters.minPrice ?? ''}
             onChange={(e) => onChange({ minPrice: e.target.value ? Number(e.target.value) : undefined })}
-            className="w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-2.5 py-1.5 text-sm font-mono"
+            className="h-11 w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3 text-[15px] tabular-nums"
           />
           <span className="text-ink-soft text-sm">–</span>
           <input
@@ -79,29 +87,29 @@ export function ProductFilters({ filters, onChange, onReset }: ProductFiltersPro
             aria-label="Maximum price"
             value={filters.maxPrice ?? ''}
             onChange={(e) => onChange({ maxPrice: e.target.value ? Number(e.target.value) : undefined })}
-            className="w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-2.5 py-1.5 text-sm font-mono"
+            className="h-11 w-full rounded-[var(--radius-control)] border border-stone-dark bg-stone-light px-3 text-[15px] tabular-nums"
           />
         </div>
       </fieldset>
 
       <fieldset>
         <legend className="sr-only">Availability</legend>
-        <label className="flex items-center gap-2.5 text-sm cursor-pointer">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[15px]">
           <input
             type="checkbox"
             checked={!!filters.inStockOnly}
             onChange={(e) => onChange({ inStockOnly: e.target.checked || undefined })}
-            className="w-4 h-4 accent-fern"
+            className="size-5 accent-fern"
           />
           <span className="text-ink-soft">In stock only</span>
         </label>
-        <label className={cn('flex items-center gap-2.5 text-sm mt-3', location?.state ? 'cursor-pointer' : 'cursor-not-allowed')}>
+        <label className={cn('flex min-h-11 items-center gap-3 text-[15px]', location?.state ? 'cursor-pointer' : 'cursor-not-allowed')}>
           <input
             type="checkbox"
             checked={!!filters.nearMe}
             disabled={!location?.state}
             onChange={(e) => onChange({ nearMe: e.target.checked || undefined })}
-            className="w-4 h-4 accent-fern"
+            className="size-5 accent-fern"
           />
           <span className="text-ink-soft">Ships from my state</span>
         </label>

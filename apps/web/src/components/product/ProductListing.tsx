@@ -1,5 +1,6 @@
 import { LayoutGrid, List, SlidersHorizontal, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
 import { Button } from '@/components/ui/Button';
 import { ProductFilters } from './ProductFilters';
@@ -11,6 +12,7 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { Pagination } from '@/components/common/Pagination';
 import { useProducts } from '@/hooks/useProducts';
 import { useProductListState } from '@/hooks/useProductListState';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { cn } from '@/utils/cn';
 
 interface ProductListingProps {
@@ -28,6 +30,36 @@ interface ProductListingProps {
    * title/description block — the storefront page uses this for its own
    * seller-info hero instead of a plain heading. */
   header?: ReactNode;
+}
+
+function FilterDrawer({ onClose, total, children }: { onClose: () => void; total?: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref, true, onClose);
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Filters"
+        className="absolute inset-y-0 right-0 flex w-[88%] max-w-sm flex-col bg-stone-light"
+      >
+        <div className="flex items-center justify-between border-b border-stone-dark px-5 py-2">
+          <h2 className="font-display text-lg font-semibold text-heading">Filters</h2>
+          <button type="button" onClick={onClose} aria-label="Close filters" className="-mr-2 flex size-11 items-center justify-center text-ink-soft">
+            <X size={22} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        <div className="border-t border-stone-dark p-4" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
+          <Button size="lg" className="w-full" onClick={onClose}>
+            {total === undefined ? 'Show products' : `Show ${total} ${total === 1 ? 'product' : 'products'}`}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ProductListing({
@@ -48,6 +80,20 @@ export function ProductListing({
     });
   const { data, isLoading, isError, refetch } = useProducts(filters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // A category page fixes its category, so switching category means going to that category's page (or the full shop),
+  // carrying the price / stock filters along.
+  const selectCategory = fixedCategory
+    ? (slug: string | undefined) => {
+        const params = new URLSearchParams(searchParams);
+        params.delete('page');
+        params.delete('category');
+        const qs = params.toString();
+        void navigate(`${slug ? `/collections/${slug}` : '/shop'}${qs ? `?${qs}` : ''}`);
+      }
+    : undefined;
 
   return (
     <Container className="py-6 sm:py-10 lg:py-16">
@@ -61,7 +107,7 @@ export function ProductListing({
       <div className="grid lg:grid-cols-[220px_1fr] gap-10">
         {/* Desktop filter sidebar */}
         <aside className="hidden lg:block">
-          <ProductFilters filters={filters} onChange={updateFilters} onReset={resetFilters} />
+          <ProductFilters filters={filters} onChange={updateFilters} onReset={resetFilters} onCategorySelect={selectCategory} pageCategory={fixedCategory} />
         </aside>
 
         <div className="min-w-0">
@@ -133,27 +179,15 @@ export function ProductListing({
 
       {/* Mobile filter drawer */}
       {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-ink/40"
-            onClick={() => setMobileFiltersOpen(false)}
-            aria-hidden="true"
+        <FilterDrawer onClose={() => setMobileFiltersOpen(false)} total={data?.total}>
+          <ProductFilters
+            filters={filters}
+            onChange={updateFilters}
+            onReset={resetFilters}
+            onCategorySelect={selectCategory}
+            pageCategory={fixedCategory}
           />
-          <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-xs bg-stone-light p-6 overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-lg font-semibold text-heading">Filters</h2>
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen(false)}
-                aria-label="Close filters"
-                className="p-1.5 text-ink-soft"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <ProductFilters filters={filters} onChange={updateFilters} onReset={resetFilters} />
-          </div>
-        </div>
+        </FilterDrawer>
       )}
     </Container>
   );
