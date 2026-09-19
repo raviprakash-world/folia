@@ -16,6 +16,7 @@ import { LocationBar } from '@/components/location/LocationPicker';
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
   { label: 'Offers', to: '/offers' },
+  { label: 'Services', to: '/services' },
   { label: 'Sellers', to: '/sellers' },
   { label: 'Journal', to: '/blog' },
   { label: 'About', to: '/about' },

@@ -9,6 +9,7 @@ const NEWSLETTER_DELAY_MS = 400;
 const subscribedEmails = new Set<string>(['subscribed@example.com']);
 
 interface ContactBody {
+  type: string;
   name: string;
   email: string;
   phone: string;
@@ -21,7 +22,7 @@ interface NewsletterBody {
 }
 
 export const contactHandlers = [
-  http.post('/api/contact', async ({ request }) => {
+  http.post('/api/enquiries', async ({ request }) => {
     await delay(CONTACT_DELAY_MS);
     const body = (await request.json()) as ContactBody;
 

@@ -11,8 +11,8 @@ const promos = [
   },
   {
     title: 'Gift a plant, not a guess',
-    description: 'Gift cards never wilt.',
-    to: '/shop/gift-cards',
+    description: 'Easy-care plants and planters that arrive ready to give.',
+    to: '/collections/gifting',
     tone: 'bg-ochre text-pine',
   },
 ];

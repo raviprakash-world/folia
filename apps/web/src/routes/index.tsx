@@ -15,6 +15,9 @@ const Shop = lazy(() => import('@/pages/Shop'));
 const Category = lazy(() => import('@/pages/Category'));
 const Collections = lazy(() => import('@/pages/Collections'));
 const Offers = lazy(() => import('@/pages/Offers'));
+const Services = lazy(() => import('@/pages/Services'));
+const GardeningServices = lazy(() => import('@/pages/GardeningServices'));
+const CorporateGifting = lazy(() => import('@/pages/CorporateGifting'));
 const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const Search = lazy(() => import('@/pages/Search'));
 const Sellers = lazy(() => import('@/pages/Sellers'));
@@ -68,6 +71,7 @@ const AdminOverview = lazy(() => import('@/pages/AdminOverview'));
 const AdminRevenue = lazy(() => import('@/pages/AdminRevenue'));
 const AdminOrders = lazy(() => import('@/pages/AdminOrders'));
 const AdminReturns = lazy(() => import('@/pages/AdminReturns'));
+const AdminEnquiries = lazy(() => import('@/pages/AdminEnquiries'));
 const AdminReturnDetail = lazy(() => import('@/pages/AdminReturnDetail'));
 const AdminProducts = lazy(() => import('@/pages/AdminProducts'));
 const AdminMarketplace = lazy(() => import('@/pages/AdminMarketplace'));
@@ -91,6 +95,9 @@ export const router = createBrowserRouter([
       { index: true, element: withSuspense(<Home />) },
       { path: 'shop', element: withSuspense(<Shop />) },
       { path: 'offers', element: withSuspense(<Offers />) },
+      { path: 'services', element: withSuspense(<Services />) },
+      { path: 'services/gardening', element: withSuspense(<GardeningServices />) },
+      { path: 'corporate-gifting', element: withSuspense(<CorporateGifting />) },
       { path: 'collections', element: withSuspense(<Collections />) },
       { path: 'collections/:slug', element: withSuspense(<Category />) },
       { path: 'product/:slug', element: withSuspense(<ProductDetail />) },
@@ -178,6 +185,7 @@ export const router = createBrowserRouter([
               { path: 'revenue', element: withSuspense(<AdminRevenue />) },
               { path: 'orders', element: withSuspense(<AdminOrders />) },
               { path: 'returns', element: withSuspense(<AdminReturns />) },
+              { path: 'enquiries', element: withSuspense(<AdminEnquiries />) },
               { path: 'returns/:id', element: withSuspense(<AdminReturnDetail />) },
               { path: 'products', element: withSuspense(<AdminProducts />) },
               { path: 'marketplace', element: withSuspense(<AdminMarketplace />) },

@@ -12,6 +12,8 @@ const columns = [
       { label: 'Collections', to: '/collections' },
       { label: 'Offers', to: '/offers' },
       { label: 'Gifting', to: '/collections/gifting' },
+      { label: 'Gardening services', to: '/services/gardening' },
+      { label: 'Corporate gifts', to: '/corporate-gifting' },
     ],
   },
   {

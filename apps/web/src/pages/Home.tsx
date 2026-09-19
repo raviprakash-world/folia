@@ -11,6 +11,7 @@ import { TrendingProducts } from '@/components/home/TrendingProducts';
 import { Benefits } from '@/components/home/Benefits';
 import { Testimonials } from '@/components/home/Testimonials';
 import { PromoBanners } from '@/components/home/PromoBanners';
+import { ServicesSegment } from '@/components/home/ServicesSegment';
 import { BlogPreview } from '@/components/home/BlogPreview';
 
 export default function Home() {
@@ -53,6 +54,7 @@ export default function Home() {
       <Benefits />
       <Testimonials />
       <PromoBanners />
+      <ServicesSegment />
       <BlogPreview />
     </>
   );

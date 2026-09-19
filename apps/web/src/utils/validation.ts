@@ -31,6 +31,35 @@ export const contactSchema = z.object({
 
 export type ContactFormValues = z.infer<typeof contactSchema>;
 
+const enquiryBase = {
+  name: z.string().min(1, 'Enter your name').max(100),
+  email: z.string().min(1, 'Enter your email').email('Enter a valid email address'),
+  phone: z.string().min(1, 'Enter a phone number').regex(PHONE_REGEX, 'Enter a valid phone number'),
+  message: z.string().min(10, 'Tell us a little more (at least 10 characters)').max(2000),
+};
+
+export const gardeningEnquirySchema = z.object({
+  ...enquiryBase,
+  city: z.string().min(1, 'Enter your city').max(120),
+  serviceType: z.string().min(1, 'Choose the kind of help you need'),
+});
+export type GardeningEnquiryValues = z.infer<typeof gardeningEnquirySchema>;
+
+export const corporateEnquirySchema = z.object({
+  ...enquiryBase,
+  company: z.string().min(1, 'Enter your company name').max(150),
+  quantity: z
+    .string()
+    .regex(/^\d+$/, 'Enter a whole number')
+    .refine((v) => Number(v) >= 1 && Number(v) <= 100000, 'Enter a number between 1 and 100,000'),
+  occasion: z.string().min(1, 'Choose an occasion'),
+  neededBy: z
+    .string()
+    .refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Enter a valid date'),
+  city: z.string().max(120),
+});
+export type CorporateEnquiryValues = z.infer<typeof corporateEnquirySchema>;
+
 export const loginSchema = z.object({
   email: z.string().min(1, 'Enter your email').email('Enter a valid email address'),
   password: z.string().min(1, 'Enter your password'),

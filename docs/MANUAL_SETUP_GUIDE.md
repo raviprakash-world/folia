@@ -278,6 +278,7 @@ Decisions/data that must come from you and your tax professional before engineer
 - **Seller KYC review process** — who reviews uploaded documents, against what checklist, and how long they are retained (private storage must exist first: section 7).
 - **Legal pages.** `/policies/privacy` and `/policies/terms` are illustrative placeholders and say so on the page. Replace them with lawyer-reviewed text; add grievance-officer/contact details and consumer-law disclosures as required for an Indian marketplace.
 - **Real company details** on the invoice, the contact page (`ContactInfo.tsx` uses a fictional Bengaluru address and phone number), and the footer.
+- **Enquiries — decide who answers them.** The contact form, the gardening-services form and the corporate-gifts form all save to the database (`enquiries` table) and show up in **Admin → Enquiries**. No email is sent when one arrives, so someone has to check that page (or you wire Resend to notify an inbox first: section 5). The gardening-services and corporate-gifts pages describe services in general terms and promise no prices or timelines; before launch, confirm which services you can really deliver, in which cities, and edit the wording in `apps/web/src/pages/GardeningServices.tsx` and `CorporateGifting.tsx` to match. The newsletter sign-up form has no backend endpoint yet.
 
 ---
 

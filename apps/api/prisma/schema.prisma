@@ -1865,3 +1865,37 @@ model SellerPayoutItem {
 
   @@map("seller_payout_items")
 }
+
+// --- Enquiries: contact form, gardening-service and corporate-gifting requests ---
+
+enum EnquiryType {
+  GENERAL
+  GARDENING_SERVICE
+  CORPORATE_GIFTING
+}
+
+enum EnquiryStatus {
+  NEW
+  HANDLED
+}
+
+/// A message from a visitor that a person needs to answer. Stored so nothing
+/// is lost when email isn't configured; the admin queue reads from here.
+model Enquiry {
+  id      String        @id @default(uuid())
+  type    EnquiryType
+  status  EnquiryStatus @default(NEW)
+  name    String
+  email   String
+  phone   String?
+  subject String?
+  message String
+  /// Type-specific fields (city, service type, company, quantity, ...).
+  details Json?
+
+  createdAt DateTime  @default(now())
+  handledAt DateTime?
+
+  @@index([status, createdAt])
+  @@map("enquiries")
+}
