@@ -32,3 +32,16 @@ them on fixed fills breaks).
 ## 4. Test the real path, not just the mock
 Turn on the real API flags (`.env.local`) and run the flow against the real
 backend and database at least once; a mock can hide a mismatch.
+
+## 5. Open every overlay and look at it
+Dialogs, dropdowns, menus and popovers must be **opened and looked at** — measure
+that the box is fully inside the viewport (top ≥ 0, bottom ≤ innerHeight) *and* take a
+screenshot at the pane's native size (custom emulated sizes can hide `fixed`
+overlays from the screenshot tool). Check Escape, the close button and a
+backdrop click, in both themes and at 390px.
+
+Why: a dialog opened from the sticky header rendered with its top off-screen. The
+header uses `backdrop-blur`, and any ancestor with `backdrop-filter`, `filter` or
+`transform` becomes the containing block for `position: fixed` children. `Modal`
+now renders through a portal into `document.body`; new overlays must too.
+

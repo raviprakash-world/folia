@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -19,7 +20,11 @@ export function Modal({ open, onClose, title, children, size = 'sm' }: ModalProp
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open, onClose);
 
-  return (
+  // Rendered into document.body, not where <Modal> happens to sit: an ancestor
+  // with backdrop-filter / transform / filter (the sticky blurred header) becomes
+  // the containing block for `position: fixed` children, which shoved a dialog
+  // opened from the header off the top of the screen.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -28,7 +33,7 @@ export function Modal({ open, onClose, title, children, size = 'sm' }: ModalProp
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-ink/40"
+            className="fixed inset-0 z-50 bg-black/50"
             aria-hidden="true"
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
@@ -61,6 +66,7 @@ export function Modal({ open, onClose, title, children, size = 'sm' }: ModalProp
           </div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
