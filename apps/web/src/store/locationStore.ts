@@ -12,9 +12,13 @@ export interface DeliveryLocation {
 interface LocationState {
   location: DeliveryLocation | null;
   pickerOpen: boolean;
+  /** Set when the picker is opened from a "use my location" button, so the dialog starts detecting immediately. */
+  autoDetect: boolean;
   setLocation: (location: DeliveryLocation) => void;
   clearLocation: () => void;
   openPicker: () => void;
+  openPickerAndDetect: () => void;
+  clearAutoDetect: () => void;
   closePicker: () => void;
 }
 
@@ -28,10 +32,13 @@ export const useLocationStore = create<LocationState>()(
     (set) => ({
       location: null,
       pickerOpen: false,
-      setLocation: (location) => set({ location, pickerOpen: false }),
+      autoDetect: false,
+      setLocation: (location) => set({ location, pickerOpen: false, autoDetect: false }),
       clearLocation: () => set({ location: null }),
-      openPicker: () => set({ pickerOpen: true }),
-      closePicker: () => set({ pickerOpen: false }),
+      openPicker: () => set({ pickerOpen: true, autoDetect: false }),
+      openPickerAndDetect: () => set({ pickerOpen: true, autoDetect: true }),
+      clearAutoDetect: () => set({ autoDetect: false }),
+      closePicker: () => set({ pickerOpen: false, autoDetect: false }),
     }),
     {
       name: 'folia-location',

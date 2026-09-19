@@ -11,7 +11,7 @@ import { useCurrentUser } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/uiStore';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
-import { LocationButton } from '@/components/location/LocationPicker';
+import { LocationBar } from '@/components/location/LocationPicker';
 
 const primaryLinks = [
   { label: 'Collections', to: '/collections' },
@@ -47,7 +47,7 @@ export function Navbar() {
           <Logo />
         </Link>
 
-        <nav aria-label="Primary" className="hidden md:flex items-center gap-8">
+        <nav aria-label="Primary" className="hidden md:flex items-center gap-4 lg:gap-8">
           <button
             type="button"
             aria-expanded={megaMenuOpen}
@@ -78,7 +78,6 @@ export function Navbar() {
           <div className="hidden sm:block">
             <ThemeToggle compact />
           </div>
-          <LocationButton />
           <Link
             to={user ? '/account' : '/account/login'}
             aria-label={user ? `Account — ${user.firstName}` : 'Sign in'}
@@ -137,6 +136,7 @@ export function Navbar() {
           </button>
         </div>
       </Container>
+      <LocationBar />
 
       <MegaMenu open={megaMenuOpen} onClose={() => setMegaMenuOpen(false)} />
       <MobileNav

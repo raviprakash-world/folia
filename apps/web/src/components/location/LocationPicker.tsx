@@ -1,32 +1,59 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Crosshair, Loader2, MapPin } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { Button } from '@/components/ui/Button';
+import { Container } from '@/components/ui/Container';
 import { Alert } from '@/components/common/Alert';
 import { FormField } from '@/components/common/FormField';
 import { useLocationStore } from '@/store/locationStore';
 import { detectPlace, lookupPincode, GeoError } from '@/utils/geo';
 import { isValidPostalCode } from '@/utils/region';
 
-/** Navbar chip: shows the current delivery PIN, or invites the visitor to set one. */
-export function LocationButton() {
+/**
+ * Always-visible strip under the navbar (every screen width) — the primary,
+ * unmissable entry point. The navbar pin icon is only a shortcut: its text
+ * label can't fit on smaller screens, so nothing important depends on it.
+ */
+export function LocationBar() {
   const location = useLocationStore((s) => s.location);
   const openPicker = useLocationStore((s) => s.openPicker);
+  const openPickerAndDetect = useLocationStore((s) => s.openPickerAndDetect);
   return (
-    <>
-      <button
-        type="button"
-        onClick={openPicker}
-        aria-label={location ? `Delivering to ${location.pincode}. Change location` : 'Set your delivery location'}
-        className="flex items-center gap-1.5 p-2.5 rounded-[var(--radius-control)] text-ink-soft hover:text-heading hover:bg-stone-dark transition-colors"
-      >
-        <MapPin size={20} />
-        <span className="hidden xl:inline text-xs font-medium whitespace-nowrap">
-          {location ? `Deliver to ${location.pincode}` : 'Set location'}
-        </span>
-      </button>
+    <div className="border-t border-stone-dark bg-stone-dark/40">
+      <Container className="py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <MapPin size={14} className="text-fern shrink-0" aria-hidden="true" />
+        {location ? (
+          <>
+            <span className="text-ink-soft">
+              Delivering to <span className="text-ink font-medium">{location.pincode}</span>
+              {location.city && `, ${location.city}`}
+            </span>
+            <button type="button" onClick={openPicker} className="text-fern hover:text-heading underline font-medium">
+              Change
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-ink-soft">See what ships to your area.</span>
+            <button
+              type="button"
+              onClick={openPickerAndDetect}
+              className="flex items-center gap-1 text-fern hover:text-heading underline font-medium"
+            >
+              <Crosshair size={12} aria-hidden="true" />
+              Use my current location
+            </button>
+            <span className="text-ink-soft" aria-hidden="true">
+              or
+            </span>
+            <button type="button" onClick={openPicker} className="text-fern hover:text-heading underline font-medium">
+              enter PIN code
+            </button>
+          </>
+        )}
+      </Container>
       <LocationDialog />
-    </>
+    </div>
   );
 }
 
@@ -37,6 +64,8 @@ function LocationDialog() {
   const setLocation = useLocationStore((s) => s.setLocation);
   const clearLocation = useLocationStore((s) => s.clearLocation);
 
+  const autoDetect = useLocationStore((s) => s.autoDetect);
+  const clearAutoDetect = useLocationStore((s) => s.clearAutoDetect);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState<'detect' | 'pin' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +86,18 @@ function LocationDialog() {
       setBusy(null);
     }
   }
+
+  // Opened from a "Use my current location" button: start right away (once).
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (open && autoDetect && !startedRef.current) {
+      startedRef.current = true;
+      clearAutoDetect();
+      void handleDetect();
+    }
+    if (!open) startedRef.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleDetect is recreated every render; only open/autoDetect should trigger this
+  }, [open, autoDetect]);
 
   async function handlePin() {
     const value = pin.trim();
