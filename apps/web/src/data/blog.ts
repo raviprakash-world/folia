@@ -1,7 +1,7 @@
 import type { BlogPost } from '@/types/blog';
 
 /** Mock journal content — static data, not MSW-backed (see README). */
-export const blogPosts: BlogPost[] = [
+const posts: Omit<BlogPost, 'image'>[] = [
   {
     "slug": "winter-light-guide",
     "title": "A realistic guide to winter light",
@@ -199,5 +199,9 @@ export const blogPosts: BlogPost[] = [
     "featured": false
   }
 ];
+
+export const blogImage = (slug: string) => `/demo/journal/${slug}.jpg`;
+
+export const blogPosts: BlogPost[] = posts.map((p) => ({ ...p, image: blogImage(p.slug) }));
 
 export const blogCategories: string[] = [...new Set(blogPosts.map((p) => p.category))];

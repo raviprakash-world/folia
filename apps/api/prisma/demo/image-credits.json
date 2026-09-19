@@ -443,5 +443,105 @@
   "slug": "indoor-plant-shelf",
   "name": "Indoor Plant Shelf",
   "kind": "illustration"
+ },
+ {
+  "slug": "journal-winter-light-guide",
+  "name": "Journal: winter light guide",
+  "kind": "photo",
+  "title": "Plants on window A D2507.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Plants_on_window_A_D2507.jpg",
+  "artist": "Tangopaso",
+  "license": "Public domain",
+  "licenseUrl": ""
+ },
+ {
+  "slug": "journal-repotting-without-shock",
+  "name": "Journal: repotting without shock",
+  "kind": "photo",
+  "title": "Wurzelboden einer Topfpflanze während des Umtopfens.JPG",
+  "page": "https://commons.wikimedia.org/wiki/File:Wurzelboden_einer_Topfpflanze_w%C3%A4hrend_des_Umtopfens.JPG",
+  "artist": "Conrad Nutschan",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+ },
+ {
+  "slug": "journal-vessel-drainage-explained",
+  "name": "Journal: vessel drainage explained",
+  "kind": "photo",
+  "title": "Terracota (Unsplash).jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Terracota_(Unsplash).jpg",
+  "artist": "Annie Spratt anniespratt",
+  "license": "CC0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ {
+  "slug": "journal-low-light-that-actually-works",
+  "name": "Journal: low light that actually works",
+  "kind": "photo",
+  "title": "ZZ Plant (Zamioculcas zamiifolia) 1.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:ZZ_Plant_(Zamioculcas_zamiifolia)_1.jpg",
+  "artist": "Mokkie",
+  "license": "CC BY-SA 3.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0"
+ },
+ {
+  "slug": "journal-pet-safe-plants-that-dont-look-boring",
+  "name": "Journal: pet safe plants that dont look boring",
+  "kind": "photo",
+  "title": "Spider Plant (Chlorophytum Comosum).jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Spider_Plant_(Chlorophytum_Comosum).jpg",
+  "artist": "S.samsamyang",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+ },
+ {
+  "slug": "journal-styling-plants-like-a-room-not-a-shelf",
+  "name": "Journal: styling plants like a room not a shelf",
+  "kind": "photo",
+  "title": "Shelf at the bottom of a window for growing houseplants.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Shelf_at_the_bottom_of_a_window_for_growing_houseplants.jpg",
+  "artist": "Tangopaso",
+  "license": "Public domain",
+  "licenseUrl": ""
+ },
+ {
+  "slug": "journal-why-your-plant-drops-leaves-after-a-move",
+  "name": "Journal: why your plant drops leaves after a move",
+  "kind": "photo",
+  "title": "Schefflera arboricola (368807186).jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Schefflera_arboricola_(368807186).jpg",
+  "artist": "Dinesh Valke from Thane, India",
+  "license": "CC BY-SA 2.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0"
+ },
+ {
+  "slug": "journal-ceramic-vs-terracotta-vs-plastic",
+  "name": "Journal: ceramic vs terracotta vs plastic",
+  "kind": "photo",
+  "title": "Potted Succulents (Unsplash).jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Potted_Succulents_(Unsplash).jpg",
+  "artist": "Noom Peerapong imnoom",
+  "license": "CC0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+ },
+ {
+  "slug": "journal-the-humidity-tray-myth",
+  "name": "Journal: the humidity tray myth",
+  "kind": "photo",
+  "title": "The morning dew gently rests on the fern leaf providing life giving moisture.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:The_morning_dew_gently_rests_on_the_fern_leaf_providing_life_giving_moisture.jpg",
+  "artist": "Hillebrand Steve, U.S. Fish and Wildlife Service",
+  "license": "Public domain",
+  "licenseUrl": ""
+ },
+ {
+  "slug": "journal-gifting-a-plant-that-survives-shipping",
+  "name": "Journal: gifting a plant that survives shipping",
+  "kind": "photo",
+  "title": "Two potted succulents.jpg",
+  "page": "https://commons.wikimedia.org/wiki/File:Two_potted_succulents.jpg",
+  "artist": "Querle",
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
  }
 ]

@@ -9,7 +9,7 @@ export function FeaturedPost({ post }: { post: BlogPost }) {
       to={`/blog/${post.slug}`}
       className="group grid md:grid-cols-2 gap-8 items-center rounded-[var(--radius-card)] bg-stone-light border border-stone-dark p-6 md:p-8 mb-14"
     >
-      <div className="aspect-[4/3] rounded-[var(--radius-control)] bg-stone-dark" />
+      <img src={post.image} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-[var(--radius-control)] bg-stone-dark object-cover" />
       <div>
         <Tag tone="ochre" tilted className="mb-3">
           Featured

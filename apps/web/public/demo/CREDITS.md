@@ -47,3 +47,20 @@ All products, sellers and reviews in the demo catalog are **fictional**. The ima
 ## Illustrations
 
 `ceramic-vessel-ash.jpg`, `stone-planter-round.jpg`, `terracotta-pot-set-of-3.jpg`, `woven-plant-basket.jpg`, `matte-black-cylinder-pot.jpg`, `brass-plant-mister.jpg`, `soil-moisture-meter.jpg`, `bamboo-plant-stakes-set-of-6.jpg`, `grow-light-full-spectrum.jpg`, `ribbed-cement-pot.jpg`, `self-watering-planter.jpg`, `organic-potting-mix.jpg`, `vermicompost.jpg`, `neem-cake-powder.jpg`, `cocopeat-block.jpg`, `all-purpose-plant-fertiliser.jpg`, `metal-plant-stand.jpg`, `macrame-plant-hanger.jpg`, `decorative-pebbles.jpg`, `bamboo-planter-stand.jpg`, `indoor-plant-shelf.jpg`
+
+## Journal photographs
+
+The ten journal articles use these Wikimedia Commons photographs (in `journal/`, cropped and resized). CC BY-SA images stay under CC BY-SA.
+
+| Article file | Author | Licence | Source |
+|---|---|---|---|
+| `winter-light-guide.jpg` | Tangopaso | Public domain | [Plants on window A D2507.jpg](https://commons.wikimedia.org/wiki/File:Plants_on_window_A_D2507.jpg) |
+| `repotting-without-shock.jpg` | Conrad Nutschan | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | [Wurzelboden einer Topfpflanze während des Umtopfens.JPG](https://commons.wikimedia.org/wiki/File:Wurzelboden_einer_Topfpflanze_w%C3%A4hrend_des_Umtopfens.JPG) |
+| `vessel-drainage-explained.jpg` | Annie Spratt anniespratt | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [Terracota (Unsplash).jpg](https://commons.wikimedia.org/wiki/File:Terracota_(Unsplash).jpg) |
+| `low-light-that-actually-works.jpg` | Mokkie | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0) | [ZZ Plant (Zamioculcas zamiifolia) 1.jpg](https://commons.wikimedia.org/wiki/File:ZZ_Plant_(Zamioculcas_zamiifolia)_1.jpg) |
+| `pet-safe-plants-that-dont-look-boring.jpg` | S.samsamyang | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0) | [Spider Plant (Chlorophytum Comosum).jpg](https://commons.wikimedia.org/wiki/File:Spider_Plant_(Chlorophytum_Comosum).jpg) |
+| `styling-plants-like-a-room-not-a-shelf.jpg` | Tangopaso | Public domain | [Shelf at the bottom of a window for growing houseplants.jpg](https://commons.wikimedia.org/wiki/File:Shelf_at_the_bottom_of_a_window_for_growing_houseplants.jpg) |
+| `why-your-plant-drops-leaves-after-a-move.jpg` | Dinesh Valke from Thane, India | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) | [Schefflera arboricola (368807186).jpg](https://commons.wikimedia.org/wiki/File:Schefflera_arboricola_(368807186).jpg) |
+| `ceramic-vs-terracotta-vs-plastic.jpg` | Noom Peerapong imnoom | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) | [Potted Succulents (Unsplash).jpg](https://commons.wikimedia.org/wiki/File:Potted_Succulents_(Unsplash).jpg) |
+| `the-humidity-tray-myth.jpg` | Hillebrand Steve, U.S. Fish and Wildlife Service | Public domain | [The morning dew gently rests on the fern leaf providing life giving moisture.jpg](https://commons.wikimedia.org/wiki/File:The_morning_dew_gently_rests_on_the_fern_leaf_providing_life_giving_moisture.jpg) |
+| `gifting-a-plant-that-survives-shipping.jpg` | Querle | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | [Two potted succulents.jpg](https://commons.wikimedia.org/wiki/File:Two_potted_succulents.jpg) |

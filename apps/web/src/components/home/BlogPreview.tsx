@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/common/SectionHeading';
 import { blogPreview } from '@/data/homepage';
+import { blogImage } from '@/data/blog';
 
 export function BlogPreview() {
   return (
@@ -18,7 +19,7 @@ export function BlogPreview() {
       <div className="grid sm:grid-cols-3 gap-6">
         {blogPreview.map((post) => (
           <Link key={post.slug} to={`/blog/${post.slug}`} className="group">
-            <div className="aspect-[4/3] rounded-[var(--radius-card)] bg-stone-dark mb-4" />
+            <img src={blogImage(post.slug)} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-[var(--radius-card)] bg-stone-dark object-cover mb-4" />
             <h3 className="font-medium text-ink group-hover:text-fern transition-colors">
               {post.title}
             </h3>

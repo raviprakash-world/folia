@@ -6,7 +6,7 @@ import type { BlogPost } from '@/types/blog';
 export function BlogCard({ post }: { post: BlogPost }) {
   return (
     <Link to={`/blog/${post.slug}`} className="group flex flex-col">
-      <div className="aspect-[4/3] rounded-[var(--radius-card)] bg-stone-dark mb-4" />
+      <img src={post.image} alt="" loading="lazy" className="aspect-[4/3] w-full rounded-[var(--radius-card)] bg-stone-dark object-cover mb-4" />
       <Tag tone="stone" className="self-start mb-3">
         {post.category}
       </Tag>

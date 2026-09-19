@@ -9,4 +9,5 @@ export interface BlogPost {
   readTimeMinutes: number;
   publishedAt: string;
   featured: boolean;
+  image: string;
 }

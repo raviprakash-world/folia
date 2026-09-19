@@ -39,7 +39,7 @@ export default function BlogDetail() {
         </span>
       </div>
 
-      <div className="aspect-[16/9] rounded-[var(--radius-card)] bg-stone-dark my-8" />
+      <img src={post.image} alt="" loading="lazy" className="aspect-[16/9] w-full rounded-[var(--radius-card)] bg-stone-dark object-cover my-8" />
 
       <div className="flex flex-col gap-5">
         {post.content.map((paragraph, i) => (
