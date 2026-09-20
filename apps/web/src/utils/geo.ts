@@ -65,7 +65,7 @@ export function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
         } else if (err.code === err.TIMEOUT) {
           reject(new GeoError('timeout', 'Finding your location took too long. Try again, or enter your PIN code.'));
         } else {
-          reject(new GeoError('unavailable', "Couldn't work out your location. Enter your PIN code instead."));
+          reject(new GeoError('unavailable', "Your device couldn't tell us where it is. Check that Location Services and Wi-Fi are on (a laptop needs Wi-Fi to find itself), or just enter your PIN code."));
         }
       },
       { enableHighAccuracy: false, timeout: 12_000, maximumAge: 5 * 60_000 },
