@@ -1,8 +1,3 @@
-databases:
-  - name: folia-postgres
-    plan: free
-    postgresMajorVersion: "16"
-
 services:
   - type: keyvalue
     name: folia-redis
@@ -22,10 +17,12 @@ services:
         value: production
       - key: PORT
         value: 3000
+      # Neon Postgres (migrated off Render's free Postgres before its
+      # 2026-10-03 expiry). Set manually in the Render Dashboard; sync: false
+      # keeps a blueprint sync from ever overwriting it or trying to
+      # recreate a fromDatabase binding.
       - key: DATABASE_URL
-        fromDatabase:
-          name: folia-postgres
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           name: folia-redis
